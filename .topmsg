@@ -1,7 +1,0 @@
-From: Paul Molodowitch <pm@stanfordalumni.org>
-Subject: disable _UpdateSelectionFrameStamp
-+
-+Re-clicking to select if there wasn't a redraw wouldn't trigger new selection
-+
-+Disabling for now, ideally should find way to more reliably check for a new selection
-+event, to avoid running N selection queries if you have N proxy shapes
