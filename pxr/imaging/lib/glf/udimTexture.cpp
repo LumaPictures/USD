@@ -246,10 +246,9 @@ GlfUdimTexture::_ReadImage()
     const unsigned int numBytesPerPixelLayer = numBytesPerPixel * _depth;
 
     unsigned int targetPixelCount =
-        static_cast<unsigned int>(GetMemoryRequested()
-        / (_depth * numBytesPerPixel));
-
+        static_cast<unsigned int>(GetMemoryRequested());
     const bool loadAllTiles = targetPixelCount == 0;
+    targetPixelCount /= _depth * numBytesPerPixel;
 
     std::vector<_TextureSize> mips {};
     mips.reserve(firstImageMips.size());
@@ -292,8 +291,14 @@ GlfUdimTexture::_ReadImage()
             targetPixelCount -= currentPixelCount;
         }
 
-        mips.resize(mipCount, {0, 0});
-        std::reverse(mips.begin(), mips.end());
+        if (mipCount == 0) {
+            mips.clear();
+            mips.emplace_back(1, 1);
+            mipCount = 1;
+        } else {
+            mips.resize(mipCount, {0, 0});
+            std::reverse(mips.begin(), mips.end());
+        }
     }
 
     std::vector<std::vector<uint8_t>> mipData;
