@@ -324,7 +324,7 @@ GlfUdimTexture::_ReadImage()
     WorkParallelForN(_tiles.size(), [&](size_t begin, size_t end) {
         for (size_t tileId = begin; tileId < end; ++tileId) {
             std::tuple<int, TfToken> const& tile = _tiles[tileId];
-            layoutData[std::get<0>(tile)] = tileId;
+            layoutData[std::get<0>(tile)] = tileId + 1;
             _MipDescArray images = _GetMipLevels(std::get<1>(tile));
             if (images.empty()) { continue; }
             for (unsigned int mip = 0; mip < mipCount; ++mip) {
