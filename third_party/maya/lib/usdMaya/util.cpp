@@ -1112,8 +1112,6 @@ UsdMayaUtil::MDagPathToUsdPath(
     // Replacing MDagPath separators with the USD ones.
     std::replace(itBegin, itEnd, '|', '/');
     std::replace(itBegin, itEnd, ':', '_'); // replace namespace ":" with "_"
-    return std::string(itBegin, itEnd);
-}
 
     SdfPath usdPath(usdPathStr);
     if (mergeTransformAndShape && _IsShape(dagPath)) {
