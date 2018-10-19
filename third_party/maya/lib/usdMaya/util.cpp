@@ -1103,6 +1103,7 @@ UsdMayaUtil::MDagPathToUsdPath(
     } else{
         usdPathStr = dagPath.fullPathName().asChar();
     }
+
     // We are keeping the iterators around, to avoid extra memory allocations.
     // Replacing characters because of underworld (transform|shapeNode->|underWorldNode).
     // Maya inserts "->|", we can safely eliminate both the "-" and ">", and keep the rest.
@@ -1112,6 +1113,7 @@ UsdMayaUtil::MDagPathToUsdPath(
     // Replacing MDagPath separators with the USD ones.
     std::replace(itBegin, itEnd, '|', '/');
     std::replace(itBegin, itEnd, ':', '_'); // replace namespace ":" with "_"
+    usdPathStr.resize(itEnd - itBegin);
 
     SdfPath usdPath(usdPathStr);
     if (mergeTransformAndShape && _IsShape(dagPath)) {
