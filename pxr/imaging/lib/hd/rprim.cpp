@@ -171,10 +171,6 @@ HdRprim::PropagateRprimDirtyBits(HdDirtyBits bits)
                  HdChangeTracker::DirtyPrimvar);
     }
 
-    // propagate point dirtiness to normal
-    bits |= (bits & HdChangeTracker::DirtyPoints) ?
-                                              HdChangeTracker::DirtyNormals : 0;
-
     // when refine level changes, topology becomes dirty.
     // XXX: can we remove DirtyDisplayStyle then?
     if (bits & HdChangeTracker::DirtyDisplayStyle) {
@@ -381,7 +377,7 @@ HdRprim::_PopulateConstantPrimvars(HdSceneDelegate* delegate,
 
         HdBufferArrayRangeSharedPtr range =
             resourceRegistry->AllocateShaderStorageBufferArrayRange(
-                HdTokens->primvar, bufferSpecs);
+                HdTokens->primvar, bufferSpecs, HdBufferArrayUsageHint());
         TF_VERIFY(range->IsValid());
 
         _sharedData.barContainer.Set(

@@ -82,16 +82,6 @@ public:
     USDIMAGINGGL_API
     static bool IsBatchingSupported();
 
-    // Prepares the given sub-index delegates for drawing.
-    // This is equivalent to calling PrepareBatch on each renderer in
-    // \p renderers with the corresponding root prim, time, and parameters.
-    USDIMAGINGGL_API
-    static void PrepareBatch(
-        const UsdImagingGLSharedPtrVector& renderers,
-        const UsdPrimVector& rootPrims,
-        const std::vector<UsdTimeCode>& times,
-        RenderParams params);
-
     /// Prepares a sub-index delegate for drawing.
     ///
     /// This can be called many times for different sub-indexes (prim paths)
@@ -177,7 +167,11 @@ public:
     virtual TfTokenVector GetRendererPlugins() const;
 
     USDIMAGINGGL_API
-    virtual std::string GetRendererPluginDesc(TfToken const &id) const;
+    virtual std::string GetRendererDisplayName(TfToken const &id) const 
+        override;
+
+    USDIMAGINGGL_API
+    virtual TfToken GetCurrentRendererId() const override;
 
     USDIMAGINGGL_API
     virtual bool SetRendererPlugin(TfToken const &id);

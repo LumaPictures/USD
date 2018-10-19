@@ -41,6 +41,7 @@
 #include "pxr/base/gf/rotation.h"
 #include "pxr/base/gf/vec3d.h"
 
+#include "pxr/base/tf/getenv.h"
 #include "pxr/base/tf/stringUtils.h"
 
 #include "pxr/base/arch/demangle.h"
@@ -67,7 +68,7 @@ UsdImagingGLHdEngine::UsdImagingGLHdEngine(
     , _selTracker(new HdxSelectionTracker)
     , _delegateID(delegateID)
     , _delegate(nullptr)
-    , _renderPlugin(nullptr)
+    , _rendererPlugin(nullptr)
     , _taskController(nullptr)
     , _selectionColor(1.0f, 1.0f, 0.0f, 1.0f)
     , _rootPath(rootPath)
@@ -78,7 +79,7 @@ UsdImagingGLHdEngine::UsdImagingGLHdEngine(
 {
     // _renderIndex, _taskController, and _delegate are initialized
     // by the plugin system.
-    if (!SetRendererPlugin(TfToken())) {
+    if (!SetRendererPlugin(GetDefaultRendererPluginId())) {
         TF_CODING_ERROR("No renderer plugins found! Check before creation.");
     }
 }
@@ -196,127 +197,6 @@ UsdImagingGLHdEngine::PrepareBatch(const UsdPrim& root, RenderParams params)
         _delegate->SetTime(params.frame);
         _PostSetTime(root, params);
     }
-}
-
-/* static */ 
-void 
-UsdImagingGLHdEngine::PrepareBatch(
-    const UsdImagingGLHdEngineSharedPtrVector& engines,
-    const UsdPrimVector& rootPrims,
-    const std::vector<UsdTimeCode>& times,
-    RenderParams params)
-{
-    HD_TRACE_FUNCTION();
-
-    if (!(engines.size() == rootPrims.size() &&
-             engines.size() == times.size())) {
-        TF_CODING_ERROR("Mismatched parameters");
-        return;
-    }
-
-    // Do some initial error checking.
-    std::set<size_t> skipped;
-    for (size_t i = 0; i < engines.size(); ++i) {
-        if (!engines[i]->_CanPrepareBatch(rootPrims[i], params)) {
-            skipped.insert(i);
-        }
-    }
-
-    if (skipped.empty()) {
-        _PrepareBatch(engines, rootPrims, times, params);
-    }
-    else {
-        // Filter out all the engines that fail the error check.
-        UsdImagingGLHdEngineSharedPtrVector tmpEngines = engines;
-        UsdPrimVector tmpRootPrims = rootPrims;
-        std::vector<UsdTimeCode> tmpTimes = times;
-
-        TF_REVERSE_FOR_ALL(it, skipped) {
-            tmpEngines.erase(tmpEngines.begin() + *it);
-            tmpRootPrims.erase(tmpRootPrims.begin() + *it);
-            tmpTimes.erase(tmpTimes.begin() + *it);
-        }
-
-        _PrepareBatch(tmpEngines, tmpRootPrims, tmpTimes, params);
-    }
-}
-
-/* static */ 
-void 
-UsdImagingGLHdEngine::_PrepareBatch(
-    const UsdImagingGLHdEngineSharedPtrVector& engines,
-    const UsdPrimVector& rootPrims,
-    const std::vector<UsdTimeCode>& times,
-    const RenderParams& params)
-{
-    HD_TRACE_FUNCTION();
-
-    _Populate(engines, rootPrims, params);
-    _SetTimes(engines, rootPrims, times, params);
-}
-
-/*static */
-void
-UsdImagingGLHdEngine::_SetTimes(const UsdImagingGLHdEngineSharedPtrVector& engines,
-                              const UsdPrimVector& rootPrims,
-                              const std::vector<UsdTimeCode>& times,
-                              const RenderParams& params)
-{
-    HD_TRACE_FUNCTION();
-
-    std::vector<UsdImagingDelegate*> delegates;
-    delegates.reserve(engines.size());
-
-    for (size_t i = 0; i < engines.size(); ++i) {
-        engines[i]->_PreSetTime(rootPrims[i], params);
-        delegates.push_back(engines[i]->_delegate);
-    }
-
-    UsdImagingDelegate::SetTimes(delegates, times);
-
-    for (size_t i = 0; i < engines.size(); ++i) {
-        engines[i]->_PostSetTime(rootPrims[i], params);
-    }
-}
-
-/* static */
-void 
-UsdImagingGLHdEngine::_Populate(const UsdImagingGLHdEngineSharedPtrVector& engines,
-                              const UsdPrimVector& rootPrims,
-                              const RenderParams& params)
-{
-    HD_TRACE_FUNCTION();
-
-    std::vector<UsdImagingDelegate*> delegatesToPopulate;
-    delegatesToPopulate.reserve(engines.size());
-
-    UsdPrimVector primsToPopulate;
-    primsToPopulate.reserve(engines.size());
-
-    std::vector<SdfPathVector> pathsToExclude, pathsToInvis;
-    pathsToExclude.reserve(engines.size());
-    pathsToInvis.reserve(engines.size());
-
-    for (size_t i = 0; i < engines.size(); ++i) {
-        if (!engines[i]->_isPopulated) {
-            engines[i]->_delegate->SetUsdDrawModesEnabled(
-                params.enableUsdDrawModes);
-            delegatesToPopulate.push_back(engines[i]->_delegate);
-            primsToPopulate.push_back(
-                rootPrims[i].GetStage()->GetPrimAtPath(engines[i]->_rootPath));
-            pathsToExclude.push_back(engines[i]->_excludedPrimPaths);
-            pathsToInvis.push_back(engines[i]->_invisedPrimPaths);
-
-            // Set _isPopulated to true immediately to weed out any duplicate
-            // engines. This is equivalent to what would happen if the 
-            // consumer called the non-vectorized PrepareBatch on each
-            // engine individually.
-            engines[i]->_isPopulated = true;
-        }
-    }
-
-    UsdImagingDelegate::Populate(delegatesToPopulate, primsToPopulate, 
-                                 pathsToExclude, pathsToInvis);
 }
 
 /* static */
@@ -737,15 +617,12 @@ UsdImagingGLHdEngine::Render(RenderParams params)
     VtValue renderTags(_renderTags);
     _engine.SetTaskContextData(HdxTokens->renderTags, renderTags);
 
-    TfToken const& renderMode = params.enableIdRender ?
-        HdxTaskSetTokens->idRender : HdxTaskSetTokens->colorRender;
-
     HdTaskSharedPtrVector tasks;
     
     if (false) {
-        tasks = _taskController->GetTasks(renderMode);
+        tasks = _taskController->GetTasks();
     } else {
-        TF_FOR_ALL(it, _taskController->GetTasks(renderMode)) {
+        TF_FOR_ALL(it, _taskController->GetTasks()) {
             tasks.push_back(boost::make_shared<_DebugGroupTaskWrapper>(*it));
         }
     }
@@ -926,7 +803,7 @@ UsdImagingGLHdEngine::GetRendererPlugins() const
 
 /* virtual */
 std::string
-UsdImagingGLHdEngine::GetRendererPluginDesc(TfToken const &id) const
+UsdImagingGLHdEngine::GetRendererDisplayName(TfToken const &id) const
 {
     HfPluginDesc pluginDescriptor;
     if (!TF_VERIFY(HdxRendererPluginRegistry::GetInstance().
@@ -937,13 +814,46 @@ UsdImagingGLHdEngine::GetRendererPluginDesc(TfToken const &id) const
     return pluginDescriptor.displayName;
 }
 
+/* virtual */
+TfToken
+UsdImagingGLHdEngine::GetCurrentRendererId() const
+{
+    return _rendererId;
+}
+
 /* static */
 bool
-UsdImagingGLHdEngine::IsDefaultPluginAvailable()
+UsdImagingGLHdEngine::IsDefaultRendererPluginAvailable()
 {
     HfPluginDescVector descs;
     HdxRendererPluginRegistry::GetInstance().GetPluginDescs(&descs);
     return !descs.empty();
+}
+
+TfToken
+UsdImagingGLHdEngine::GetDefaultRendererPluginId()
+{
+    std::string defaultRendererDisplayName = 
+        TfGetenv("HD_DEFAULT_RENDERER", "");
+
+    if (defaultRendererDisplayName.empty()) {
+        return TfToken();
+    }
+
+    HfPluginDescVector pluginDescs;
+    HdxRendererPluginRegistry::GetInstance().GetPluginDescs(&pluginDescs);
+
+    // Look for the one with the matching display name
+    for (size_t i = 0; i < pluginDescs.size(); ++i) {
+        if (pluginDescs[i].displayName == defaultRendererDisplayName) {
+            return pluginDescs[i].id;
+        }
+    }
+
+    TF_WARN("Failed to find default renderer with display name '%s'.",
+            defaultRendererDisplayName.c_str());
+
+    return TfToken();
 }
 
 /* virtual */
@@ -964,7 +874,7 @@ UsdImagingGLHdEngine::SetRendererPlugin(TfToken const &id)
     if (plugin == nullptr) {
         TF_CODING_ERROR("Couldn't find plugin for id %s", actualId.GetText());
         return false;
-    } else if (plugin == _renderPlugin) {
+    } else if (plugin == _rendererPlugin) {
         // It's a no-op to load the same plugin twice.
         HdxRendererPluginRegistry::GetInstance().ReleasePlugin(plugin);
         return true;
@@ -991,8 +901,10 @@ UsdImagingGLHdEngine::SetRendererPlugin(TfToken const &id)
     _DeleteHydraResources();
 
     // Recreate the render index.
-    _renderPlugin = plugin;
-    HdRenderDelegate *renderDelegate = _renderPlugin->CreateRenderDelegate();
+    _rendererPlugin = plugin;
+    _rendererId = actualId;
+
+    HdRenderDelegate *renderDelegate = _rendererPlugin->CreateRenderDelegate();
     _renderIndex = HdRenderIndex::New(renderDelegate);
 
     // Create the new delegate & task controller.
@@ -1035,12 +947,13 @@ UsdImagingGLHdEngine::_DeleteHydraResources()
         delete _renderIndex;
         _renderIndex = nullptr;
     }
-    if (_renderPlugin != nullptr) {
+    if (_rendererPlugin != nullptr) {
         if (renderDelegate != nullptr) {
-            _renderPlugin->DeleteRenderDelegate(renderDelegate);
+            _rendererPlugin->DeleteRenderDelegate(renderDelegate);
         }
-        HdxRendererPluginRegistry::GetInstance().ReleasePlugin(_renderPlugin);
-        _renderPlugin = nullptr;
+        HdxRendererPluginRegistry::GetInstance().ReleasePlugin(_rendererPlugin);
+        _rendererPlugin = nullptr;
+        _rendererId = TfToken();
     }
 }
 

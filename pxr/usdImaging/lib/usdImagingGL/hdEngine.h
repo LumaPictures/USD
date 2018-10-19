@@ -59,8 +59,8 @@ typedef std::vector<UsdPrim> UsdPrimVector;
 class UsdImagingGLHdEngine : public UsdImagingGLEngine
 {
 public:
-    // Important! Call UsdImagingGLHdEngine::IsDefaultPluginAvailable() before
-    // construction; if no plugins are available, the class will only
+    // Important! Call UsdImagingGLHdEngine::IsDefaultRendererPluginAvailable()
+    // before construction; if no plugins are available, the class will only
     // get halfway constructed.
     USDIMAGINGGL_API
     UsdImagingGLHdEngine(const SdfPath& rootPath,
@@ -69,7 +69,10 @@ public:
                        const SdfPath& delegateID = SdfPath::AbsoluteRootPath());
 
     USDIMAGINGGL_API
-    static bool IsDefaultPluginAvailable();
+    static bool IsDefaultRendererPluginAvailable();
+
+    USDIMAGINGGL_API
+    static TfToken GetDefaultRendererPluginId();
 
     USDIMAGINGGL_API
     virtual ~UsdImagingGLHdEngine();
@@ -81,14 +84,8 @@ public:
     virtual void InvalidateBuffers();
 
     USDIMAGINGGL_API
-    static void PrepareBatch(
-        const UsdImagingGLHdEngineSharedPtrVector& engines,
-        const UsdPrimVector& rootPrims,
-        const std::vector<UsdTimeCode>& times,
-        RenderParams params);
-
-    USDIMAGINGGL_API
     virtual void PrepareBatch(const UsdPrim& root, RenderParams params);
+
     USDIMAGINGGL_API
     virtual void RenderBatch(const SdfPathVector& paths, RenderParams params);
 
@@ -150,7 +147,11 @@ public:
     virtual TfTokenVector GetRendererPlugins() const;
 
     USDIMAGINGGL_API
-    virtual std::string GetRendererPluginDesc(TfToken const &id) const;
+    virtual std::string GetRendererDisplayName(TfToken const &id) const 
+        override;
+
+    USDIMAGINGGL_API
+    virtual TfToken GetCurrentRendererId() const override;
 
     USDIMAGINGGL_API
     virtual bool SetRendererPlugin(TfToken const &id);
@@ -189,20 +190,6 @@ public:
     virtual VtDictionary GetResourceAllocation() const;
 
 private:
-    // Helper functions for preparing multiple engines for
-    // batched drawing.
-    static void _PrepareBatch(const UsdImagingGLHdEngineSharedPtrVector& engines,
-                              const UsdPrimVector& rootPrims,
-                              const std::vector<UsdTimeCode>& times,
-                              const RenderParams& params);
-
-    static void _Populate(const UsdImagingGLHdEngineSharedPtrVector& engines,
-                          const UsdPrimVector& rootPrims,
-                          const RenderParams& params);
-    static void _SetTimes(const UsdImagingGLHdEngineSharedPtrVector& engines,
-                          const UsdPrimVector& rootPrims,
-                          const std::vector<UsdTimeCode>& times,
-                          const RenderParams& params);
 
     // These functions factor batch preparation into separate steps so they
     // can be reused by both the vectorized and non-vectorized API.
@@ -234,7 +221,8 @@ private:
     SdfPath const _delegateID;
     UsdImagingDelegate *_delegate;
 
-    HdxRendererPlugin *_renderPlugin;
+    HdxRendererPlugin *_rendererPlugin;
+    TfToken _rendererId;
     HdxTaskController *_taskController;
 
     GlfSimpleLightingContextRefPtr _lightingContextForOpenGLState;
