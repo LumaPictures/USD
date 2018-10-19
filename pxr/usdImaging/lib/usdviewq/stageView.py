@@ -791,8 +791,8 @@ class StageView(QtOpenGL.QGLWidget):
         return self._lastComputedGfCamera.frustum
 
     @property
-    def rendererPluginName(self):
-        return self._rendererPluginName
+    def rendererDisplayName(self):
+        return self._rendererDisplayName
 
     @property
     def rendererAovName(self):
@@ -899,12 +899,15 @@ class StageView(QtOpenGL.QGLWidget):
         if not self._renderer:
             if self.isValid():
                 self._renderer = UsdImagingGL.GL()
-                self._rendererPluginName = ""
-                self._rendererAovName = "color"
+                self._handleRendererChanged(self.GetCurrentRendererId())
             elif not self._reportedContextError:
                 self._reportedContextError = True
                 raise RuntimeError("StageView could not initialize renderer without a valid GL context")
         return self._renderer
+
+    def _handleRendererChanged(self, rendererId):
+        self._rendererDisplayName = self.GetRendererDisplayName(rendererId)
+        self._rendererAovName = "color"
 
     def closeRenderer(self):
         '''Close the current renderer.'''
@@ -919,18 +922,22 @@ class StageView(QtOpenGL.QGLWidget):
         else:
             return []
 
-    def GetRendererPluginDisplayName(self, plugId):
+    def GetRendererDisplayName(self, plugId):
         if self._renderer:
-            return self._renderer.GetRendererPluginDesc(plugId)
+            return self._renderer.GetRendererDisplayName(plugId)
+        else:
+            return ""
+
+    def GetCurrentRendererId(self):
+        if self._renderer:
+            return self._renderer.GetCurrentRendererId()
         else:
             return ""
 
     def SetRendererPlugin(self, plugId):
         if self._renderer:
             if self._renderer.SetRendererPlugin(plugId):
-                self._rendererPluginName = \
-                        self.GetRendererPluginDisplayName(plugId)
-                self._rendererAovName = "color"
+                self._handleRendererChanged(plugId)
                 self.updateGL()
                 return True
             else:
@@ -1766,7 +1773,7 @@ class StageView(QtOpenGL.QGLWidget):
         hydraMode = "Disabled"
 
         if UsdImagingGL.GL.IsEnabledHydra():
-            hydraMode = self._rendererPluginName
+            hydraMode = self._rendererDisplayName
             if not hydraMode:
                 hydraMode = "Enabled"
 

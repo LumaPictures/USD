@@ -255,6 +255,8 @@ class Blocker:
 
 class AppController(QtCore.QObject):
 
+    HYDRA_DISABLED_OPTION_STRING = "HydraDisabled"
+
     ###########
     # Signals #
     ###########
@@ -338,9 +340,14 @@ class AppController(QtCore.QObject):
             # be restored later.
             self._viewerModeEscapeSizes = None
 
-            AppController._renderer = parserData.renderer
-            if AppController._renderer == 'simple':
-                os.environ['HD_ENABLED'] = '0'
+            self._rendererNameOpt = parserData.renderer
+
+            if self._rendererNameOpt:
+                if self._rendererNameOpt == \
+                            AppController.HYDRA_DISABLED_OPTION_STRING:
+                    os.environ['HD_ENABLED'] = '0'
+                else:
+                    os.environ['HD_DEFAULT_RENDERER'] = self._rendererNameOpt
 
             self._mainWindow = QtWidgets.QMainWindow(None)
             # Showing the window immediately prevents UI flashing.
@@ -1211,6 +1218,14 @@ class AppController(QtCore.QObject):
 
         self._refreshCameraListAndMenu(preserveCurrCamera = preserveCamera)
 
+    @staticmethod
+    def GetRendererOptionChoices():
+        choices = UsdImagingGL.GL.GetRegisteredRendererPluginsDisplayNames()
+        if choices:
+            choices.append(AppController.HYDRA_DISABLED_OPTION_STRING)
+        else:
+            choices = [AppController.HYDRA_DISABLED_OPTION_STRING]
+        return choices
 
     # Render plugin support
     def _rendererPluginChanged(self, plugin):
@@ -1219,7 +1234,7 @@ class AppController(QtCore.QObject):
                 # If SetRendererPlugin failed, we need to reset the check mark
                 # to whatever the currently loaded renderer is.
                 for action in self._ui.rendererPluginActionGroup.actions():
-                    if action.text() == self._stageView.rendererPluginName:
+                    if action.text() == self._stageView.rendererDisplayName:
                         action.setChecked(True)
                         break
                 # Then display an error message to let the user know something
@@ -1243,7 +1258,7 @@ class AppController(QtCore.QObject):
 
             pluginTypes = self._stageView.GetRendererPlugins()
             for pluginType in pluginTypes:
-                name = self._stageView.GetRendererPluginDisplayName(pluginType)
+                name = self._stageView.GetRendererDisplayName(pluginType)
                 action = self._ui.menuRendererPlugin.addAction(name)
                 action.setCheckable(True)
                 action.pluginType = pluginType
@@ -1252,19 +1267,19 @@ class AppController(QtCore.QObject):
                 action.triggered[bool].connect(lambda _, pluginType=pluginType:
                         self._rendererPluginChanged(pluginType))
 
-            # If any plugins exist, set the first one we find supported as the
-            # default
-            foundPlugin = False
-            if len(self._ui.rendererPluginActionGroup.actions()) > 0:
-                i = 0
-                for pluginType in pluginTypes:
-                    if self._stageView.SetRendererPlugin(pluginType):
-                        self._ui.rendererPluginActionGroup.actions()[i].setChecked(True)
-                        foundPlugin = True
-                        break
-                    i += 1
 
-            # Otherwise, disable the menu.
+            # Now set the checked box on the current renderer (it should
+            # have been set by now).
+            currentRendererId = self._stageView.GetCurrentRendererId()
+            foundPlugin = False
+            
+            for action in self._ui.rendererPluginActionGroup.actions():
+                if action.pluginType == currentRendererId:
+                    action.setChecked(True)
+                    foundPlugin = True
+                    break
+
+            # Disable the menu if no plugins were found
             self._ui.menuRendererPlugin.setEnabled(foundPlugin)
 
             # Refresh the AOV menu
