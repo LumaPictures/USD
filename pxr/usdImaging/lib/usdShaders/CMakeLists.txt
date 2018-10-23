@@ -26,4 +26,5 @@ pxr_library(usdShaders
         shaders/previewSurface.glslfx
         shaders/uvTexture.glslfx
         shaders/primvarReader.glslfx
+        shaders/imagePlane.glslfx
 )
