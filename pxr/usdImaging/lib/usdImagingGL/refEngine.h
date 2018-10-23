@@ -60,7 +60,8 @@ public:
 
     // Entry point for kicking off a render
     USDIMAGINGGL_API
-    virtual void Render(const UsdPrim& root, RenderParams params);
+    virtual void Render(const UsdPrim& root, 
+                        const UsdImagingGLRenderParams& params) override;
 
     USDIMAGINGGL_API
     virtual void SetCameraState(const GfMatrix4d& viewMatrix,
@@ -138,7 +139,7 @@ private:
                            UsdStageWeakPtr const& sender);
 
 private:
-    RenderParams _params;
+    UsdImagingGLRenderParams _params;
 
     GfMatrix4d _ctm;
 

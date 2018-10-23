@@ -426,246 +426,8 @@ UsdImagingGLRefEngine::_DrawLines(bool drawID)
 }
 
 void
-UsdImagingGLRefEngine::_DrawImagePlanes()
-{
-    // Since the viewport can change independently from the
-    // image plane / camera settings without trigger a recalculation
-    // it's better to calculate this here. Optionally we could cache the calculations
-    // based on the viewport, but it's not too heavy anyway.
-    if (_imagePlanes.empty()) {
-        return;
-    }
-
-    GLint old_matrix_mode = GL_PROJECTION;
-    glGetIntegerv(GL_MATRIX_MODE, &old_matrix_mode);
-    const bool old_texture_enabled = glIsEnabled(GL_TEXTURE_2D);
-
-    GLint old_bound_texture = 0;
-    glGetIntegerv(GL_TEXTURE_BINDING_2D, &old_bound_texture);
-
-    if (!old_texture_enabled) {
-        glEnable(GL_TEXTURE_2D);
-    }
-
-    glMatrixMode(GL_PROJECTION);
-    glPushMatrix();
-    glLoadIdentity();
-    glMatrixMode(GL_MODELVIEW);
-    glPushMatrix();
-    glLoadIdentity();
-    glMatrixMode(GL_TEXTURE);
-    glPushMatrix();
-    glLoadIdentity();
-
-    glDisable(GL_CULL_FACE);
-    glDisable(GL_DEPTH_TEST);
-    glDepthMask(GL_FALSE);
-
-    glPushAttrib(GL_LIGHTING_BIT);
-    glDisable(GL_LIGHTING);
-    glShadeModel(GL_FLAT);
-
-    // 2 and 3 are width and height
-    int viewport[4];
-    glGetIntegerv(GL_VIEWPORT, viewport);
-
-    const float width = static_cast<float>(viewport[2]);
-    const float height = static_cast<float>(viewport[3]);
-
-    for (auto& it : _imagePlanes)
-    {
-        if (it.gl_texture == invalid_texture) {
-            continue;
-        }
-
-        glColor3f(1.0f, 1.0f, 1.0f);
-        glBindTexture(GL_TEXTURE_2D, it.gl_texture);
-
-        float min_x = -width;
-        float max_x = width;
-        float min_y = -height;
-        float max_y = height;
-
-        float min_uv_x = 0.0f;
-        float max_uv_x = 1.0f;
-        float min_uv_y = 0.0f;
-        float max_uv_y = 1.0f;
-
-        const float image_width = static_cast<float>(it.width);
-        const float image_height = static_cast<float>(it.height);
-
-        switch (it.fit) {
-            case UsdGeomImagePlane::FIT_FILL:
-            {
-                const float image_ratio = image_width / image_height;
-                const float viewport_ratio = width / height;
-                if (image_ratio > viewport_ratio) {
-                    max_x = image_width * height / image_height;
-                    min_x = -1.0f * max_x;
-                } else {
-                    max_y = image_height * width / image_width;
-                    min_y = -1.0f * max_y;
-                }
-            }
-                break;
-            case UsdGeomImagePlane::FIT_BEST:
-            {
-                const float image_ratio = image_width / image_height;
-                const float viewport_ratio = width / height;
-                if (image_ratio > viewport_ratio) {
-                    max_y = image_height * width / image_width;
-                    min_y = -1.0f * max_y;
-                } else {
-                    max_x = image_width * height / image_height;
-                    min_x = -1.0f * max_x;
-                }
-            }
-                break;
-            case UsdGeomImagePlane::FIT_HORIZONTAL:
-                max_y = image_height * width / image_width;
-                min_y = -1.0f * max_y;
-                break;
-            case UsdGeomImagePlane::FIT_VERTICAL:
-                max_x = image_width * height / image_height;
-                min_x = -1.0f * max_x;
-                break;
-            case UsdGeomImagePlane::FIT_TO_SIZE:
-                break;
-            default:
-                assert("Invalid enum passed in ImagePlaneDef.fit!");
-        }
-
-        const float size_ratio_x = it.size[0] / it.camera_aperture[0];
-        const float size_ratio_y = it.size[1] / it.camera_aperture[1];
-
-        if (it.size[0] >= 0.0f) {
-            min_x *= size_ratio_x;
-            max_x *= size_ratio_x;
-        }
-
-        if (it.size[1] >= 0.0f) {
-            min_y *= size_ratio_y;
-            max_y *= size_ratio_y;
-        }
-
-        GfVec2f lower_left(min_x, min_y);
-        GfVec2f lower_right(max_x, min_y);
-
-        GfVec2f upper_left(min_x, max_y);
-        GfVec2f upper_right(max_x, max_y);
-
-        auto lerp = [] (float v, float lo, float hi) -> float {
-            return lo * (1.0f - v) + hi * v;
-        };
-
-        // TODO: we need a global define for "epsilon"
-        if (it.rotate < -0.0001f || it.rotate > 0.0001f) {
-            // TODO: due to how these coordinates are converted to screen space ones
-            // we need to compensate for the from window => screen coordinates transform
-            // we want to match the maya rotation order, so that's why the negate
-            const float dsin = sinf(-it.rotate);
-            const float dcos = cosf(-it.rotate);
-
-            auto rotate_corner = [&](GfVec2f& corner) {
-                const float t = corner[0] * dcos - corner[1] * dsin;
-                corner[1] = corner[0] * dsin + corner[1] * dcos;
-                corner[0] = t;
-            };
-
-            rotate_corner(lower_left);
-            rotate_corner(lower_right);
-            rotate_corner(upper_left);
-            rotate_corner(upper_right);
-        }
-
-        auto convert_back = [&](GfVec2f& corner) {
-            corner[0] = corner[0] / width;
-            corner[1] = corner[1] / height;
-        };
-
-        convert_back(lower_left);
-        convert_back(lower_right);
-        convert_back(upper_left);
-        convert_back(upper_right);
-
-        const float offset_x = it.offset[0] / it.camera_aperture[0];
-        const float offset_y = it.offset[1] / it.camera_aperture[1];
-
-        lower_left[0] += offset_x;
-        lower_right[0] += offset_x;
-        upper_left[0] += offset_x;
-        upper_right[0] += offset_x;
-
-        lower_left[1] += offset_y;
-        lower_right[1] += offset_y;
-        upper_left[1] += offset_y;
-        upper_right[1] += offset_y;
-
-        // TODO: this could be calculated at texture load time, we could also load up a smaller texture
-        // but be careful with that, opengl has a minimum valid texture size (32) !
-        if (it.coverage_origin[0] > 0) {
-            min_uv_x = static_cast<float>(it.coverage_origin[0]) / static_cast<float>(it.width);
-            max_uv_x = lerp(static_cast<float>(std::min(it.coverage[0], it.width - it.coverage_origin[0])) /
-                            static_cast<float>(it.width - it.coverage_origin[0]), min_uv_x, 1.0f);
-        }
-        else if (it.coverage_origin[0] < 0) {
-            max_uv_x = static_cast<float>(it.coverage[0]) * static_cast<float>(it.width + it.coverage_origin[0]) / static_cast<float>(it.width * it.width);
-        }
-        else {
-            max_uv_x = static_cast<float>(it.coverage[0]) / static_cast<float>(it.width);
-        }
-
-        if (it.coverage_origin[1] > 0) {
-            max_uv_y = static_cast<float>(it.height - it.coverage_origin[1]) / static_cast<float>(it.height);
-            min_uv_y = lerp(static_cast<float>(std::min(it.coverage[1], it.height - it.coverage_origin[1])) /
-                            static_cast<float>(it.height - it.coverage_origin[1]), max_uv_y, 0.0f);
-        }
-        else if (it.coverage_origin[1] < 0) {
-            min_uv_y = std::min(1.0f, static_cast<float>(-it.coverage_origin[1]) / static_cast<float>(it.height) +
-                                      (1.0f - static_cast<float>(it.coverage[1]) / static_cast<float>(it.height)));
-        }
-        else {
-            min_uv_y = 1.0f - static_cast<float>(it.coverage[1]) / static_cast<float>(it.height);
-        }
-
-        const float depth = 1.0f;
-        const float w = 1.0f;
-
-        glBegin(GL_QUADS);
-        glTexCoord2f(min_uv_x, max_uv_y);
-        glVertex4f(lower_left[0], lower_left[1], depth, w);
-
-        glTexCoord2f(max_uv_x, max_uv_y);
-        glVertex4f(lower_right[0], lower_right[1], depth, w);
-
-        glTexCoord2f(max_uv_x, min_uv_y);
-        glVertex4f(upper_right[0], upper_right[1], depth, w);
-
-        glTexCoord2f(min_uv_x, min_uv_y);
-        glVertex4f(upper_left[0], upper_left[1], depth, w);
-        glEnd();
-    }
-
-    glPopAttrib(); // GL_LIGHTING_BIT
-    glBindTexture(GL_TEXTURE_2D, old_bound_texture);
-
-    glPopMatrix();
-    glMatrixMode(GL_MODELVIEW);
-    glPopMatrix();
-    glMatrixMode(GL_PROJECTION);
-    glPopMatrix();
-
-    glMatrixMode(old_matrix_mode);
-
-    glEnable(GL_DEPTH_TEST);
-    glDepthMask(GL_TRUE);
-
-    if (!old_texture_enabled)
-        glDisable(GL_TEXTURE_2D);
-}
-
-void
-UsdImagingGLRefEngine::Render(const UsdPrim& root, RenderParams params)
+UsdImagingGLRefEngine::Render(const UsdPrim& root, 
+    const UsdImagingGLRenderParams& params)
 {
     TRACE_FUNCTION();
 
@@ -692,7 +454,7 @@ UsdImagingGLRefEngine::Render(const UsdPrim& root, RenderParams params)
     glPushAttrib( GL_CURRENT_BIT );
     glPushAttrib( GL_ENABLE_BIT );
 
-    if (params.cullStyle == CULL_STYLE_NOTHING) {
+    if (params.cullStyle == UsdImagingGLCullStyle::CULL_STYLE_NOTHING) {
         glDisable( GL_CULL_FACE );
     } else {
         static const GLenum USD_2_GL_CULL_FACE[] =
@@ -703,16 +465,20 @@ UsdImagingGLRefEngine::Render(const UsdPrim& root, RenderParams params)
                 GL_FRONT,  // CULL_STYLE_FRONT
                 GL_BACK,   // CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED
         };
-        static_assert((sizeof(USD_2_GL_CULL_FACE) / sizeof(USD_2_GL_CULL_FACE[0])) == CULL_STYLE_COUNT, "enum size mismatch");
+        static_assert((sizeof(USD_2_GL_CULL_FACE) / 
+                       sizeof(USD_2_GL_CULL_FACE[0])) 
+                == (size_t)UsdImagingGLCullStyle::CULL_STYLE_COUNT, 
+            "enum size mismatch");
 
-        // XXX: CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED, should disable cull face for double-sided prims.
+        // XXX: CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED, should disable cull face 
+        // for double-sided prims.
         glEnable( GL_CULL_FACE );
-        glCullFace(USD_2_GL_CULL_FACE[params.cullStyle]);
+        glCullFace(USD_2_GL_CULL_FACE[(size_t)params.cullStyle]);
     }
 
-    if (_params.drawMode != DRAW_GEOM_ONLY      &&
-        _params.drawMode != DRAW_GEOM_SMOOTH    &&
-        _params.drawMode != DRAW_GEOM_FLAT) {
+    if (_params.drawMode != UsdImagingGLDrawMode::DRAW_GEOM_ONLY      &&
+        _params.drawMode != UsdImagingGLDrawMode::DRAW_GEOM_SMOOTH    &&
+        _params.drawMode != UsdImagingGLDrawMode::DRAW_GEOM_FLAT) {
         glEnable(GL_COLOR_MATERIAL);
         glColorMaterial(GL_FRONT_AND_BACK, GL_DIFFUSE); 
                 
@@ -723,12 +489,12 @@ UsdImagingGLRefEngine::Render(const UsdPrim& root, RenderParams params)
     }
 
     switch (_params.drawMode) {
-    case DRAW_WIREFRAME:
+    case UsdImagingGLDrawMode::DRAW_WIREFRAME:
         glDisable( GL_LIGHTING );
         glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
         break;
-    case DRAW_SHADED_FLAT:
-    case DRAW_SHADED_SMOOTH:
+    case UsdImagingGLDrawMode::DRAW_SHADED_FLAT:
+    case UsdImagingGLDrawMode::DRAW_SHADED_SMOOTH:
         break;
     default:
         break;
@@ -796,23 +562,23 @@ UsdImagingGLRefEngine::Render(const UsdPrim& root, RenderParams params)
     }
 
     switch (_params.drawMode) {
-    case DRAW_GEOM_FLAT:
-    case DRAW_GEOM_SMOOTH:
+    case UsdImagingGLDrawMode::DRAW_GEOM_FLAT:
+    case UsdImagingGLDrawMode::DRAW_GEOM_SMOOTH:
         glEnableClientState(GL_NORMAL_ARRAY);
         glPolygonMode( GL_FRONT_AND_BACK, GL_FILL);
         break;
-    case DRAW_SHADED_FLAT:
+    case UsdImagingGLDrawMode::DRAW_SHADED_FLAT:
         glEnableClientState(GL_NORMAL_ARRAY);
         glEnableClientState(GL_COLOR_ARRAY);
         glPolygonMode( GL_FRONT_AND_BACK, GL_FILL);
         glShadeModel(GL_FLAT);
         break;
-    case DRAW_SHADED_SMOOTH:
+    case UsdImagingGLDrawMode::DRAW_SHADED_SMOOTH:
         glEnableClientState(GL_NORMAL_ARRAY);
         glEnableClientState(GL_COLOR_ARRAY);
         glPolygonMode( GL_FRONT_AND_BACK, GL_FILL);
         break;
-    case DRAW_POINTS:
+    case UsdImagingGLDrawMode::DRAW_POINTS:
         glEnableClientState(GL_COLOR_ARRAY);
         glPolygonMode( GL_FRONT_AND_BACK, GL_POINT);
     default:
@@ -820,7 +586,7 @@ UsdImagingGLRefEngine::Render(const UsdPrim& root, RenderParams params)
     }
 
     // Draw the overlay wireframe, if requested.
-    if (_params.drawMode == DRAW_WIREFRAME_ON_SURFACE) {
+    if (_params.drawMode == UsdImagingGLDrawMode::DRAW_WIREFRAME_ON_SURFACE) {
         // We have to push lighting again since we don't know what state we want
         // after this without popping.
         glPushAttrib( GL_LIGHTING_BIT );
@@ -840,7 +606,7 @@ UsdImagingGLRefEngine::Render(const UsdPrim& root, RenderParams params)
     // Draw polygons & curves.
     _DrawPolygons(drawID);
 
-    if (_params.drawMode == DRAW_WIREFRAME_ON_SURFACE)
+    if (_params.drawMode == UsdImagingGLDrawMode::DRAW_WIREFRAME_ON_SURFACE)
         glDisable(GL_POLYGON_OFFSET_FILL);
 
     _DrawLines(drawID);
