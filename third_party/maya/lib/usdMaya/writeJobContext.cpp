@@ -332,7 +332,8 @@ UsdMayaWriteJobContext::_NeedToTraverse(const MDagPath& curDag) const
         return false;
     }
 
-    if (!UsdMayaUtil::isWritable(ob)) {
+    MFnDagNode dagNode(curDag);
+    if (!dagNode.inUnderWorld() && !UsdMayaUtil::isWritable(ob)) {
         return false;
     }
 
