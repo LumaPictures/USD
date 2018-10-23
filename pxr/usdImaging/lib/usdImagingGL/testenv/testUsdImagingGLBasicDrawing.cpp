@@ -160,7 +160,7 @@ My_TestGLDrawing::InitTest()
     }
 
     if(IsEnabledTestLighting()) {
-        if(UsdImagingGL::IsEnabledHydra()) {
+        if(UsdImagingGLEngine::IsHydraEnabled()) {
             // set same parameter as GlfSimpleLightingContext::SetStateFromOpenGL
             // OpenGL defaults
             _lightingContext = GlfSimpleLightingContext::New();
@@ -248,22 +248,22 @@ My_TestGLDrawing::DrawTest(bool offscreen)
         if (*timeIt == -999) {
             time = UsdTimeCode::Default();
         }
-        UsdImagingGLEngine::RenderParams params;
+        UsdImagingGLRenderParams params;
         params.drawMode = GetDrawMode();
         params.enableLighting = IsEnabledTestLighting();
         params.enableIdRender = IsEnabledIdRender();
         params.frame = time;
         params.complexity = _GetComplexity();
         params.cullStyle = IsEnabledCullBackfaces() ?
-                            UsdImagingGLEngine::CULL_STYLE_BACK :
-                            UsdImagingGLEngine::CULL_STYLE_NOTHING;
+                            UsdImagingGLCullStyle::CULL_STYLE_BACK :
+                            UsdImagingGLCullStyle::CULL_STYLE_NOTHING;
 
         glViewport(0, 0, width, height);
 
         glEnable(GL_DEPTH_TEST);
 
         if(IsEnabledTestLighting()) {
-            if(UsdImagingGL::IsEnabledHydra()) {
+            if(UsdImagingGLEngine::IsHydraEnabled()) {
                 _engine->SetLightingState(_lightingContext);
             } else {
                 _engine->SetLightingStateFromOpenGL();
