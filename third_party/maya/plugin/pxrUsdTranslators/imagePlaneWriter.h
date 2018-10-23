@@ -9,9 +9,6 @@
 #include "usdMaya/transformWriter.h"
 #include "pxr/usd/usd/prim.h"
 
-// Generating extra shader definitions for real-time display.
-#define GENERATE_SHADERS
-
 PXR_NAMESPACE_OPEN_SCOPE
 
 class UsdGeomImagePlane;
@@ -29,9 +26,7 @@ protected:
     bool _WriteImagePlaneAttrs(
         const UsdTimeCode& usdTime, UsdGeomImagePlane& primSchema);
 
-#ifdef GENERATE_SHADERS
     UsdPrim mTexture;
-#endif
 };
 
 using MayaImagePlaneWriterPtr = std::shared_ptr<MayaImagePlaneWriter>;
