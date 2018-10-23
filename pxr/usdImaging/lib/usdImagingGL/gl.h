@@ -62,10 +62,6 @@ typedef std::vector<UsdImagingGLSharedPtr> UsdImagingGLSharedPtrVector;
 class UsdImagingGL : public UsdImagingGLEngine {
 public:
 
-    /// Returns true if Hydra is enabled for GL drawing.
-    USDIMAGINGGL_API
-    static bool IsEnabledHydra();
-
     USDIMAGINGGL_API
     UsdImagingGL();
     USDIMAGINGGL_API
@@ -77,24 +73,21 @@ public:
     USDIMAGINGGL_API
     virtual ~UsdImagingGL();
 
-    // Support for batched rendering
-    // Currently, supported only when Hydra is enabled
-    USDIMAGINGGL_API
-    static bool IsBatchingSupported();
-
     /// Prepares a sub-index delegate for drawing.
     ///
     /// This can be called many times for different sub-indexes (prim paths)
     /// over the stage, and then all rendered together with a call to
     /// RenderBatch()
     USDIMAGINGGL_API
-    virtual void PrepareBatch(const UsdPrim& root, RenderParams params);
+    virtual void PrepareBatch(const UsdPrim& root, 
+                              const UsdImagingGLRenderParams& params) override;
 
     /// Draws all sub-indices identified by \p paths.  Presumes that each
     /// sub-index has already been prepared for drawing by calling
     /// PrepareBatch()
     USDIMAGINGGL_API
-    virtual void RenderBatch(const SdfPathVector& paths, RenderParams params);
+    virtual void RenderBatch(const SdfPathVector& paths, 
+                             const UsdImagingGLRenderParams& params) override;
 
     /// Render everything at and beneath \p root, using the configuration in
     /// \p params
@@ -104,7 +97,8 @@ public:
     /// again on \p root or any descendant of \p root, but not on any parent,
     /// sibling, or cousin of \p root.
     USDIMAGINGGL_API
-    virtual void Render(const UsdPrim& root, RenderParams params);
+    virtual void Render(const UsdPrim& root, 
+                        const UsdImagingGLRenderParams& params) override;
 
     USDIMAGINGGL_API
     virtual void InvalidateBuffers();
@@ -188,12 +182,12 @@ public:
         const GfMatrix4d &projectionMatrix,
         const GfMatrix4d &worldToLocalSpace,
         const UsdPrim& root, 
-        RenderParams params,
+        const UsdImagingGLRenderParams& params,
         GfVec3d *outHitPoint,
         SdfPath *outHitPrimPath = NULL,
         SdfPath *outHitInstancerPath = NULL,
         int *outHitInstanceIndex = NULL,
-        int *outHitElementIndex = NULL);
+        int *outHitElementIndex = NULL) override;
 
     USDIMAGINGGL_API
     virtual bool TestIntersectionBatch(
@@ -201,13 +195,26 @@ public:
         const GfMatrix4d &projectionMatrix,
         const GfMatrix4d &worldToLocalSpace,
         const SdfPathVector& paths, 
-        RenderParams params,
+        const UsdImagingGLRenderParams& params,
         unsigned int pickResolution,
         PathTranslatorCallback pathTranslator,
-        HitBatch *outHit);
+        HitBatch *outHit) override;
 
     USDIMAGINGGL_API
     virtual VtDictionary GetResourceAllocation() const;
+
+    /// Returns the list of renderer settings.
+    USDIMAGINGGL_API
+    virtual UsdImagingGLRendererSettingsList GetRendererSettingsList() const;
+
+    /// Gets a renderer setting's current value.
+    USDIMAGINGGL_API
+    virtual VtValue GetRendererSetting(TfToken const& id) const;
+
+    /// Sets a renderer setting's value.
+    USDIMAGINGGL_API
+    virtual void SetRendererSetting(TfToken const& id,
+                                    VtValue const& value);
 
 private:
     UsdImagingGLEngineSharedPtr _engine;
