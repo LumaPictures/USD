@@ -22,67 +22,25 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/pxr.h"
-#include "pxr/imaging/glf/glew.h"
 
 #include "pxr/usdImaging/usdImagingGL/gl.h"
 #include "pxr/usdImaging/usdImagingGL/hdEngine.h"
 #include "pxr/usdImaging/usdImagingGL/refEngine.h"
 
-#include "pxr/imaging/hdx/rendererPluginRegistry.h"
-
-#include "pxr/base/tf/getenv.h"
 #include "pxr/base/tf/diagnostic.h"
 
 #include "pxr/imaging/glf/glContext.h"
-#include "pxr/imaging/glf/textureRegistry.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
-namespace {
-
 static
-bool
-_IsEnabledHydra()
+UsdImagingGLEngine* 
+_InitEngine(const SdfPath& rootPath,
+            const SdfPathVector& excludedPaths,
+            const SdfPathVector& invisedPaths,
+            const SdfPath& delegateID = SdfPath::AbsoluteRootPath())
 {
-    // Make sure there is an OpenGL context when 
-    // trying to initialize Hydra/Reference
-    GlfGLContextSharedPtr context = GlfGLContext::GetCurrentGLContext();
-    if (!context) {
-        TF_CODING_ERROR("OpenGL context required, using reference renderer");
-        return false;
-    }
-    if (TfGetenv("HD_ENABLED", "1") != "1") {
-        return false;
-    }
-    
-    // Check to see if we have a default plugin for the renderer
-    TfToken defaultPlugin = 
-        HdxRendererPluginRegistry::GetInstance().GetDefaultPluginId();
-
-    return !defaultPlugin.IsEmpty();
-}
-
-} // anonymous namespace
-
-/*static*/
-bool
-UsdImagingGL::IsEnabledHydra()
-{
-    GlfGlewInit();
-
-    static bool isEnabledHydra = _IsEnabledHydra();
-    return isEnabledHydra;
-}
-
-static
-UsdImagingGLEngine* _InitEngine(const SdfPath& rootPath,
-                              const SdfPathVector& excludedPaths,
-                              const SdfPathVector& invisedPaths,
-                              const SdfPath& delegateID =
-                                        SdfPath::AbsoluteRootPath())
-{
-    if (UsdImagingGL::IsEnabledHydra()) {
+    if (UsdImagingGLEngine::IsHydraEnabled()) {
         return new UsdImagingGLHdEngine(rootPath, excludedPaths,
                                         invisedPaths, delegateID);
     } else {
@@ -121,30 +79,26 @@ UsdImagingGL::InvalidateBuffers()
     _engine->InvalidateBuffers();
 }
 
-/* static */
-bool
-UsdImagingGL::IsBatchingSupported()
-{
-    // Currently, batch drawing is supported only by the Hydra engine.
-    return IsEnabledHydra();
-}
-
 /*virtual*/
 void
-UsdImagingGL::PrepareBatch(const UsdPrim& root, RenderParams params)
+UsdImagingGL::PrepareBatch(const UsdPrim& root, 
+                           const UsdImagingGLRenderParams& params)
 {
     _engine->PrepareBatch(root, params);
 }
 
 /*virtual*/
 void
-UsdImagingGL::RenderBatch(const SdfPathVector& paths, RenderParams params) {
+UsdImagingGL::RenderBatch(const SdfPathVector& paths, 
+                          const UsdImagingGLRenderParams& params)
+{
     _engine->RenderBatch(paths, params);
 }
 
 /*virtual*/
 void
-UsdImagingGL::Render(const UsdPrim& root, RenderParams params)
+UsdImagingGL::Render(const UsdPrim& root, 
+                     const UsdImagingGLRenderParams& params)
 {
     _engine->Render(root, params);
 }
@@ -297,13 +251,35 @@ UsdImagingGL::SetRendererAov(TfToken const &id)
     return _engine->SetRendererAov(id);
 }
 
+/* virtual */
+UsdImagingGLRendererSettingsList
+UsdImagingGL::GetRendererSettingsList() const
+{
+    return _engine->GetRendererSettingsList();
+}
+
+/* virtual */
+VtValue
+UsdImagingGL::GetRendererSetting(TfToken const& id) const
+{
+    return _engine->GetRendererSetting(id);
+}
+
+/* virtual */
+void
+UsdImagingGL::SetRendererSetting(TfToken const& id,
+                                 VtValue const& value)
+{
+    _engine->SetRendererSetting(id, value);
+}
+
 bool
 UsdImagingGL::TestIntersection(
     const GfMatrix4d &viewMatrix,
     const GfMatrix4d &projectionMatrix,
     const GfMatrix4d &worldToLocalSpace,
     const UsdPrim& root, 
-    RenderParams params,
+    const UsdImagingGLRenderParams& params,
     GfVec3d *outHitPoint,
     SdfPath *outHitPrimPath,
     SdfPath *outHitInstancerPath,
@@ -322,7 +298,7 @@ UsdImagingGL::TestIntersectionBatch(
     const GfMatrix4d &projectionMatrix,
     const GfMatrix4d &worldToLocalSpace,
     const SdfPathVector& paths, 
-    RenderParams params,
+    const UsdImagingGLRenderParams& params,
     unsigned int pickResolution,
     PathTranslatorCallback pathTranslator,
     HitBatch *outHit)
@@ -336,23 +312,7 @@ UsdImagingGL::TestIntersectionBatch(
 VtDictionary
 UsdImagingGL::GetResourceAllocation() const
 {
-    VtDictionary dict;
-    dict = _engine->GetResourceAllocation();
-
-    // append texture usage
-    size_t texMem = 0;
-    for (auto const &texInfo :
-             GlfTextureRegistry::GetInstance().GetTextureInfos()) {
-        VtDictionary::const_iterator it = texInfo.find("memoryUsed");
-        if (it != texInfo.end()) {
-            VtValue mem = it->second;
-            if (mem.IsHolding<size_t>()) {
-                texMem += mem.Get<size_t>();
-            }
-        }
-    }
-    dict["textureMemoryUsed"] = texMem;
-    return dict;
+    return _engine->GetResourceAllocation();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
