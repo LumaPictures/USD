@@ -4451,7 +4451,6 @@ class AppController(QtCore.QObject):
         self._refreshRolloverPrimInfoMenu()
         self._refreshSelectionHighlightingMenu()
         self._refreshSelectionHighlightColorMenu()
-        self._refreshImagePlane()
         self._refreshAuthoredStepsOnly()
 
     def _refreshRenderModeMenu(self):
