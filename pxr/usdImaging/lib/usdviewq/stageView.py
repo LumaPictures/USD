@@ -960,6 +960,23 @@ class StageView(QtOpenGL.QGLWidget):
                 return False
         return True
 
+    def GetRendererSettingsList(self):
+        if self._renderer:
+            return self._renderer.GetRendererSettingsList()
+        else:
+            return []
+
+    def GetRendererSetting(self, name):
+        if self._renderer:
+            return self._renderer.GetRendererSetting(name)
+        else:
+            return None
+
+    def SetRendererSetting(self, name, value):
+        if self._renderer:
+            self._renderer.SetRendererSetting(name, value)
+            self.updateGL()
+
     def _stageReplaced(self):
         '''Set the USD Stage this widget will be displaying. To decommission
         (even temporarily) this widget, supply None as 'stage'.'''
@@ -1772,7 +1789,7 @@ class StageView(QtOpenGL.QGLWidget):
         # Hydra Enabled (Top Right)
         hydraMode = "Disabled"
 
-        if UsdImagingGL.GL.IsEnabledHydra():
+        if UsdImagingGL.GL.IsHydraEnabled():
             hydraMode = self._rendererDisplayName
             if not hydraMode:
                 hydraMode = "Enabled"
@@ -1794,8 +1811,8 @@ class StageView(QtOpenGL.QGLWidget):
             texMem = 0
             if "gpuMemoryUsed" in allocInfo:
                 gpuMemTotal = allocInfo["gpuMemoryUsed"]
-            if "textureMemoryUsed" in allocInfo:
-                texMem = allocInfo["textureMemoryUsed"]
+            if "textureMemory" in allocInfo:
+                texMem = allocInfo["textureMemory"]
                 gpuMemTotal += texMem
 
             toPrint["GL prims "] = self._glPrimitiveGeneratedQuery.GetResult()
