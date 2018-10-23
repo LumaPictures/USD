@@ -350,7 +350,6 @@ UsdImagingGLHdEngine::_MakeHydraUsdImagingGLRenderParams(
     }
 
     params.enableSceneMaterials = renderParams.enableSceneMaterials;
-    params.displayImagePlanes = renderParams.displayImagePlanes;
 
     // Leave default values for:
     // - params.geomStyle

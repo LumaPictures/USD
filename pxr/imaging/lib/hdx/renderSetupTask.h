@@ -127,7 +127,6 @@ struct HdxRenderTaskParams : public HdTaskParams
         , tessLevel(1.0)
         , drawingRange(0.0, -1.0)
         , enableSceneMaterials(true)
-        , displayImagePlanes(true)
         , renderTags()
         , depthBiasUseDefault(true)
         , depthBiasEnable(false)
@@ -165,7 +164,6 @@ struct HdxRenderTaskParams : public HdTaskParams
     float tessLevel;
     GfVec2f drawingRange;
     bool enableSceneMaterials;
-    bool displayImagePlanes;
     TfTokenVector renderTags;
 
     // Depth Bias Raster State
