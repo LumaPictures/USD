@@ -13,6 +13,8 @@ pxr_plugin(${PXR_PACKAGE}
         usdShade
         usdSkel
         usdUtils
+        usdImaging
+        usdHydra
         vt
         ${Boost_PYTHON_LIBRARY}
         ${MAYA_LIBRARIES}
