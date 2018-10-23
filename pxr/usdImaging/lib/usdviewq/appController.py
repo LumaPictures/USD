@@ -4434,7 +4434,6 @@ class AppController(QtCore.QObject):
         self._refreshRolloverPrimInfoMenu()
         self._refreshSelectionHighlightingMenu()
         self._refreshSelectionHighlightColorMenu()
-        self._refreshImagePlane()
 
     def _refreshRenderModeMenu(self):
         for action in self._renderModeActions:
