@@ -52,8 +52,6 @@
 #include "pxr/usd/usdGeom/capsule.h"
 #include "pxr/usd/usdGeom/points.h"
 #include "pxr/usd/usdGeom/nurbsPatch.h"
-#include "pxr/usd/usdGeom/camera.h"
-#include "pxr/usd/usdGeom/imagePlane.h"
 
 #include "pxr/usd/sdf/path.h"
 
@@ -73,147 +71,6 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-static const GLuint invalid_texture = 0;
-
-struct ImagePlaneDef {
-    SdfAssetPath asset;
-    GfVec2f size;
-    GfVec2f offset;
-    GfVec2i coverage;
-    GfVec2i coverage_origin;
-    GfVec2f camera_aperture;
-    GLuint gl_texture;
-    float rotate;
-    int width;
-    int height;
-    int fit;
-
-    ImagePlaneDef(const UsdPrim &prim, const UsdImagingGLEngine::RenderParams& _params, const UsdPrim& _root)
-        : camera_aperture(1.0f, 1.0f), gl_texture(invalid_texture), width(0), height(0)
-    { // TODO: use try to use the functions from Hydra to loadup these images
-// Hydra's memory manager might not exists at this point
-// Right now using the simples approach to load the texture to video memory
-        UsdGeomImagePlane image_plane(prim);
-
-        double frame = 0.0;
-        image_plane.GetFrameAttr().Get(&frame, _params.frame);
-        image_plane.GetFilenameAttr().Get(&asset, UsdTimeCode(_params.frame.GetValue() + frame));
-        image_plane.GetSizeAttr().Get(&size, _params.frame);
-        image_plane.GetOffsetAttr().Get(&offset, _params.frame);
-        image_plane.GetRotateAttr().Get(&rotate, _params.frame);
-        image_plane.GetCoverageAttr().Get(&coverage, _params.frame);
-        image_plane.GetCoverageOriginAttr().Get(&coverage_origin, _params.frame);
-        TfToken fit_token;
-        image_plane.GetFitAttr().Get(&fit_token, _params.frame);
-        if (fit_token == UsdGeomTokens->fill) {
-            fit = UsdGeomImagePlane::FIT_FILL;
-        } else if (fit_token == UsdGeomTokens->best) {
-            fit = UsdGeomImagePlane::FIT_BEST;
-        } else if (fit_token == UsdGeomTokens->horizontal) {
-            fit = UsdGeomImagePlane::FIT_HORIZONTAL;
-        } else if (fit_token == UsdGeomTokens->vertical) {
-            fit = UsdGeomImagePlane::FIT_VERTICAL;
-        } else if (fit_token == UsdGeomTokens->toSize) {
-            fit = UsdGeomImagePlane::FIT_TO_SIZE;
-        } else {
-            fit = UsdGeomImagePlane::FIT_BEST;
-        }
-        rotate = static_cast<float>(M_PI) * rotate / 180.0f;
-
-        bool found_camera = false;
-        constexpr float mm_to_inch = 1.0f / 25.4f;
-
-        auto read_camera = [&](const UsdPrim& camera_prim) {
-            UsdGeomCamera camera(camera_prim);
-            camera.GetHorizontalApertureAttr().Get(&camera_aperture[0], _params.frame);
-            camera.GetVerticalApertureAttr().Get(&camera_aperture[1], _params.frame);
-            camera_aperture[0] *= mm_to_inch;
-            camera_aperture[1] *= mm_to_inch;
-
-            found_camera = true;
-        };
-
-        SdfPathVector camera_paths;
-        image_plane.GetCameraRel().GetForwardedTargets(&camera_paths);
-        if (camera_paths.size() > 0)
-        {
-            const UsdPrim camera_prim = _root.GetStage()->GetPrimAtPath(camera_paths[0]);
-            if (camera_prim.IsValid() && camera_prim.IsA<UsdGeomCamera>())
-                read_camera(camera_prim);
-        }
-
-        // traverse upwards in the hierarchy to find the camera above the image plane
-        if (!found_camera)
-        {
-            for (UsdPrim parent = prim.GetParent(); parent.IsValid(); parent = parent.GetParent())
-            {
-                if (parent.IsA<UsdGeomCamera>())
-                    read_camera(parent);
-            }
-        }
-    }
-
-    void release()
-    {
-        if (gl_texture != invalid_texture)
-        {
-            glDeleteTextures(1, &gl_texture);
-            gl_texture = invalid_texture;
-        }
-    }
-
-    void read_texture(OIIO::ImageCache* cache)
-    {
-        // This is cleared at a different stage, so if it exists, just skip loading the texture.
-        if (gl_texture != invalid_texture)
-            return;
-        OIIO::ImageSpec spec;
-        const OIIO::ustring image_path(asset.GetResolvedPath());
-        if (!cache->get_imagespec(image_path, spec))
-            return;
-        width = spec.width;
-        height = spec.height;
-        // oiio gives back invalid textures sometimes
-        if (width < 32 ||
-            height < 32 ||
-            width > 4096 ||
-            height > 4096 ||
-            spec.nchannels > 4 ||
-            spec.nchannels < 3) {
-            return;
-        }
-
-        std::vector<unsigned char> pixels(static_cast<size_t>(width * height * spec.nchannels), 0);
-        cache->get_pixels(image_path, 0, 0, 0, width, 0, height, 0, 1, OIIO::TypeDesc::UINT8, &pixels[0]);
-
-        GLint old_bound_texture = 0;
-        glGetIntegerv(GL_TEXTURE_BINDING_2D, &old_bound_texture);
-
-        glGenTextures(1, &gl_texture);
-        glBindTexture(GL_TEXTURE_2D, gl_texture);
-        glTexImage2D(GL_TEXTURE_2D, 0,
-                     spec.nchannels == 4 ? GL_RGBA : GL_RGB, width, height, 0,
-                     spec.nchannels == 4 ? GL_RGBA : GL_RGB, GL_UNSIGNED_BYTE, &pixels[0]);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glBindTexture(GL_TEXTURE_2D, old_bound_texture);
-
-        // limiting settings
-        if (coverage[0] <= 0)
-            coverage[0] = width;
-        else
-            coverage[0] = std::min(std::max(0, coverage[0]), width);
-        if (coverage[1] <= 0)
-            coverage[1] = height;
-        else
-            coverage[1] = std::min(std::max(0, coverage[1]), height);
-        coverage_origin[0] = std::min(std::max(-width, coverage_origin[0]), width);
-        coverage_origin[1] = std::min(std::max(-height, coverage_origin[1]), height);
-    }
-};
-
 // Sentinel value for prim restarts, so that multiple prims can be lumped into a
 // single draw call, if the hardware supports it.
 #define _PRIM_RESTART_INDEX 0xffffffff 
@@ -229,17 +86,12 @@ UsdImagingGLRefEngine::UsdImagingGLRefEngine(const SdfPathVector &excludedPrimPa
     TF_FOR_ALL(pathIt, excludedPrimPaths) {
         _excludedSet.insert(*pathIt);
     }
-
-    _imageCache = OIIO::ImageCache::create(false);
-    _imageCache->attribute("max_memory_MB", 1024.0);
-    _imageCache->attribute("max_open_files", 256);
 }
 
 UsdImagingGLRefEngine::~UsdImagingGLRefEngine()
 {
     TfNotice::Revoke(_objectsChangedNoticeKey);
     InvalidateBuffers();
-    OIIO::ImageCache::destroy(_imageCache);
 }
 
 bool
@@ -275,9 +127,6 @@ UsdImagingGLRefEngine::InvalidateBuffers()
 
     glDeleteBuffers(1, &_attribBuffer);
     glDeleteBuffers(1, &_indexBuffer);
-
-    for (auto& it : _imagePlanes)
-        it.release();
 
     _attribBuffer = 0;
     _indexBuffer = 0;
@@ -340,12 +189,6 @@ UsdImagingGLRefEngine::_PopulateBuffers()
     offset = 0;
     _AppendSubData<GLuint>(GL_ELEMENT_ARRAY_BUFFER, &offset, _verts);
     _AppendSubData<GLuint>(GL_ELEMENT_ARRAY_BUFFER, &offset, _lineVerts);
-
-    if (_params.displayImagePlanes)
-    {
-        for (auto& it : _imagePlanes)
-            it.read_texture(_imageCache);
-    }
 }
 
 /*virtual*/ 
@@ -523,7 +366,6 @@ UsdImagingGLRefEngine::Render(const UsdPrim& root,
         TfReset(_numLineVerts);
         TfReset(_vertIdxOffsets);
         TfReset(_lineVertIdxOffsets);
-        _imagePlanes.clear();
         _vertCount = 0;
         _lineVertCount = 0;
         _primIDCounter = 0;
@@ -538,10 +380,6 @@ UsdImagingGLRefEngine::Render(const UsdPrim& root,
     } else {
         glBindBuffer(GL_ARRAY_BUFFER, _attribBuffer);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _indexBuffer);
-    }
-
-    if (_params.displayImagePlanes) {
-        _DrawImagePlanes();
     }
 
     glEnableClientState(GL_VERTEX_ARRAY);
@@ -837,9 +675,7 @@ UsdImagingGLRefEngine::_TraverseStage(const UsdPrim& root)
                 else if (iter->IsA<UsdGeomPoints>())
                     _HandlePoints(*iter);
                 else if (iter->IsA<UsdGeomNurbsPatch>())
-                    _HandleNurbsPatch(*iter);
-                else if (iter->IsA<UsdGeomImagePlane>())
-                    _imagePlanes.emplace_back(*iter, _params, _root);
+                    _HandleNurbsPatch(*iter);                    
             } else {
                 iter.PruneChildren();
             }

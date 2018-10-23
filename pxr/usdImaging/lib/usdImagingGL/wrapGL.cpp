@@ -209,7 +209,6 @@ void wrapGL()
             .def_readwrite("enableSceneMaterials", 
                 &Params::enableSceneMaterials)
             .def_readwrite("enableUsdDrawModes", &Params::enableUsdDrawModes)
-            .def_readwrite("displayImagePlanes", &Params::displayImagePlanes)
         ;
 
         // Wrap the UsdImagingGLRendererSetting::Type enum. Accessible as
