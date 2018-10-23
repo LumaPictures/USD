@@ -53,7 +53,7 @@ _TestIntersection(
     const GfMatrix4d &projectionMatrix,
     const GfMatrix4d &worldToLocalSpace,
     const UsdPrim& root, 
-    UsdImagingGL::RenderParams params)
+    UsdImagingGLRenderParams params)
 {
     GfVec3d hitPoint;
     SdfPath hitPrimPath;
@@ -114,7 +114,8 @@ _GetRegisteredRendererPluginsDisplayNames()
 void wrapGL()
 {
     { 
-        // Start a new scope so that DrawMode, CullStyle and RenderParams are under GL.
+        // Start a new scope so that DrawMode, CullStyle and 
+        // UsdImagingGLRenderParams are under GL.
         scope GL = class_<UsdImagingGL, boost::noncopyable>("GL",
                                         "UsdImaging GL Renderer class")
             .def( init<>() )
@@ -132,53 +133,60 @@ void wrapGL()
             .def("GetRprimPathFromPrimId", &UsdImagingGL::GetRprimPathFromPrimId)
             .def("GetPrimPathFromInstanceIndex", &_GetPrimPathFromInstanceIndex)
             .def("TestIntersection", &_TestIntersection)
-            .def("IsEnabledHydra", &UsdImagingGL::IsEnabledHydra)
-                .staticmethod("IsEnabledHydra")
+            .def("IsHydraEnabled", &UsdImagingGLEngine::IsHydraEnabled)
+                .staticmethod("IsHydraEnabled")
             .def("IsConverged", &UsdImagingGL::IsConverged)
             .def("GetRendererPlugins", &UsdImagingGL::GetRendererPlugins,
-                 return_value_policy< TfPySequenceToTuple >())
+                 return_value_policy< TfPySequenceToList >())
             .def("GetRendererDisplayName", 
                     &UsdImagingGL::GetRendererDisplayName)
             .def("GetCurrentRendererId", &UsdImagingGL::GetCurrentRendererId)
             .def("SetRendererPlugin", &UsdImagingGL::SetRendererPlugin)
             .def("GetRendererAovs", &UsdImagingGL::GetRendererAovs,
-                 return_value_policy< TfPySequenceToTuple >())
-            .def ("SetRendererAov", &UsdImagingGL::SetRendererAov)
+                 return_value_policy< TfPySequenceToList >())
+            .def("SetRendererAov", &UsdImagingGL::SetRendererAov)
             .def("GetResourceAllocation", &UsdImagingGL::GetResourceAllocation)
             .def("GetRegisteredRendererPluginsDisplayNames", 
                  &_GetRegisteredRendererPluginsDisplayNames)
                 .staticmethod("GetRegisteredRendererPluginsDisplayNames")
+            .def("GetRendererSettingsList", &UsdImagingGL::GetRendererSettingsList,
+                 return_value_policy< TfPySequenceToList >())
+            .def("GetRendererSetting", &UsdImagingGL::GetRendererSetting)
+            .def("SetRendererSetting", &UsdImagingGL::SetRendererSetting)
         ;
 
         // Wrap the constants.
         GL.attr("ALL_INSTANCES") = UsdImagingDelegate::ALL_INSTANCES;
 
         // Wrap the DrawMode enum. Accessible as UsdImaging.GL.DrawMode
-        enum_<UsdImagingGL::DrawMode>("DrawMode")
-            .value("DRAW_POINTS", UsdImagingGL::DRAW_POINTS)
-            .value("DRAW_WIREFRAME", UsdImagingGL::DRAW_WIREFRAME)
+        enum_<UsdImagingGLDrawMode>("DrawMode")
+            .value("DRAW_POINTS", UsdImagingGLDrawMode::DRAW_POINTS)
+            .value("DRAW_WIREFRAME", UsdImagingGLDrawMode::DRAW_WIREFRAME)
             .value("DRAW_WIREFRAME_ON_SURFACE", 
-                UsdImagingGL::DRAW_WIREFRAME_ON_SURFACE)
-        .value("DRAW_SHADED_FLAT", UsdImagingGL::DRAW_SHADED_FLAT)
-        .value("DRAW_SHADED_SMOOTH", UsdImagingGL::DRAW_SHADED_SMOOTH)
-        .value("DRAW_GEOM_ONLY", UsdImagingGL::DRAW_GEOM_ONLY)
-        .value("DRAW_GEOM_FLAT", UsdImagingGL::DRAW_GEOM_FLAT)
-        .value("DRAW_GEOM_SMOOTH", UsdImagingGL::DRAW_GEOM_SMOOTH)
+                UsdImagingGLDrawMode::DRAW_WIREFRAME_ON_SURFACE)
+        .value("DRAW_SHADED_FLAT", UsdImagingGLDrawMode::DRAW_SHADED_FLAT)
+        .value("DRAW_SHADED_SMOOTH", UsdImagingGLDrawMode::DRAW_SHADED_SMOOTH)
+        .value("DRAW_GEOM_ONLY", UsdImagingGLDrawMode::DRAW_GEOM_ONLY)
+        .value("DRAW_GEOM_FLAT", UsdImagingGLDrawMode::DRAW_GEOM_FLAT)
+        .value("DRAW_GEOM_SMOOTH", UsdImagingGLDrawMode::DRAW_GEOM_SMOOTH)
         ;
 
         // Wrap the CullStyle enum. Accessible as UsdImaging.GL.CullStyle
-        enum_<UsdImagingGL::CullStyle>("CullStyle")
-                .value("CULL_STYLE_NOTHING", UsdImagingGL::CULL_STYLE_NOTHING)
-                .value("CULL_STYLE_BACK", UsdImagingGL::CULL_STYLE_BACK)
-                .value("CULL_STYLE_FRONT", UsdImagingGL::CULL_STYLE_FRONT)
+        enum_<UsdImagingGLCullStyle>("CullStyle")
+                .value("CULL_STYLE_NOTHING", 
+                    UsdImagingGLCullStyle::CULL_STYLE_NOTHING)
+                .value("CULL_STYLE_BACK", 
+                    UsdImagingGLCullStyle::CULL_STYLE_BACK)
+                .value("CULL_STYLE_FRONT", 
+                    UsdImagingGLCullStyle::CULL_STYLE_FRONT)
                 .value("CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED", 
-                    UsdImagingGL::CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED)
+                    UsdImagingGLCullStyle::CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED)
          ;
 
-        // Wrap the RenderParams struct.
+        // Wrap the UsdImagingGLRenderParams struct.
         // Accessible as UsdImaging.GL.RenderParams
-        typedef UsdImagingGL::RenderParams Params;
-        class_<UsdImagingGL::RenderParams>("RenderParams",
+        typedef UsdImagingGLRenderParams Params;
+        class_<UsdImagingGLRenderParams>("RenderParams",
                                         "GL Renderer parameters")
             .def_readwrite("frame", &Params::frame)
             .def_readwrite("complexity", &Params::complexity)
@@ -201,6 +209,28 @@ void wrapGL()
             .def_readwrite("enableSceneMaterials", 
                 &Params::enableSceneMaterials)
             .def_readwrite("enableUsdDrawModes", &Params::enableUsdDrawModes)
+        ;
+
+        // Wrap the UsdImagingGLRendererSetting::Type enum. Accessible as
+        // UsdImaging.GL.RendererSettingType.
+        enum_<UsdImagingGLRendererSetting::Type>("RendererSettingType")
+            .value("FLAG", UsdImagingGLRendererSetting::TYPE_FLAG)
+            .value("INT", UsdImagingGLRendererSetting::TYPE_INT)
+            .value("FLOAT", UsdImagingGLRendererSetting::TYPE_FLOAT)
+            .value("STRING", UsdImagingGLRendererSetting::TYPE_STRING)
+        ;
+
+        // Wrap the UsdImagingGLRendererSetting struct.
+        // Accessible as UsdImaging.GL.RendererSetting
+        typedef UsdImagingGLRendererSetting Setting;
+        class_<UsdImagingGLRendererSetting>("RendererSetting",
+                "Renderer Setting Metadata")
+            .add_property("key", make_getter(&Setting::key,
+                return_value_policy<return_by_value>()))
+            .def_readonly("name", &Setting::name)
+            .def_readonly("type", &Setting::type)
+            .add_property("defValue", make_getter(&Setting::defValue,
+                return_value_policy<return_by_value>()))
         ;
 
         TfPyContainerConversions::from_python_sequence<
