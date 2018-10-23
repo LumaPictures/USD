@@ -887,7 +887,6 @@ class StageView(QtOpenGL.QGLWidget):
         self._displayPrimId = False
         self._cullBackfaces = True
         self._enableHardwareShading = True
-        self._displayImagePlanes = True
         
         # Lighting properties
         self._ambientLightOnly = False
@@ -1341,7 +1340,6 @@ class StageView(QtOpenGL.QGLWidget):
         self._renderParams.enableSampleAlphaToCoverage = not self._dataModel.viewSettings.displayPrimId
         self._renderParams.highlight = renderSelHighlights
         self._renderParams.enableSceneMaterials = self._dataModel.viewSettings.enableSceneMaterials
-        self._renderParams.displayImagePlanes = self._dataModel.viewSettings.displayImagePlanes
 
         pseudoRoot = self._dataModel.stage.GetPseudoRoot()
 
@@ -2036,7 +2034,6 @@ class StageView(QtOpenGL.QGLWidget):
         self._renderParams.enableIdRender = True
         self._renderParams.enableSampleAlphaToCoverage = False
         self._renderParams.enableSceneMaterials = self._dataModel.viewSettings.enableSceneMaterials
-        self._renderParams.displayImagePlanes = self._dataModel.viewSettings.displayImagePlanes
 
         results = renderer.TestIntersection(
                 pickFrustum.ComputeViewMatrix(),
