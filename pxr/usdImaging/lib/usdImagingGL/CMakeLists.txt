@@ -51,9 +51,11 @@ pxr_library(usdImagingGL
         hydraMaterialAdapter
         package
         refEngine
+        renderParams
 
     PUBLIC_HEADERS
         api.h
+        rendererSettings.h
         version.h
 
     PRIVATE_CLASSES
