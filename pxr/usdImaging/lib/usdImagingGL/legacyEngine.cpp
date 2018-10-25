@@ -24,7 +24,7 @@
 #include "pxr/pxr.h"
 #include "pxr/imaging/glf/glew.h"
 
-#include "pxr/usdImaging/usdImagingGL/refEngine.h"
+#include "pxr/usdImaging/usdImagingGL/legacyEngine.h"
 
 #include "pxr/usdImaging/usdImaging/cubeAdapter.h"
 #include "pxr/usdImaging/usdImaging/sphereAdapter.h"
@@ -57,7 +57,10 @@
 
 #include "pxr/base/trace/trace.h"
 
+#include "pxr/imaging/hdx/intersector.h"
+
 #include "pxr/imaging/glf/diagnostic.h"
+#include "pxr/imaging/glf/drawTarget.h"
 #include "pxr/imaging/glf/glContext.h"
 #include "pxr/imaging/glf/info.h"
 
@@ -70,12 +73,23 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+namespace {
+
+struct _HitData {
+    int xMin;
+    int yMin;
+    double zMin;
+    int minIndex;
+};
+typedef TfHashMap< int32_t, _HitData > _HitDataById;
+
+}
 
 // Sentinel value for prim restarts, so that multiple prims can be lumped into a
 // single draw call, if the hardware supports it.
 #define _PRIM_RESTART_INDEX 0xffffffff 
 
-UsdImagingGLRefEngine::UsdImagingGLRefEngine(const SdfPathVector &excludedPrimPaths) :
+UsdImagingGLLegacyEngine::UsdImagingGLLegacyEngine(const SdfPathVector &excludedPrimPaths) :
     _ctm(GfMatrix4d(1.0)),
     _vertCount(0),
     _lineVertCount(0),
@@ -88,21 +102,21 @@ UsdImagingGLRefEngine::UsdImagingGLRefEngine(const SdfPathVector &excludedPrimPa
     }
 }
 
-UsdImagingGLRefEngine::~UsdImagingGLRefEngine()
+UsdImagingGLLegacyEngine::~UsdImagingGLLegacyEngine()
 {
     TfNotice::Revoke(_objectsChangedNoticeKey);
     InvalidateBuffers();
 }
 
 bool
-UsdImagingGLRefEngine::_SupportsPrimitiveRestartIndex()
+UsdImagingGLLegacyEngine::_SupportsPrimitiveRestartIndex()
 {
     static bool supported = GlfHasExtensions("GL_NV_primitive_restart");
     return supported;
 }
 
 void
-UsdImagingGLRefEngine::InvalidateBuffers()
+UsdImagingGLLegacyEngine::InvalidateBuffers()
 {
     TRACE_FUNCTION();
 
@@ -141,7 +155,7 @@ _AppendSubData(GLenum target, GLintptr* offset, T const& vec)
 }
 
 void
-UsdImagingGLRefEngine::_PopulateBuffers()
+UsdImagingGLLegacyEngine::_PopulateBuffers()
 {
     glGenBuffers(1, &_attribBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, _attribBuffer);
@@ -193,7 +207,7 @@ UsdImagingGLRefEngine::_PopulateBuffers()
 
 /*virtual*/ 
 SdfPath
-UsdImagingGLRefEngine::GetRprimPathFromPrimId(int primId) const 
+UsdImagingGLLegacyEngine::GetRprimPathFromPrimId(int primId) const 
 {
     _PrimIDMap::const_iterator it = _primIDMap.find(primId);
     if(it != _primIDMap.end()) {
@@ -203,7 +217,7 @@ UsdImagingGLRefEngine::GetRprimPathFromPrimId(int primId) const
 }
 
 void
-UsdImagingGLRefEngine::_DrawPolygons(bool drawID)
+UsdImagingGLLegacyEngine::_DrawPolygons(bool drawID)
 {
     if (_points.empty()) {
         return;
@@ -234,7 +248,7 @@ UsdImagingGLRefEngine::_DrawPolygons(bool drawID)
 }
 
 void
-UsdImagingGLRefEngine::_DrawLines(bool drawID)
+UsdImagingGLLegacyEngine::_DrawLines(bool drawID)
 {
     // We are just drawing curves as unrefined line segments, so we turn off
     // normals.
@@ -269,13 +283,13 @@ UsdImagingGLRefEngine::_DrawLines(bool drawID)
 }
 
 void
-UsdImagingGLRefEngine::Render(const UsdPrim& root, 
+UsdImagingGLLegacyEngine::Render(const UsdPrim& root, 
     const UsdImagingGLRenderParams& params)
 {
     TRACE_FUNCTION();
 
     // Start listening for change notices from this stage.
-    UsdImagingGLRefEnginePtr self = TfCreateWeakPtr(this);
+    UsdImagingGLLegacyEnginePtr self = TfCreateWeakPtr(this);
 
     // Invalidate existing buffers if we are drawing from a different root or
     // frame.
@@ -465,7 +479,7 @@ UsdImagingGLRefEngine::Render(const UsdPrim& root,
 }
 
 void
-UsdImagingGLRefEngine::SetCameraState(const GfMatrix4d& viewMatrix,
+UsdImagingGLLegacyEngine::SetCameraState(const GfMatrix4d& viewMatrix,
                             const GfMatrix4d& projectionMatrix,
                             const GfVec4d& viewport)
 {
@@ -479,7 +493,7 @@ UsdImagingGLRefEngine::SetCameraState(const GfMatrix4d& viewMatrix,
 }
 
 void
-UsdImagingGLRefEngine::SetLightingState(GlfSimpleLightVector const &lights,
+UsdImagingGLLegacyEngine::SetLightingState(GlfSimpleLightVector const &lights,
                                         GlfSimpleMaterial const &material,
                                         GfVec4f const &sceneAmbient)
 {
@@ -517,14 +531,14 @@ UsdImagingGLRefEngine::SetLightingState(GlfSimpleLightVector const &lights,
 }
 
 void 
-UsdImagingGLRefEngine::_OnObjectsChanged(UsdNotice::ObjectsChanged const& notice,
+UsdImagingGLLegacyEngine::_OnObjectsChanged(UsdNotice::ObjectsChanged const& notice,
                                        UsdStageWeakPtr const& sender)
 {
     InvalidateBuffers(); 
 }
 
 static void 
-UsdImagingGLRefEngine_ComputeSmoothNormals(const VtVec3fArray &points,
+UsdImagingGLLegacyEngine_ComputeSmoothNormals(const VtVec3fArray &points,
                                   const VtIntArray &numVerts,
                                   const VtIntArray &verts, 
                                   bool ccw,
@@ -606,7 +620,7 @@ _ShouldCullDueToOpacity(const UsdGeomGprim *gprimSchema, const UsdTimeCode &fram
 }
 
 void
-UsdImagingGLRefEngine::_TraverseStage(const UsdPrim& root)
+UsdImagingGLLegacyEngine::_TraverseStage(const UsdPrim& root)
 {
     // Instead of using root.begin(), setup a special iterator that does both
     // pre-order and post-order traversal so we can push and pop state.
@@ -702,7 +716,7 @@ UsdImagingGLRefEngine::_TraverseStage(const UsdPrim& root)
 }
 
 void
-UsdImagingGLRefEngine::_ProcessGprimColor(const UsdGeomGprim *gprimSchema,
+UsdImagingGLLegacyEngine::_ProcessGprimColor(const UsdGeomGprim *gprimSchema,
                                  const UsdPrim &prim,
                                  bool *doubleSided,
                                  VtArray<GfVec3f> *color,
@@ -722,7 +736,7 @@ UsdImagingGLRefEngine::_ProcessGprimColor(const UsdGeomGprim *gprimSchema,
 }
 
 void 
-UsdImagingGLRefEngine::_HandleXform(const UsdPrim &prim) 
+UsdImagingGLLegacyEngine::_HandleXform(const UsdPrim &prim) 
 { 
     // Don't apply the root prim's transform.
     if (prim == _root)
@@ -746,7 +760,7 @@ UsdImagingGLRefEngine::_HandleXform(const UsdPrim &prim)
 }
 
 GfVec4f 
-UsdImagingGLRefEngine::_IssueID(SdfPath const& path)
+UsdImagingGLLegacyEngine::_IssueID(SdfPath const& path)
 {
     _PrimID::ValueType maxId = (1 << 24) - 1;
     // Notify the user (failed verify) and return an invalid ID.
@@ -760,7 +774,7 @@ UsdImagingGLRefEngine::_IssueID(SdfPath const& path)
 }
 
 void 
-UsdImagingGLRefEngine::_HandleMesh(const UsdPrim &prim)
+UsdImagingGLLegacyEngine::_HandleMesh(const UsdPrim &prim)
 { 
     TRACE_FUNCTION();
 
@@ -784,7 +798,7 @@ UsdImagingGLRefEngine::_HandleMesh(const UsdPrim &prim)
 }
 
 void
-UsdImagingGLRefEngine::_HandleCurves(const UsdPrim& prim)
+UsdImagingGLLegacyEngine::_HandleCurves(const UsdPrim& prim)
 {
     TRACE_FUNCTION();
 
@@ -880,7 +894,7 @@ UsdImagingGLRefEngine::_HandleCurves(const UsdPrim& prim)
 }
 
 void 
-UsdImagingGLRefEngine::_HandleCube(const UsdPrim &prim)
+UsdImagingGLLegacyEngine::_HandleCube(const UsdPrim &prim)
 { 
     TRACE_FUNCTION();
 
@@ -908,7 +922,7 @@ UsdImagingGLRefEngine::_HandleCube(const UsdPrim &prim)
 }
 
 void 
-UsdImagingGLRefEngine::_HandleSphere(const UsdPrim &prim)
+UsdImagingGLLegacyEngine::_HandleSphere(const UsdPrim &prim)
 { 
     TRACE_FUNCTION();
 
@@ -936,7 +950,7 @@ UsdImagingGLRefEngine::_HandleSphere(const UsdPrim &prim)
 }
 
 void 
-UsdImagingGLRefEngine::_HandleCone(const UsdPrim &prim)
+UsdImagingGLLegacyEngine::_HandleCone(const UsdPrim &prim)
 { 
     TRACE_FUNCTION();
 
@@ -960,7 +974,7 @@ UsdImagingGLRefEngine::_HandleCone(const UsdPrim &prim)
 }
 
 void 
-UsdImagingGLRefEngine::_HandleCylinder(const UsdPrim &prim)
+UsdImagingGLLegacyEngine::_HandleCylinder(const UsdPrim &prim)
 { 
     TRACE_FUNCTION();
 
@@ -984,7 +998,7 @@ UsdImagingGLRefEngine::_HandleCylinder(const UsdPrim &prim)
 }
 
 void 
-UsdImagingGLRefEngine::_HandleCapsule(const UsdPrim &prim)
+UsdImagingGLLegacyEngine::_HandleCapsule(const UsdPrim &prim)
 { 
     TRACE_FUNCTION();
 
@@ -1008,13 +1022,13 @@ UsdImagingGLRefEngine::_HandleCapsule(const UsdPrim &prim)
 }
 
 void 
-UsdImagingGLRefEngine::_HandlePoints(const UsdPrim &prim)
+UsdImagingGLLegacyEngine::_HandlePoints(const UsdPrim &prim)
 {
     TF_WARN("Point primitives are not yet supported.");
 }
 
 void 
-UsdImagingGLRefEngine::_HandleNurbsPatch(const UsdPrim &prim)
+UsdImagingGLLegacyEngine::_HandleNurbsPatch(const UsdPrim &prim)
 { 
     TRACE_FUNCTION();
 
@@ -1037,7 +1051,7 @@ UsdImagingGLRefEngine::_HandleNurbsPatch(const UsdPrim &prim)
 }
 
 void 
-UsdImagingGLRefEngine::_RenderPrimitive(const UsdPrim &prim, 
+UsdImagingGLLegacyEngine::_RenderPrimitive(const UsdPrim &prim, 
                                       const UsdGeomGprim *gprimSchema, 
                                       const VtArray<GfVec3f>& pts, 
                                       const VtIntArray& nmvts,
@@ -1120,7 +1134,7 @@ UsdImagingGLRefEngine::_RenderPrimitive(const UsdPrim &prim,
     // If the user is using FLAT SHADING it will still use interpolated normals
     // which means that OpenGL will pick one normal (provoking vertex) out of the 
     // normals array.
-    UsdImagingGLRefEngine_ComputeSmoothNormals(pts, nmvts, vts, true /*ccw*/, &normals);
+    UsdImagingGLLegacyEngine_ComputeSmoothNormals(pts, nmvts, vts, true /*ccw*/, &normals);
 
     TF_FOR_ALL(itr, normals) {
         _normals.push_back((*itr)[0]);
@@ -1134,7 +1148,7 @@ UsdImagingGLRefEngine::_RenderPrimitive(const UsdPrim &prim,
         // reversed, so that we handle doublesided geometry alongside
         // backface-culled geometry in the same draw call.
 
-        TRACE_SCOPE("UsdImagingGLRefEngine::HandleMesh (doublesided)");
+        TRACE_SCOPE("UsdImagingGLLegacyEngine::HandleMesh (doublesided)");
 
         index = 0;
         TF_FOR_ALL(itr, pts) {
@@ -1191,6 +1205,479 @@ UsdImagingGLRefEngine::_RenderPrimitive(const UsdPrim &prim,
         }
     }
 }
+
+bool
+UsdImagingGLLegacyEngine::TestIntersection(
+    const GfMatrix4d &viewMatrix,
+    const GfMatrix4d &projectionMatrix,
+    const GfMatrix4d &worldToLocalSpace,
+    const UsdPrim& root, 
+    const UsdImagingGLRenderParams& params,
+    GfVec3d *outHitPoint,
+    SdfPath *outHitPrimPath,
+    SdfPath *outHitInstancerPath,
+    int *outHitInstanceIndex,
+    int *outHitElementIndex)
+{
+    // Choose a framebuffer that's large enough to catch thin slice polys.  No
+    // need to go too large though, since the depth writes will accumulate to
+    // the correct answer.
+
+    const int width = 128;
+    const int height = width;
+
+    if (GlfHasLegacyGraphics()) {
+        TF_RUNTIME_ERROR("framebuffer object not supported");
+        return false;
+    }
+
+    // Use a separate drawTarget (framebuffer object) for each GL context
+    // that uses this renderer, but the drawTargets can share attachments.
+    
+    GlfGLContextSharedPtr context = GlfGLContext::GetCurrentGLContext();
+    if (!TF_VERIFY(context)) {
+        TF_RUNTIME_ERROR("Invalid GL context");
+        return false;
+    }
+
+    GfVec2i attachmentSize(width,height);
+    GlfDrawTargetRefPtr drawTarget;
+    if (!TfMapLookup(_drawTargets, context, &drawTarget)) {
+
+        // Create an instance for use with this GL context
+        drawTarget = GlfDrawTarget::New(attachmentSize);
+
+        if (!_drawTargets.empty()) {
+            // Share existing attachments
+            drawTarget->Bind();
+            drawTarget->CloneAttachments(_drawTargets.begin()->second);
+            drawTarget->Unbind();
+        } else {
+            // Need to create initial attachments
+            drawTarget->Bind();
+            drawTarget->AddAttachment(
+                "primId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8);
+            drawTarget->AddAttachment(
+                "instanceId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8);
+            drawTarget->AddAttachment(
+                "elementId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8);
+            drawTarget->AddAttachment(
+                "depth", GL_DEPTH_COMPONENT, GL_FLOAT, GL_DEPTH_COMPONENT32F);
+            drawTarget->Unbind();
+        }
+
+        // This is a good time to clean up any drawTargets no longer in use.
+        for (_DrawTargetPerContextMap::iterator
+                it = _drawTargets.begin(); it != _drawTargets.end(); ++it) {
+            if (!(it->first && it->first->IsValid())) {
+                _drawTargets.erase(it);
+            }
+        }
+
+        _drawTargets[context] = drawTarget;
+    }
+
+    // Resize if necessary
+    if (drawTarget->GetSize() != attachmentSize) {
+        drawTarget->SetSize(attachmentSize);
+    }
+
+    drawTarget->Bind();
+
+    glPushAttrib( GL_VIEWPORT_BIT |
+                  GL_ENABLE_BIT |
+                  GL_COLOR_BUFFER_BIT |
+                  GL_DEPTH_BUFFER_BIT |
+                  GL_TEXTURE_BIT );
+
+    GLenum drawBuffers[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+    glDrawBuffers(2, drawBuffers);
+    
+    glDepthMask(GL_TRUE);
+    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+
+    glEnable(GL_DEPTH_TEST);
+
+    // Setup the modelview matrix
+    const GfMatrix4d modelViewMatrix = worldToLocalSpace * viewMatrix;
+
+    // Set up camera matrices and viewport. At some point in the future,
+    // this may be handled by Hydra itself since we are calling SetCameraState
+    // with all of this information so we can support culling
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadMatrixd(projectionMatrix.GetArray());
+    
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadMatrixd(modelViewMatrix.GetArray());
+   
+    glViewport(0, 0, width, height);
+
+    SetCameraState(modelViewMatrix, projectionMatrix, GfVec4d(0,0,width, height) );
+
+    GLF_POST_PENDING_GL_ERRORS();
+    
+    // to enable wireframe picking, should respect incoming drawMode
+    //params.drawMode = DRAW_GEOM_ONLY;
+    Render(root, params);
+    
+    GLF_POST_PENDING_GL_ERRORS();
+
+    // Restore all gl state
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    
+    glMatrixMode(GL_MODELVIEW);
+    glPopMatrix();
+
+    int xMin = 0;
+    int yMin = 0;
+    double zMin = 1.0;
+    int zMinIndex = -1;
+
+    GLubyte primId[width*height*4];
+    glBindTexture(GL_TEXTURE_2D,
+        drawTarget->GetAttachments().at("primId")->GetGlTextureName());
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, primId);
+
+    GLubyte instanceId[width*height*4];
+    glBindTexture(GL_TEXTURE_2D,
+        drawTarget->GetAttachments().at("instanceId")->GetGlTextureName());
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, instanceId);
+
+    GLubyte elementId[width*height*4];
+    glBindTexture(GL_TEXTURE_2D,
+        drawTarget->GetAttachments().at("elementId")->GetGlTextureName());
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, elementId);
+
+    GLfloat depths[width*height];
+    glBindTexture(GL_TEXTURE_2D,
+        drawTarget->GetAttachments().at("depth")->GetGlTextureName());
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, GL_FLOAT, depths);
+
+    glPopAttrib(); /* GL_VIEWPORT_BIT |
+                      GL_ENABLE_BIT |
+                      GL_COLOR_BUFFER_BIT
+                      GL_DEPTH_BUFFER_BIT
+                      GL_TEXTURE_BIT */
+
+    GLF_POST_PENDING_GL_ERRORS();
+    
+    // Find the smallest value (nearest pixel) in the z buffer
+    for (int y=0, i=0; y<height; y++) {
+        for (int x=0; x<width; x++, i++) {
+            if (depths[i] < zMin) {
+	            xMin = x;
+	            yMin = y;
+	            zMin = depths[i];
+                    zMinIndex = i;
+            }
+        }
+    }
+
+    bool didHit = (zMin < 1.0);
+
+    if (didHit) {
+        GLint viewport[4] = { 0, 0, width, height };
+        GfVec3d hitPoint;
+
+        gluUnProject( xMin, yMin, zMin,
+                      viewMatrix.GetArray(),
+                      projectionMatrix.GetArray(),
+                      viewport,
+                      &((*outHitPoint)[0]),
+                      &((*outHitPoint)[1]),
+                      &((*outHitPoint)[2]));
+
+        if (outHitPrimPath) {
+            int idIndex = zMinIndex*4;
+
+            *outHitPrimPath = GetRprimPathFromPrimId(
+                    HdxIntersector::DecodeIDRenderColor(&primId[idIndex]));
+            if (outHitInstanceIndex) {
+                *outHitInstanceIndex = HdxIntersector::DecodeIDRenderColor(
+                        &instanceId[idIndex]);
+            }
+            if (outHitElementIndex) {
+                *outHitElementIndex = HdxIntersector::DecodeIDRenderColor(
+                        &elementId[idIndex]);
+            }
+
+        }
+    }
+
+    drawTarget->Unbind();
+    GLF_POST_PENDING_GL_ERRORS();
+
+    return didHit;
+}
+
+static
+uint32_t
+_pow2roundup (uint32_t x)
+{
+    // Round up to next higher power of 2 (return x if it's already a power
+    // of 2).
+    
+    --x;
+    x |= x >> 1;
+    x |= x >> 2;
+    x |= x >> 4;
+    x |= x >> 8;
+    x |= x >> 16;
+    return x+1;
+}
+
+bool
+UsdImagingGLLegacyEngine::TestIntersectionBatch(
+    const GfMatrix4d &viewMatrix,
+    const GfMatrix4d &projectionMatrix,
+    const GfMatrix4d &worldToLocalSpace,
+    const SdfPathVector& paths, 
+    const UsdImagingGLRenderParams& params,
+    unsigned int pickResolution,
+    PathTranslatorCallback pathTranslator,
+    HitBatch *outHit)
+{
+    // outHit is not optional
+    if (!outHit) {
+        return false;
+    }
+    
+    // Choose a framebuffer that's large enough to catch thin slice polys.  No
+    // need to go too large though, since the depth writes will accumulate to
+    // the correct answer.
+    //
+    // The incoming pickResolution may not be a power of two, so round up to the
+    // nearest fully-support resolution.
+    //
+    const int width = _pow2roundup(pickResolution);
+    const int height = width;
+
+    if (GlfHasLegacyGraphics()) {
+        TF_RUNTIME_ERROR("framebuffer object not supported");
+        return false;
+    }
+
+    // Use a separate drawTarget (framebuffer object) for each GL context
+    // that uses this renderer, but the drawTargets can share attachments.
+    
+    GlfGLContextSharedPtr context = GlfGLContext::GetCurrentGLContext();
+    if (!TF_VERIFY(context)) {
+        TF_RUNTIME_ERROR("Invalid GL context");
+        return false;
+    }
+
+    GfVec2i attachmentSize(width,height);
+    GlfDrawTargetRefPtr drawTarget;
+    if (!TfMapLookup(_drawTargets, context, &drawTarget)) {
+
+        // Create an instance for use with this GL context
+        drawTarget = GlfDrawTarget::New(attachmentSize);
+
+        if (!_drawTargets.empty()) {
+            // Share existing attachments
+            drawTarget->Bind();
+            drawTarget->CloneAttachments(_drawTargets.begin()->second);
+            drawTarget->Unbind();
+        } else {
+            // Need to create initial attachments
+            drawTarget->Bind();
+            drawTarget->AddAttachment(
+                "primId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8);
+            drawTarget->AddAttachment(
+                "instanceId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8);
+            drawTarget->AddAttachment(
+                "depth", GL_DEPTH_COMPONENT, GL_FLOAT, GL_DEPTH_COMPONENT32F);
+            drawTarget->Unbind();
+        }
+
+        // This is a good time to clean up any drawTargets no longer in use.
+        for (_DrawTargetPerContextMap::iterator
+                it = _drawTargets.begin(); it != _drawTargets.end(); ++it) {
+            if (!(it->first && it->first->IsValid())) {
+                _drawTargets.erase(it);
+            }
+        }
+
+        _drawTargets[context] = drawTarget;
+    }
+
+    // Resize if necessary
+    if (drawTarget->GetSize() != attachmentSize) {
+        drawTarget->SetSize(attachmentSize);
+    }
+
+    drawTarget->Bind();
+
+    glPushAttrib( GL_VIEWPORT_BIT |
+                  GL_ENABLE_BIT |
+                  GL_COLOR_BUFFER_BIT |
+                  GL_DEPTH_BUFFER_BIT |
+                  GL_TEXTURE_BIT );
+
+    GLenum drawBuffers[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+    glDrawBuffers(2, drawBuffers);
+    
+    glDepthMask(GL_TRUE);
+    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+
+    glEnable(GL_DEPTH_TEST);
+
+    // Setup the modelview matrix
+    const GfMatrix4d modelViewMatrix = worldToLocalSpace * viewMatrix;
+
+    // Set up camera matrices and viewport. At some point in the future,
+    // this may be handled by Hydra itself since we are calling SetCameraState
+    // with all of this information so we can support culling
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadMatrixd(projectionMatrix.GetArray());
+    
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadMatrixd(modelViewMatrix.GetArray());
+   
+    glViewport(0, 0, width, height);
+
+    SetCameraState(modelViewMatrix, projectionMatrix, GfVec4d(0,0,width, height) );
+
+    GLF_POST_PENDING_GL_ERRORS();
+    
+    // to enable wireframe picking, should respect incoming drawMode
+    //params.drawMode = DRAW_GEOM_ONLY;
+    RenderBatch(paths, params);
+    
+    GLF_POST_PENDING_GL_ERRORS();
+
+    // Restore all gl state
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    
+    glMatrixMode(GL_MODELVIEW);
+    glPopMatrix();
+
+    std::vector<GLubyte> primId(width*height*4);
+    glBindTexture(GL_TEXTURE_2D,
+        drawTarget->GetAttachments().at("primId")->GetGlTextureName());
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, primId.data());
+
+    std::vector<GLubyte> instanceId(width*height*4);
+    glBindTexture(GL_TEXTURE_2D,
+        drawTarget->GetAttachments().at("instanceId")->GetGlTextureName());
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, instanceId.data());
+
+    std::vector<GLfloat> depths(width*height);
+    glBindTexture(GL_TEXTURE_2D,
+        drawTarget->GetAttachments().at("depth")->GetGlTextureName());
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, GL_FLOAT, depths.data());
+
+    glPopAttrib(); /* GL_VIEWPORT_BIT |
+                      GL_ENABLE_BIT |
+                      GL_COLOR_BUFFER_BIT
+                      GL_DEPTH_BUFFER_BIT
+                      GL_TEXTURE_BIT */
+
+    GLF_POST_PENDING_GL_ERRORS();
+
+    _HitDataById hitResults;
+    
+    // Find the smallest value (nearest pixel) in the z buffer for each primId
+    for (int y=0, i=0; y<height; y++) {
+        for (int x=0; x<width; x++, i++) {
+            if( depths[i]>=1.0 )
+                continue;
+            
+            // primIdx construction mirrors the underlying prim code,
+            // ignoring the A component.
+            int32_t primIdx = ((primId[i*4+0] & 0xff) <<  0) | 
+                              ((primId[i*4+1] & 0xff) <<  8) |
+                              ((primId[i*4+2] & 0xff) << 16);
+            
+            // Set the iterator to the entry if it exists in hitResults,
+            // otherwise insert a new entry with the default values.
+            std::pair< _HitDataById::iterator, bool > primEntry =
+                    hitResults.insert( {primIdx, {0,0,1.0,-1}} );
+            
+            _HitData &primHitData = primEntry.first->second;
+            if (depths[i] < primHitData.zMin) {
+	            primHitData.xMin = x;
+	            primHitData.yMin = y;
+	            primHitData.zMin = depths[i];
+                    primHitData.minIndex = i;
+            }
+        }
+    }
+
+    bool didHit = !hitResults.empty();
+    
+    TfHashMap<SdfPath,double,SdfPath::Hash> minDistToPath;
+
+    if (didHit) {
+        GLint viewport[4] = { 0, 0, width, height };
+        
+        TF_FOR_ALL( hitEntry, hitResults ) {
+            _HitData &primHitData = hitEntry->second;
+
+            int idIndex = primHitData.minIndex*4;
+
+            GfVec4i primIdColor(
+                primId[idIndex+0],
+                primId[idIndex+1],
+                primId[idIndex+2],
+                primId[idIndex+3]);
+
+            GfVec4i instanceIdColor(
+                instanceId[idIndex+0],
+                instanceId[idIndex+1],
+                instanceId[idIndex+2],
+                instanceId[idIndex+3]);
+            
+            int hitInstanceIndex;
+            SdfPath primPath = GetPrimPathFromPrimIdColor(primIdColor,
+                                                          instanceIdColor,
+                                                          &hitInstanceIndex);
+
+            // Translate the path. Allows client-side collating of hit prims into
+            // useful bins as needed. The simplest translator returns primPath.
+            //
+            // Note that this non-Hydra implementation has no concept of an
+            // instancer path.
+            SdfPath hitPath( pathTranslator(primPath, SdfPath(), hitInstanceIndex) );
+            
+            if( !hitPath.IsEmpty() ) {
+                
+                double minDist;
+                bool exists = TfMapLookup( minDistToPath, hitPath, &minDist );
+                if( !exists || primHitData.zMin < minDist ) {
+
+                    GfVec3d hitPoint;
+                    gluUnProject( primHitData.xMin, primHitData.yMin, primHitData.zMin,
+                                  viewMatrix.GetArray(),
+                                  projectionMatrix.GetArray(),
+                                  viewport,
+                                  &(hitPoint[0]),
+                                  &(hitPoint[1]),
+                                  &(hitPoint[2]));
+
+                    HitInfo &hitInfo = (*outHit)[hitPath];
+
+                    hitInfo.worldSpaceHitPoint = hitPoint;
+                    hitInfo.hitInstanceIndex = hitInstanceIndex;
+
+                    minDistToPath[hitPath] = primHitData.zMin;
+                }
+            }
+        }
+    }
+
+    drawTarget->Unbind();
+    GLF_POST_PENDING_GL_ERRORS();
+
+    return didHit;
+}
+
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
