@@ -92,7 +92,7 @@ HdxRenderSetupTask::_Sync(HdTaskContext* ctx)
         SyncParams(params);
     }
 
-    SyncAttachments();
+    SyncAovBindings();
     SyncCamera();
     SyncRenderPassState();
 }
@@ -155,6 +155,15 @@ HdxRenderSetupTask::SyncParams(HdxRenderTaskParams const &params)
     _renderPassState->SetStencil(params.stencilFunc, params.stencilRef,
             params.stencilMask, params.stencilFailOp, params.stencilZFailOp,
             params.stencilZPassOp);
+
+    // blend
+    _renderPassState->SetBlendEnabled(params.blendEnable);
+    _renderPassState->SetBlend(
+            params.blendColorOp,
+            params.blendColorSrcFactor, params.blendColorDstFactor,
+            params.blendAlphaOp,
+            params.blendAlphaSrcFactor, params.blendAlphaDstFactor);
+    _renderPassState->SetBlendConstantColor(params.blendConstantColor);
     
     // alpha to coverage
     // XXX:  Long-term Alpha to Coverage will be a render style on the
@@ -168,7 +177,7 @@ HdxRenderSetupTask::SyncParams(HdxRenderTaskParams const &params)
     _viewport = params.viewport;
     _renderTags = params.renderTags;
     _cameraId = params.camera;
-    _attachments = params.attachments;
+    _aovBindings = params.aovBindings;
 
     if (HdStRenderPassState* extendedState =
             dynamic_cast<HdStRenderPassState*>(_renderPassState.get())) {
@@ -177,21 +186,21 @@ HdxRenderSetupTask::SyncParams(HdxRenderTaskParams const &params)
 }
 
 void
-HdxRenderSetupTask::SyncAttachments()
+HdxRenderSetupTask::SyncAovBindings()
 {
-    // Walk the attachments, resolving the render index references as they're
+    // Walk the aov bindings, resolving the render index references as they're
     // encountered.
     const HdRenderIndex &renderIndex = GetDelegate()->GetRenderIndex();
-    HdRenderPassAttachmentVector attachments = _attachments;
-    for (size_t i = 0; i < attachments.size(); ++i)
+    HdRenderPassAovBindingVector aovBindings = _aovBindings;
+    for (size_t i = 0; i < aovBindings.size(); ++i)
     {
-        if (attachments[i].renderBuffer == nullptr) {
-            attachments[i].renderBuffer = static_cast<HdRenderBuffer*>(
+        if (aovBindings[i].renderBuffer == nullptr) {
+            aovBindings[i].renderBuffer = static_cast<HdRenderBuffer*>(
                 renderIndex.GetBprim(HdPrimTypeTokens->renderBuffer,
-                attachments[i].renderBufferId));
+                aovBindings[i].renderBufferId));
         }
     }
-    _renderPassState->SetAttachments(attachments);
+    _renderPassState->SetAovBindings(aovBindings);
 }
 
 void
@@ -263,10 +272,26 @@ std::ostream& operator<<(std::ostream& out, const HdxRenderTaskParams& pv)
         << pv.tessLevel << " "
         << pv.drawingRange << " "
         << pv.enableSceneMaterials << " "
+        << pv.depthBiasUseDefault << " "
         << pv.depthBiasEnable << " "
         << pv.depthBiasConstantFactor << " "
         << pv.depthBiasSlopeFactor << " "
         << pv.depthFunc << " "
+        << pv.stencilFunc << " "
+        << pv.stencilRef << " "
+        << pv.stencilMask << " "
+        << pv.stencilFailOp << " "
+        << pv.stencilZFailOp << " "
+        << pv.stencilZPassOp << " "
+        << pv.stencilEnable << " "
+        << pv.blendColorOp << " "
+        << pv.blendColorSrcFactor << " "
+        << pv.blendColorDstFactor << " "
+        << pv.blendAlphaOp << " "
+        << pv.blendAlphaSrcFactor << " "
+        << pv.blendAlphaDstFactor << " "
+        << pv.blendConstantColor << " "
+        << pv.blendEnable << " "
         << pv.cullStyle << " "
         << pv.geomStyle << " "
         << pv.complexity << " "
@@ -274,7 +299,7 @@ std::ostream& operator<<(std::ostream& out, const HdxRenderTaskParams& pv)
         << pv.surfaceVisibility << " "
         << pv.camera << " "
         << pv.viewport << " ";
-        for (auto const& a : pv.attachments) {
+        for (auto const& a : pv.aovBindings) {
             out << a << " ";
         }
         for (auto const& rt : pv.renderTags) {
@@ -298,16 +323,32 @@ bool operator==(const HdxRenderTaskParams& lhs, const HdxRenderTaskParams& rhs)
            lhs.tessLevel               == rhs.tessLevel               &&
            lhs.drawingRange            == rhs.drawingRange            &&
            lhs.enableSceneMaterials    == rhs.enableSceneMaterials    &&
+           lhs.depthBiasUseDefault     == rhs.depthBiasUseDefault     &&
            lhs.depthBiasEnable         == rhs.depthBiasEnable         &&
            lhs.depthBiasConstantFactor == rhs.depthBiasConstantFactor &&
            lhs.depthBiasSlopeFactor    == rhs.depthBiasSlopeFactor    &&
            lhs.depthFunc               == rhs.depthFunc               &&
+           lhs.stencilFunc             == rhs.stencilFunc             &&
+           lhs.stencilRef              == rhs.stencilRef              &&
+           lhs.stencilMask             == rhs.stencilMask             &&
+           lhs.stencilFailOp           == rhs.stencilFailOp           &&
+           lhs.stencilZFailOp          == rhs.stencilZFailOp          &&
+           lhs.stencilZPassOp          == rhs.stencilZPassOp          &&
+           lhs.stencilEnable           == rhs.stencilEnable           &&
+           lhs.blendColorOp            == rhs.blendColorOp            &&
+           lhs.blendColorSrcFactor     == rhs.blendColorSrcFactor     &&
+           lhs.blendColorDstFactor     == rhs.blendColorDstFactor     &&
+           lhs.blendAlphaOp            == rhs.blendAlphaOp            &&
+           lhs.blendAlphaSrcFactor     == rhs.blendAlphaSrcFactor     &&
+           lhs.blendAlphaDstFactor     == rhs.blendAlphaDstFactor     &&
+           lhs.blendConstantColor      == rhs.blendConstantColor      &&
+           lhs.blendEnable             == rhs.blendEnable             &&
            lhs.cullStyle               == rhs.cullStyle               &&
            lhs.geomStyle               == rhs.geomStyle               &&
            lhs.complexity              == rhs.complexity              &&
            lhs.hullVisibility          == rhs.hullVisibility          &&
            lhs.surfaceVisibility       == rhs.surfaceVisibility       &&
-           lhs.attachments             == rhs.attachments             &&
+           lhs.aovBindings             == rhs.aovBindings             &&
            lhs.camera                  == rhs.camera                  &&
            lhs.viewport                == rhs.viewport                &&
            lhs.renderTags              == rhs.renderTags;
