@@ -415,7 +415,7 @@ SdfPath::HasPrefix(const SdfPath &prefix) const
         --curDepth;
     }
 
-    return _NodesEqual(*curNode, prefixNode);
+    return *curNode == prefixNode;
 }
 
 SdfPath
@@ -475,8 +475,16 @@ SdfPath::GetAbsoluteRootOrPrimPath() const {
     return (*this == AbsoluteRootPath()) ? *this : GetPrimPath();
 }
 
-static SdfPath
-_AppendNode(const SdfPath &path, const Sdf_PathNodeConstRefPtr &node) {
+static inline SdfPath
+_AppendNode(const SdfPath &path, Sdf_PathNode const *node);
+
+static inline SdfPath
+_AppendNode(const SdfPath &path, Sdf_PathNodeConstRefPtr const &node) {
+    return _AppendNode(path, node.get());
+}
+
+static inline SdfPath
+_AppendNode(const SdfPath &path, Sdf_PathNode const *node) {
 
     switch (node->GetNodeType()) {
         case Sdf_PathNode::PrimNode:
@@ -607,28 +615,17 @@ SdfPath::AppendChild(TfToken const &childName) const {
 
 SdfPath
 SdfPath::AppendProperty(TfToken const &propName) const {
-    SdfPath ret;
     if (!IsValidNamespacedIdentifier(propName.GetString())) {
         //TF_WARN("Invalid property name.");
-        return ret;
+        return EmptyPath();
     }
-    if (Sdf_PathNode const *node = boost::get_pointer(_pathNode)) {
-        Sdf_PathNode::NodeType type = node->GetNodeType();
-        if (type == Sdf_PathNode::PrimNode ||
-            type == Sdf_PathNode::PrimVariantSelectionNode ||
-            node == Sdf_PathNode::GetRelativeRootNode()) {
-            // Create a "floating" non-interned path node, so that creating prim
-            // property nodes is as fast as possible.
-            ret = SdfPath(
-                Sdf_PrimPropertyPathNode::NewFloatingNode(
-                    _pathNode, propName));
-        }
-    }
-    if (ret.IsEmpty()) {
+    if (!IsPrimVariantSelectionPath() && 
+        !IsPrimPath() && (_pathNode != Sdf_PathNode::GetRelativeRootNode())) {
         TF_WARN("Can only append a property '%s' to a prim path (%s)",
                 propName.GetText(), GetText());
+        return EmptyPath();
     }
-    return ret;
+    return SdfPath(Sdf_PathNode::FindOrCreatePrimProperty(_pathNode, propName));
 }
 
 SdfPath
@@ -808,6 +805,10 @@ SdfPath
 SdfPath::ReplacePrefix(const SdfPath &oldPrefix, const SdfPath &newPrefix,
                       bool fixTargetPaths) const
 {
+    // Perhaps surprisingly, this path need not have oldPrefix as a prefix.  For
+    // example, '/a.rel[/target]'.ReplacePrefix('/target', '/other/target') ->
+    // '/a.rel[/other/target]' when fixTargetPaths == true.
+
     TRACE_FUNCTION();
 
     if (oldPrefix == newPrefix) {
@@ -816,70 +817,115 @@ SdfPath::ReplacePrefix(const SdfPath &oldPrefix, const SdfPath &newPrefix,
     if (oldPrefix.IsEmpty() || newPrefix.IsEmpty()) {
         return EmptyPath();
     }
-
-    return _ReplacePrefix(oldPrefix, newPrefix, fixTargetPaths);
-}
-
-SdfPath
-SdfPath::_ReplacePrefix(const SdfPath &oldPrefix, const SdfPath &newPrefix,
-                       bool fixTargetPaths) const
-{
     if (*this == oldPrefix) {
-        // Base case: we've reached oldPrefix.
         return newPrefix;
     }
 
-    if (GetPathElementCount() == 0) {
-        // Empty paths have nothing to replace.
+    size_t thisElemCount = GetPathElementCount();
+    size_t oldPfxElemCount = oldPrefix.GetPathElementCount();
+
+    if (thisElemCount == 0 ||
+        (oldPfxElemCount >= thisElemCount &&
+         (!fixTargetPaths || !_pathNode.get()->ContainsTargetPath()))) {
         return *this;
     }
 
-    // If we've recursed above the oldPrefix, we can bail as long as there
-    // are no target paths we need to fix.
-    if (GetPathElementCount() <= oldPrefix.GetPathElementCount() &&
-        (!fixTargetPaths || !_pathNode->ContainsTargetPath())) {
-        // We'll never see oldPrefix beyond here, so return.
+    // Get temporary node storage -- stack if small enough, heap otherwise.
+    constexpr size_t MaxLocalNodes = 16;
+    using Sdf_PathNodeConstPtr = Sdf_PathNode const *;
+    Sdf_PathNodeConstPtr localNodes[MaxLocalNodes];
+    std::unique_ptr<Sdf_PathNodeConstPtr []> remoteNodes;
+    Sdf_PathNodeConstPtr *tmpNodes = localNodes;
+    // If we're fixing target paths, we may need to examine the entirety of this
+    // path, not just the tail elements.
+    size_t requiredTmpNodes =
+        fixTargetPaths ? thisElemCount : thisElemCount - oldPfxElemCount;
+    if (requiredTmpNodes > MaxLocalNodes) {
+        remoteNodes.reset(new Sdf_PathNodeConstPtr[requiredTmpNodes]);
+        tmpNodes = remoteNodes.get();
+    }
+    // Now tmpNodes is our temporary node storage.
+
+    // Walk up this path until we do not need to check anymore.  If we're not
+    // fixing target paths, this is just until we hit the same elem count as
+    // oldPrefix.  If we are doing target paths it's additionally until there
+    // are no more target path elements to examine.
+    size_t i = 0;
+    tmpNodes[i++] = _pathNode.get();
+    size_t numTailNodes =
+        thisElemCount > oldPfxElemCount ? thisElemCount - oldPfxElemCount : 0;
+    bool foundOldPrefix = false;
+    bool foundTargetPaths =
+        fixTargetPaths && _pathNode.get()->ContainsTargetPath();
+    bool moreTargetPaths = foundTargetPaths;
+    while (numTailNodes || moreTargetPaths) {
+        Sdf_PathNodeConstPtr tmp = tmpNodes[i-1]->GetParentNode().get();
+        if (numTailNodes) {
+            --numTailNodes;
+            foundOldPrefix = (tmp == oldPrefix._pathNode.get());
+            if (foundOldPrefix)
+                break;
+        }
+        moreTargetPaths =
+            moreTargetPaths && tmpNodes[i-1]->ContainsTargetPath();
+        tmpNodes[i++] = tmp;
+    }
+
+    // Now tmpNodes[i-1]->GetParentNode() is either equal to oldPrefix or we
+    // never hit oldPrefix and we're just fixing target paths above.
+
+    // If we didn't find the old prefix and we're not fixing up embedded target
+    // paths, then oldPrefix is not a prefix of this path so we just return this
+    // path.
+    if (!foundOldPrefix && (!fixTargetPaths || !foundTargetPaths)) {
         return *this;
     }
 
-    // Recursively translate the parent.
-    SdfPath parent =
-        GetParentPath()._ReplacePrefix(oldPrefix, newPrefix, fixTargetPaths);
-
-    // Translation of the parent may fail; it will have emitted an error.
-    // Return here so we don't deref an invalid _pathNode below.
-    if (parent.IsEmpty())
-        return SdfPath();
+    --i;
 
     // Append the tail component.  Use _AppendNode() except in these cases:
     // - For prims and properties, we construct child nodes directly
     //   so as to not expand out ".." components and to avoid the cost
     //   of unnecessarily re-validating identifiers.
     // - For embedded target paths, translate the target path.
-    switch (_pathNode->GetNodeType()) {
-    case Sdf_PathNode::PrimNode:
-        return SdfPath(Sdf_PathNode::FindOrCreatePrim(parent._pathNode,
-                                                    _pathNode->GetName()));
-    case Sdf_PathNode::PrimPropertyNode:
-        return SdfPath(Sdf_PathNode::FindOrCreatePrimProperty(
-                                parent._pathNode, _pathNode->GetName()));
-    case Sdf_PathNode::TargetNode:
-        if (fixTargetPaths) {
-            return parent.AppendTarget( _pathNode->GetTargetPath()
-                ._ReplacePrefix(oldPrefix, newPrefix, fixTargetPaths));
-        } else {
-            return _AppendNode(parent, _pathNode);
+
+    Sdf_PathNodeConstRefPtr newPath = foundOldPrefix ? 
+        newPrefix._pathNode : tmpNodes[i]->GetParentNode();
+
+    do {
+        switch (tmpNodes[i]->GetNodeType()) {
+        case Sdf_PathNode::PrimNode:
+            newPath = Sdf_PathNode::FindOrCreatePrim(
+                newPath, tmpNodes[i]->GetName());
+            break;
+        case Sdf_PathNode::PrimPropertyNode:
+            newPath = Sdf_PathNode::FindOrCreatePrimProperty(
+                newPath, tmpNodes[i]->GetName());
+            break;
+        case Sdf_PathNode::TargetNode:
+            if (fixTargetPaths) {
+                newPath = SdfPath(newPath).AppendTarget(
+                    tmpNodes[i]->GetTargetPath().ReplacePrefix(
+                        oldPrefix, newPrefix, fixTargetPaths))._pathNode;
+            } else {
+                newPath = _AppendNode(SdfPath(newPath), tmpNodes[i])._pathNode;
+            }
+            break;
+        case Sdf_PathNode::MapperNode:
+            if (fixTargetPaths) {
+                newPath = SdfPath(newPath).AppendMapper(
+                    tmpNodes[i]->GetTargetPath().ReplacePrefix(
+                        oldPrefix, newPrefix, fixTargetPaths))._pathNode;
+            } else {
+                newPath = _AppendNode(SdfPath(newPath), tmpNodes[i])._pathNode;
+            }
+            break;
+        default:
+            newPath = _AppendNode(SdfPath(newPath), tmpNodes[i])._pathNode;
         }
-    case Sdf_PathNode::MapperNode:
-        if (fixTargetPaths) {
-            return parent.AppendMapper( _pathNode->GetTargetPath()
-                ._ReplacePrefix(oldPrefix, newPrefix, fixTargetPaths));
-        } else {
-            return _AppendNode(parent, _pathNode);
-        }
-    default:
-        return _AppendNode(parent, _pathNode);
-    }
+    } while (i--);
+    
+    return SdfPath(std::move(newPath));
 }
 
 SdfPath
@@ -1106,7 +1152,7 @@ SdfPath::MakeRelativePath(const SdfPath & anchor) const
     TF_AXIOM(thisCount == anchorCount);
 
     // walk to a common prefix
-    while (!_NodesEqual(curThisNode, curAnchorNode)) {
+    while (curThisNode != curAnchorNode) {
         ++dotdotCount;
         relNodes.push_back(curThisNode);
         curThisNode   = curThisNode->GetParentNode();
@@ -1396,28 +1442,13 @@ SdfPath::_LessThanInternal(Sdf_PathNodeConstRefPtr const &lhsRefPtr,
     }
 
     // Now the cur nodes are at the same depth in the node tree
-    if (_NodesEqual(curThisNode, curRhsNode)) {
+    if (curThisNode == curRhsNode) {
         // They differ only in the tail.  If there's no tail, they are equal.
         // If rhs has the tail, then this is less, otherwise rhs is less.
         return thisCount < rhsCount;
     }
 
     // Crawl up both chains till we find an equal parent.
-    //
-    // Note that this is not doing a _NodesEqual call as above and is instead
-    // checking pointer equality.  This is okay, since _NodesEqual is only
-    // required for "floating" non-interned prim property paths, and we never
-    // compare those here.  The reason is that prim property sub-paths (like
-    // /foo.bar[/target]) *always* have interned prim property path nodes, so
-    // the only possible way to get a floating node here is to have a path like
-    // /foo.bar.  The code above will walk up to matching depth, so you could
-    // either get /foo.bar vs /foo.bar (with either or both or neither
-    // floating), but then the _NodesEqual check above will handle that case.
-    // The other case is getting something like /foo.bar and /foo.baz here, but
-    // in that case the while-loop immediately moves to the parent node (a prim,
-    // prim variant selection, or relative root node) and does a pointer
-    // comparison, which is safe, and then the final check on the property nodes
-    // is done with the Compare() call below, which does the right thing.
     while (curThisNode->GetParentNode() != curRhsNode->GetParentNode()) {
         curThisNode = boost::get_pointer(curThisNode->GetParentNode());
         curRhsNode = boost::get_pointer(curRhsNode->GetParentNode());
@@ -1425,19 +1456,6 @@ SdfPath::_LessThanInternal(Sdf_PathNodeConstRefPtr const &lhsRefPtr,
 
     // Now parents are equal, compare the current child nodes.
     return curThisNode->Compare<Sdf_PathNode::LessThan>(*curRhsNode);
-}
-
-size_t
-SdfPath::_HashInternal(Sdf_PathNodeConstRefPtr const &ptr)
-{
-    return Sdf_PathNode::Hash(ptr.get());
-}
-
-bool
-SdfPath::_EqualsInternal(Sdf_PathNode const *lhs,
-                         Sdf_PathNode const *rhs)
-{
-    return Sdf_PathNode::Equals(lhs, rhs);
 }
 
 std::ostream & operator<<( std::ostream &out, const SdfPath &path ) {
