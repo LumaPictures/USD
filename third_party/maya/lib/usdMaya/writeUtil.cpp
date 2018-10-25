@@ -47,7 +47,6 @@
 #include "pxr/usd/usdRi/statementsAPI.h"
 #include "pxr/usd/usdUtils/sparseValueWriter.h"
 
-#include <maya/MDagPath.h>
 #include <maya/MDoubleArray.h>
 #include <maya/MFnDependencyNode.h>
 #include <maya/MFnDoubleArrayData.h>
@@ -65,6 +64,7 @@
 #include <maya/MFnVectorArrayData.h>
 #include <maya/MFnAttribute.h>
 #include <maya/MMatrix.h>
+#include <maya/MObject.h>
 #include <maya/MPlug.h>
 #include <maya/MPoint.h>
 #include <maya/MStatus.h>
@@ -127,7 +127,7 @@ _GetMayaAttributeNumericTypedAndUnitDataTypes(
 bool
 UsdMayaWriteUtil::WriteUVAsFloat2()
 {
-    static const bool writeUVAsFloat2 = 
+    static const bool writeUVAsFloat2 =
         TfGetEnvSetting(PIXMAYA_WRITE_UV_AS_FLOAT2);
     return writeUVAsFloat2;
 }
@@ -456,9 +456,9 @@ UsdAttribute UsdMayaWriteUtil::GetOrCreateUsdRiAttribute(
 
 template <typename T>
 static bool
-_SetAttribute(const UsdAttribute& usdAttr, 
-              const T &value, 
-              const UsdTimeCode &usdTime, 
+_SetAttribute(const UsdAttribute& usdAttr,
+              const T &value,
+              const UsdTimeCode &usdTime,
               UsdUtilsSparseValueWriter *valueWriter)
 {
     return valueWriter ?
@@ -870,11 +870,12 @@ UsdMayaWriteUtil::SetUsdAttr(
     return _SetAttribute(usdAttr, val, usdTime, valueWriter);
 }
 
-// This method inspects the JSON blob stored in the 'USD_UserExportedAttributesJson'
-// attribute on the Maya node at dagPath and exports any attributes specified
-// there onto usdPrim at time usdTime. The JSON should contain an object that
-// maps Maya attribute names to other JSON objects that contain metadata about
-// how to export the attribute into USD. For example:
+// This method inspects the JSON blob stored in the
+// 'USD_UserExportedAttributesJson' attribute on the Maya node mayaNode and
+// exports any attributes specified there onto usdPrim at time usdTime.
+// The JSON should contain an object that maps Maya attribute names to other
+// JSON objects that contain metadata about how to export the attribute into
+// USD. For example:
 //
 //    {
 //        "myMayaAttributeOne": {
@@ -907,13 +908,13 @@ UsdMayaWriteUtil::SetUsdAttr(
 //
 bool
 UsdMayaWriteUtil::WriteUserExportedAttributes(
-        const MDagPath& dagPath,
+        const MObject& mayaNode,
         const UsdPrim& usdPrim,
         const UsdTimeCode& usdTime,
         UsdUtilsSparseValueWriter *valueWriter)
 {
     std::vector<UsdMayaUserTaggedAttribute> exportedAttributes =
-        UsdMayaUserTaggedAttribute::GetUserTaggedAttributesForNode(dagPath);
+        UsdMayaUserTaggedAttribute::GetUserTaggedAttributesForNode(mayaNode);
     for (const UsdMayaUserTaggedAttribute& attr : exportedAttributes) {
         const std::string& usdAttrName = attr.GetUsdName();
         const TfToken& usdAttrType = attr.GetUsdType();
@@ -1013,7 +1014,7 @@ bool
 UsdMayaWriteUtil::WriteAPISchemaAttributesToPrim(
     const MObject& mayaObject,
     const UsdPrim& prim,
-    UsdUtilsSparseValueWriter *valueWriter)    
+    UsdUtilsSparseValueWriter *valueWriter)
 {
     UsdMayaAdaptor adaptor(mayaObject);
     if (!adaptor) {
@@ -1213,13 +1214,13 @@ UsdMayaWriteUtil::WriteArrayAttrsToInstancer(
                     return (int) numPrototypes - 1;
                 }
             });
-        _SetAttribute(instancer.CreateProtoIndicesAttr(), vtArray, 
+        _SetAttribute(instancer.CreateProtoIndicesAttr(), vtArray,
                       usdTime, valueWriter);
     }
     else {
         VtArray<int> vtArray;
         vtArray.assign(numInstances, 0);
-        _SetAttribute(instancer.CreateProtoIndicesAttr(), 
+        _SetAttribute(instancer.CreateProtoIndicesAttr(),
                       vtArray, usdTime, valueWriter);
     }
 
@@ -1247,7 +1248,7 @@ UsdMayaWriteUtil::WriteArrayAttrsToInstancer(
 
     if (inputPointsData.checkArrayExist("rotation", type) &&
             type == MFnArrayAttrsData::kVectorArray) {
-        const MVectorArray rotation = inputPointsData.vectorArray("rotation", 
+        const MVectorArray rotation = inputPointsData.vectorArray("rotation",
                 &status);
         CHECK_MSTATUS_AND_RETURN(status, false);
 
@@ -1266,7 +1267,7 @@ UsdMayaWriteUtil::WriteArrayAttrsToInstancer(
     else {
         VtQuathArray vtArray;
         vtArray.assign(numInstances, GfQuath(0.0f));
-        _SetAttribute(instancer.CreateOrientationsAttr(), 
+        _SetAttribute(instancer.CreateOrientationsAttr(),
                       vtArray, usdTime, valueWriter);
     }
 
