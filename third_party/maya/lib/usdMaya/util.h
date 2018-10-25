@@ -43,6 +43,7 @@
 #include "pxr/usd/usd/timeCode.h"
 
 #include <maya/MArgDatabase.h>
+#include <maya/MBoundingBox.h>
 #include <maya/MDagPath.h>
 #include <maya/MDataHandle.h>
 #include <maya/MFnDagNode.h>
@@ -169,6 +170,19 @@ ConvertCMToMM(const double cm)
     return cm * MillimetersPerCentimeter;
 }
 
+/// Get the full name of the Maya node \p mayaNode.
+///
+/// If \p mayaNode refers to a DAG node (i.e. supports the MFnDagNode function
+/// set), then the name returned will be the DAG node's full path name.
+///
+/// If \p mayaNode refers to a DG node (i.e. supports the MFnDependencyNode
+/// function set), then the name returned will be the DG node's absolute name.
+///
+/// If \p mayaNode is not one of these or if an error is encountered, an
+/// empty string will be returned.
+PXRUSDMAYA_API
+std::string GetMayaNodeName(const MObject& mayaNode);
+
 /// Gets the Maya MObject for the node named \p nodeName.
 PXRUSDMAYA_API
 MStatus GetMObjectByName(const std::string& nodeName, MObject& mObj);
@@ -207,9 +221,9 @@ bool isAncestorDescendentRelationship(
 PXRUSDMAYA_API
 int getSampledType(const MPlug& iPlug, const bool includeConnectedChildren);
 
-// determine if a Maya Object is animated or not
+/// Determine if the Maya object \p mayaObject is animated or not
 PXRUSDMAYA_API
-bool isAnimated(MObject& object, const bool checkParent = false);
+bool isAnimated(const MObject& mayaObject, const bool checkParent = false);
 
 // Determine if a specific Maya plug is animated or not.
 PXRUSDMAYA_API
@@ -383,7 +397,7 @@ bool getPlugValue(
     }
 
     if (isAnimated) {
-        *isAnimated = plg.isDestination();
+        *isAnimated = isPlugAnimated(plg);
     }
 
     return plg.getValue(*val);
@@ -495,6 +509,9 @@ PXRUSDMAYA_API
 bool FindAncestorSceneAssembly(
         const MDagPath& dagPath,
         MDagPath* assemblyPath = nullptr);
+
+PXRUSDMAYA_API
+MBoundingBox GetInfiniteBoundingBox();
 
 } // namespace UsdMayaUtil
 
