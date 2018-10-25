@@ -59,9 +59,6 @@ typedef std::vector<UsdPrim> UsdPrimVector;
 class UsdImagingGLHdEngine : public UsdImagingGLEngine
 {
 public:
-    // Important! Call UsdImagingGLHdEngine::IsDefaultRendererPluginAvailable()
-    // before construction; if no plugins are available, the class will only
-    // get halfway constructed.
     USDIMAGINGGL_API
     UsdImagingGLHdEngine(const SdfPath& rootPath,
                        const SdfPathVector& excludedPaths,
@@ -69,16 +66,7 @@ public:
                        const SdfPath& delegateID = SdfPath::AbsoluteRootPath());
 
     USDIMAGINGGL_API
-    static bool IsDefaultRendererPluginAvailable();
-
-    USDIMAGINGGL_API
-    static TfToken GetDefaultRendererPluginId();
-
-    USDIMAGINGGL_API
     virtual ~UsdImagingGLHdEngine();
-
-    USDIMAGINGGL_API
-    HdRenderIndex *GetRenderIndex() const;
 
     USDIMAGINGGL_API
     virtual void InvalidateBuffers();
@@ -94,10 +82,6 @@ public:
     USDIMAGINGGL_API
     virtual void Render(const UsdPrim& root, 
         const UsdImagingGLRenderParams& params) override;
-
-    // Core rendering function: just draw, don't update anything.
-    USDIMAGINGGL_API
-    void Render(const UsdImagingGLRenderParams& params);
 
     USDIMAGINGGL_API
     virtual void SetCameraState(const GfMatrix4d& viewMatrix,
@@ -202,7 +186,16 @@ public:
     virtual void SetRendererSetting(TfToken const& id,
                                     VtValue const& value);
 
+protected:
+
+    USDIMAGINGGL_API
+    HdRenderIndex *_GetRenderIndex() const override;
+
 private:
+
+    // Core rendering function: just draw, don't update anything.
+    virtual void _Render(const UsdImagingGLRenderParams& params);
+
 
     // These functions factor batch preparation into separate steps so they
     // can be reused by both the vectorized and non-vectorized API.
@@ -226,6 +219,8 @@ private:
     // the task controller, and the usd imaging delegate.
     void _DeleteHydraResources();
 
+    static TfToken _GetDefaultRendererPluginId();
+
     HdEngine _engine;
 
     HdRenderIndex *_renderIndex;
@@ -245,6 +240,9 @@ private:
 
     // Data we want to live across render plugin switches:
     GfVec4f _selectionColor;
+
+    // Hold onto viewport dimensions for render delegate creation.
+    GfVec4d _viewport;
 
     SdfPath _rootPath;
     SdfPathVector _excludedPrimPaths;
