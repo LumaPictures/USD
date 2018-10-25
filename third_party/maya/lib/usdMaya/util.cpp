@@ -43,6 +43,7 @@
 #include <maya/MAnimUtil.h>
 #include <maya/MArgDatabase.h>
 #include <maya/MArgList.h>
+#include <maya/MBoundingBox.h>
 #include <maya/MColor.h>
 #include <maya/MDGModifier.h>
 #include <maya/MDagPath.h>
@@ -64,6 +65,7 @@
 #include <maya/MObject.h>
 #include <maya/MPlug.h>
 #include <maya/MPlugArray.h>
+#include <maya/MPoint.h>
 #include <maya/MSelectionList.h>
 #include <maya/MStatus.h>
 #include <maya/MString.h>
@@ -77,6 +79,37 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
+
+std::string
+UsdMayaUtil::GetMayaNodeName(const MObject& mayaNode)
+{
+    MString nodeName;
+    MStatus status;
+
+    // All DAG nodes are also DG nodes, so try it as a DG node first.
+    const MFnDependencyNode depNodeFn(mayaNode, &status);
+    if (status == MS::kSuccess) {
+#if MAYA_API_VERSION >= 20180000
+        const MString depName = depNodeFn.absoluteName(&status);
+#else
+        const MString depName = depNodeFn.name(&status);
+#endif
+        if (status == MS::kSuccess) {
+            nodeName = depName;
+        }
+    }
+
+    // Overwrite the DG name if we find that it's a DAG node.
+    const MFnDagNode dagNodeFn(mayaNode, &status);
+    if (status == MS::kSuccess) {
+        const MString dagName = dagNodeFn.fullPathName(&status);
+        if (status == MS::kSuccess) {
+            nodeName = dagName;
+        }
+    }
+
+    return nodeName.asChar();
+}
 
 MStatus
 UsdMayaUtil::GetMObjectByName(const std::string& nodeName, MObject& mObj)
@@ -296,35 +329,38 @@ UsdMayaUtil::getSampledType(
 
 // does this cover all cases?
 bool
-UsdMayaUtil::isAnimated(MObject& object, const bool checkParent)
+UsdMayaUtil::isAnimated(const MObject& mayaObject, const bool checkParent)
 {
-    MStatus stat;
+    // MItDependencyGraph takes a non-const MObject as a constructor parameter,
+    // so we have to make a copy of mayaObject here.
+    MObject mayaObjectCopy(mayaObject);
+
+    MStatus status;
     MItDependencyGraph iter(
-        object,
+        mayaObjectCopy,
         MFn::kInvalid,
         MItDependencyGraph::kUpstream,
         MItDependencyGraph::kDepthFirst,
         MItDependencyGraph::kNodeLevel,
-        &stat);
-
-    if (stat!= MS::kSuccess)
-    {
-        TF_RUNTIME_ERROR("Unable to create DG iterator");
+        &status);
+    if (status != MS::kSuccess) {
+        TF_RUNTIME_ERROR(
+            "Unable to create DG iterator for Maya node '%s'",
+            GetMayaNodeName(mayaObject).c_str());
     }
 
     // MAnimUtil::isAnimated(node) will search the history of the node
     // for any animation curve nodes. It will return true for those nodes
     // that have animation curve in their history.
     // The average time complexity is O(n^2) where n is the number of history
-    // nodes. But we can improve the best case by split the loop into two.
+    // nodes. But we can improve the best case by splitting the loop into two.
     std::vector<MObject> nodesToCheckAnimCurve;
 
-    for (; !iter.isDone(); iter.next())
-    {
+    for (; !iter.isDone(); iter.next()) {
         MObject node = iter.thisNode();
 
         if (node.hasFn(MFn::kPluginDependNode) ||
-                node.hasFn( MFn::kConstraint ) ||
+                node.hasFn(MFn::kConstraint) ||
                 node.hasFn(MFn::kPointConstraint) ||
                 node.hasFn(MFn::kAimConstraint) ||
                 node.hasFn(MFn::kOrientConstraint) ||
@@ -348,11 +384,9 @@ UsdMayaUtil::isAnimated(MObject& object, const bool checkParent)
             return true;
         }
 
-        if (node.hasFn(MFn::kExpression))
-        {
-            MFnExpression fn(node, &stat);
-            if (stat == MS::kSuccess && fn.isAnimated())
-            {
+        if (node.hasFn(MFn::kExpression)) {
+            MFnExpression fn(node, &status);
+            if (status == MS::kSuccess && fn.isAnimated()) {
                 return true;
             }
         }
@@ -360,10 +394,8 @@ UsdMayaUtil::isAnimated(MObject& object, const bool checkParent)
         nodesToCheckAnimCurve.push_back(node);
     }
 
-    for (auto& node : nodesToCheckAnimCurve)
-    {
-        if (MAnimUtil::isAnimated(node, checkParent))
-        {
+    for (const MObject& node : nodesToCheckAnimCurve) {
+        if (MAnimUtil::isAnimated(node, checkParent)) {
             return true;
         }
     }
@@ -377,7 +409,7 @@ UsdMayaUtil::isPlugAnimated(const MPlug& plug)
     if (plug.isNull()) {
         return false;
     }
-    if (plug.isKeyable() && MAnimUtil::isAnimated(plug)) {
+    if (MAnimUtil::isAnimated(plug)) {
         return true;
     }
     if (plug.isDestination()) {
@@ -1807,4 +1839,11 @@ UsdMayaUtil::FindAncestorSceneAssembly(
         currentPath.pop();
     }
     return false;
+}
+
+MBoundingBox
+UsdMayaUtil::GetInfiniteBoundingBox()
+{
+    constexpr double inf = std::numeric_limits<double>::infinity();
+    return MBoundingBox(MPoint(-inf, -inf, -inf), MPoint(inf, inf, inf));
 }

@@ -383,6 +383,8 @@ UsdImagingGLDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
                 _GetSurfaceShaderSource();
             valueCache->GetDisplacementShaderSource(cachePath) =
                 std::string();
+            valueCache->GetMaterialMetadata(cachePath) =
+                                                VtValue(VtDictionary());
         }
 
         // DirtyParams indicates we should return material bindings;
