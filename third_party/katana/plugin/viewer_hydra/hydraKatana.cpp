@@ -198,7 +198,7 @@ void HydraKatana::draw(ViewportWrapperPtr viewport)
     m_engine.SetTaskContextData(HdxTokens->selectionState, selectionValue);
 
     // Render
-    auto tasks = m_taskController->GetTasks(HdxTaskSetTokens->colorRender);
+    auto tasks = m_taskController->GetTasks();
     m_engine.Execute(*m_renderIndex, tasks);
 }
 
