@@ -28,7 +28,11 @@
 #include "pxr/imaging/hd/renderDelegate.h"
 #include "pxr/imaging/hd/renderThread.h"
 
+#if EMBREE_VERSION_MAJOR == 3
+#include <embree3/rtcore.h>
+#else
 #include <embree2/rtcore.h>
+#endif
 
 PXR_NAMESPACE_OPEN_SCOPE
 
