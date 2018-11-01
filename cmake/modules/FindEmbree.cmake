@@ -36,44 +36,43 @@
 #
 #=============================================================================
 
-if (APPLE)
-    set (EMBREE_LIB_NAME libembree.dylib)
-elseif (UNIX)
-    set (EMBREE_LIB_NAME libembree.so)
-elseif (WIN32)
-    set (EMBREE_LIB_NAME embree.lib)
-endif()
+# Embree 2 lib name has no version suffix
+foreach (_EMBREE_VERSION_SUFFIX "" "3")
+    find_library(EMBREE_LIBRARY
+            "embree${_EMBREE_VERSION_SUFFIX}"
+        HINTS
+            "${EMBREE_LOCATION}/lib64"
+            "${EMBREE_LOCATION}/lib"
+            "$ENV{EMBREE_LOCATION}/lib64"
+            "$ENV{EMBREE_LOCATION}/lib"
+        DOC
+            "Embree library path"
+    )
 
-find_library(EMBREE_LIBRARY
-        "${EMBREE_LIB_NAME}"
+    if (EMBREE_LIBRARY)
+        break()
+    endif ()
+endforeach ()
+
+foreach (_EMBREE_VERSION_SUFFIX "2" "3")
+    find_path(EMBREE_INCLUDE_DIR
+        embree${_EMBREE_VERSION_SUFFIX}/rtcore.h
     HINTS
-        "${EMBREE_LOCATION}/lib64"
-        "${EMBREE_LOCATION}/lib"
-        "$ENV{EMBREE_LOCATION}/lib64"
-        "$ENV{EMBREE_LOCATION}/lib"
+        "${EMBREE_LOCATION}/include"
+        "$ENV{EMBREE_LOCATION}/include"
     DOC
-        "Embree library path"
-)
+        "Embree headers path"
+    )
 
-find_path(EMBREE_INCLUDE_DIR
-    embree2/rtcore.h
-HINTS
-    "${EMBREE_LOCATION}/include"
-    "$ENV{EMBREE_LOCATION}/include"
-DOC
-    "Embree headers path"
-)
-
-if (EMBREE_INCLUDE_DIR AND EXISTS "${EMBREE_INCLUDE_DIR}/embree2/rtcore_version.h" )
-    file(STRINGS "${EMBREE_INCLUDE_DIR}/embree2/rtcore_version.h" TMP REGEX "^#define RTCORE_VERSION_MAJOR.*$")
-    string(REGEX MATCHALL "[0-9]+" MAJOR ${TMP})
-    file(STRINGS "${EMBREE_INCLUDE_DIR}/embree2/rtcore_version.h" TMP REGEX "^#define RTCORE_VERSION_MINOR.*$")
-    string(REGEX MATCHALL "[0-9]+" MINOR ${TMP})
-    file(STRINGS "${EMBREE_INCLUDE_DIR}/embree2/rtcore_version.h" TMP REGEX "^#define RTCORE_VERSION_PATCH.*$")
-    string(REGEX MATCHALL "[0-9]+" PATCH ${TMP})
-
-    set (EMBREE_VERSION ${MAJOR}.${MINOR}.${PATCH})
-endif()
+    if (EMBREE_INCLUDE_DIR AND EXISTS "${EMBREE_INCLUDE_DIR}/embree${_EMBREE_VERSION_SUFFIX}/rtcore_version.h" )
+        foreach (_EMBREE_VERSION_COMP "MAJOR" "MINOR" "PATCH")
+            file(STRINGS "${EMBREE_INCLUDE_DIR}/embree${_EMBREE_VERSION_SUFFIX}/rtcore_version.h" _EMBREE_TMP REGEX "^#define RTC(ORE)?_VERSION_${_EMBREE_VERSION_COMP} .*$")
+            string(REGEX MATCHALL "[0-9]+" "EMBREE_VERSION_${_EMBREE_VERSION_COMP}" ${_EMBREE_TMP})
+        endforeach ()
+        set(EMBREE_VERSION ${EMBREE_VERSION_MAJOR}.${EMBREE_VERSION_MINOR}.${EMBREE_VERSION_PATCH})
+        break()
+    endif ()
+endforeach ()
 
 include(FindPackageHandleStandardArgs)
 
@@ -81,6 +80,9 @@ find_package_handle_standard_args(Embree
     REQUIRED_VARS
         EMBREE_INCLUDE_DIR
         EMBREE_LIBRARY
+        EMBREE_VERSION_MAJOR
+        EMBREE_VERSION_MINOR
+        EMBREE_VERSION_PATCH
     VERSION_VAR
         EMBREE_VERSION
 )
