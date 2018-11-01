@@ -1079,6 +1079,8 @@ function(_pxr_library NAME)
     set(multiValueArgs
         PUBLIC_HEADERS
         PRIVATE_HEADERS
+        PRIVATE_DEFINITIONS
+        PUBLIC_DEFINITIONS
         CPPFILES
         LIBRARIES
         INCLUDE_DIRS
@@ -1254,6 +1256,7 @@ function(_pxr_library NAME)
         PUBLIC
             ${pythonEnabled}
             ${apiPublic}
+            ${args_PUBLIC_DEFINITIONS}
         PRIVATE
             MFB_PACKAGE_NAME=${PXR_PACKAGE}
             MFB_ALT_PACKAGE_NAME=${PXR_PACKAGE}
@@ -1263,6 +1266,7 @@ function(_pxr_library NAME)
             ${pxrInstallLocation}
             ${pythonModulesEnabled}
             ${apiPrivate}
+            ${args_PRIVATE_DEFINITIONS}
     )
 
     if (PXR_PLUGS_LOADING_FALLBACK)

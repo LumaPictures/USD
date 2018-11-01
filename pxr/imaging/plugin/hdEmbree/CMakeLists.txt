@@ -46,15 +46,18 @@ pxr_plugin(hdEmbree
 
     RESOURCE_FILES
         plugInfo.json
+
+    PUBLIC_DEFINITIONS
+        EMBREE_VERSION_MAJOR=${EMBREE_VERSION_MAJOR}
 )
 
-if (X11_FOUND OR APPLE)
-pxr_build_test(testHdEmbree
-    LIBRARIES
-        hdEmbree
-        garch
-        arch
-    CPPFILES
-        testenv/testHdEmbree.cpp
-)
-endif()
+# if (X11_FOUND OR APPLE)
+# pxr_build_test(testHdEmbree
+#     LIBRARIES
+#         hdEmbree
+#         garch
+#         arch
+#     CPPFILES
+#         testenv/testHdEmbree.cpp
+# )
+# endif()
