@@ -18,3 +18,4 @@ tg/simple_features/tex_image_format
 tg/simple_features/animated_textures_for_draw_mode
 tg/simple_features/cards_sprite_display
 tg/simple_features/embree_3_support
+tg/simple_features/maya_importing_instances
