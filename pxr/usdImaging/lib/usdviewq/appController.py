@@ -393,6 +393,9 @@ class AppController(QtCore.QObject):
             self._dataModel = UsdviewDataModel(
                 self._printTiming, self._settings2)
 
+            self._dataModel.signalPrimsChanged.connect(
+                self._onPrimsChanged)
+
             self._dataModel.stage = stage
 
             self._primViewSelectionBlocker = Blocker()
@@ -422,6 +425,7 @@ class AppController(QtCore.QObject):
                         parserData.complexity, fallback.id))
                 self._dataModel.viewSettings.complexity = fallback
 
+            self._hasPrimResync = False
             self._timeSamples = None
             self._stageView = None
             self._startingPrimCamera = None
@@ -868,6 +872,8 @@ class AppController(QtCore.QObject):
 
             self._ui.colorGroup.triggered.connect(self._changeBgColor)
 
+            # Configuring the PrimView's Show menu.  In addition to the
+            # "designed" menu items, we inject a PrimView HeaderContextMenu
             self._ui.primViewDepthGroup.triggered.connect(self._changePrimViewDepth)
 
             self._ui.actionExpand_All.triggered.connect(
@@ -887,6 +893,12 @@ class AppController(QtCore.QObject):
 
             self._ui.actionShow_Abstract_Prims.triggered.connect(
                 self._toggleShowAbstractPrims)
+
+            # Since setting column visibility is probably not a common
+            # operation, it's actually good to have Columns at the end.
+            self._ui.menuShow.addSeparator()
+            self._ui.menuShow.addMenu(HeaderContextMenu(self._ui.primView))
+
 
             self._ui.actionRollover_Prim_Info.triggered.connect(
                 self._toggleRolloverPrimInfo)
@@ -1230,11 +1242,14 @@ class AppController(QtCore.QObject):
 
     @staticmethod
     def GetRendererOptionChoices():
-        choices = UsdImagingGL.GL.GetRegisteredRendererPluginsDisplayNames()
-        if choices:
+        ids = UsdImagingGL.GL.GetRendererPlugins()
+        choices = []
+        if ids:
+            choices = [UsdImagingGL.GL.GetRendererDisplayName(x) for x in ids]
             choices.append(AppController.HYDRA_DISABLED_OPTION_STRING)
         else:
             choices = [AppController.HYDRA_DISABLED_OPTION_STRING]
+
         return choices
 
     # Render plugin support
@@ -1360,8 +1375,10 @@ class AppController(QtCore.QObject):
             self._ui.settingsFlagActions = []
 
             settings = self._stageView.GetRendererSettingsList()
+            moreSettings = False
             for setting in settings:
                 if setting.type != UsdImagingGL.GL.RendererSettingType.FLAG:
+                    moreSettings = True
                     continue
                 action = self._ui.menuRendererSettings.addAction(setting.name)
                 action.setCheckable(True)
@@ -1371,21 +1388,24 @@ class AppController(QtCore.QObject):
                     self._rendererSettingsFlagChanged(action))
                 self._ui.settingsFlagActions.append(action)
 
-            self._ui.menuRendererSettings.addSeparator()
+            if moreSettings:
+                self._ui.menuRendererSettings.addSeparator()
 
-            self._ui.settingsAdvancedAction = self._ui.menuRendererSettings.addAction("More...")
-            self._ui.settingsAdvancedAction.setCheckable(False)
-            self._ui.settingsAdvancedAction.triggered[bool].connect(self._advancedRendererSettings)
+                self._ui.settingsMoreAction = self._ui.menuRendererSettings.addAction("More...")
+                self._ui.settingsMoreAction.setCheckable(False)
+                self._ui.settingsMoreAction.triggered[bool].connect(self._moreRendererSettings)
 
             self._ui.menuRendererSettings.setEnabled(len(settings) != 0)
-            if hasattr(self._ui, 'settingsAdvancedDialog'):
-                self._ui.settingsAdvancedDialog.reject()
 
-    def _advancedRendererSettings(self):
+            # Close the old "More..." dialog if it's still open
+            if hasattr(self._ui, 'settingsMoreDialog'):
+                self._ui.settingsMoreDialog.reject()
+
+    def _moreRendererSettings(self):
         # Recreate the settings dialog
-        self._ui.settingsAdvancedDialog = QtWidgets.QDialog(self._mainWindow)
-        self._ui.settingsAdvancedDialog.setWindowTitle("Hydra Settings")
-        self._ui.settingsAdvancedWidgets = []
+        self._ui.settingsMoreDialog = QtWidgets.QDialog(self._mainWindow)
+        self._ui.settingsMoreDialog.setWindowTitle("Hydra Settings")
+        self._ui.settingsMoreWidgets = []
         layout = QtWidgets.QVBoxLayout()
 
         # Add settings
@@ -1404,7 +1424,7 @@ class AppController(QtCore.QObject):
                 checkBox.key = str(setting.key)
                 checkBox.defValue = setting.defValue
                 formLayout.addRow(setting.name, checkBox)
-                self._ui.settingsAdvancedWidgets.append(checkBox)
+                self._ui.settingsMoreWidgets.append(checkBox)
             if setting.type == UsdImagingGL.GL.RendererSettingType.INT:
                 spinBox = QtWidgets.QSpinBox()
                 spinBox.setMinimum(-2 ** 31)
@@ -1413,7 +1433,7 @@ class AppController(QtCore.QObject):
                 spinBox.key = str(setting.key)
                 spinBox.defValue = setting.defValue
                 formLayout.addRow(setting.name, spinBox)
-                self._ui.settingsAdvancedWidgets.append(spinBox)
+                self._ui.settingsMoreWidgets.append(spinBox)
             if setting.type == UsdImagingGL.GL.RendererSettingType.FLOAT:
                 spinBox = QtWidgets.QDoubleSpinBox()
                 spinBox.setDecimals(10)
@@ -1423,14 +1443,14 @@ class AppController(QtCore.QObject):
                 spinBox.key = str(setting.key)
                 spinBox.defValue = setting.defValue
                 formLayout.addRow(setting.name, spinBox)
-                self._ui.settingsAdvancedWidgets.append(spinBox)
+                self._ui.settingsMoreWidgets.append(spinBox)
             if setting.type == UsdImagingGL.GL.RendererSettingType.STRING:
                 lineEdit = QtWidgets.QLineEdit()
                 lineEdit.setText(self._stageView.GetRendererSetting(setting.key))
                 lineEdit.key = str(setting.key)
                 lineEdit.defValue = setting.defValue
                 formLayout.addRow(setting.name, lineEdit)
-                self._ui.settingsAdvancedWidgets.append(lineEdit)
+                self._ui.settingsMoreWidgets.append(lineEdit)
 
         # Add buttons
         buttonBox = QtWidgets.QDialogButtonBox(
@@ -1438,17 +1458,17 @@ class AppController(QtCore.QObject):
             QtWidgets.QDialogButtonBox.Cancel |
             QtWidgets.QDialogButtonBox.RestoreDefaults)
         layout.addWidget(buttonBox)
-        buttonBox.rejected.connect(self._ui.settingsAdvancedDialog.reject)
-        buttonBox.accepted.connect(self._ui.settingsAdvancedDialog.accept)
-        self._ui.settingsAdvancedDialog.accepted.connect(self._applyAdvancedRendererSettings)
+        buttonBox.rejected.connect(self._ui.settingsMoreDialog.reject)
+        buttonBox.accepted.connect(self._ui.settingsMoreDialog.accept)
+        self._ui.settingsMoreDialog.accepted.connect(self._applyMoreRendererSettings)
         defaultButton = buttonBox.button(QtWidgets.QDialogButtonBox.RestoreDefaults)
-        defaultButton.clicked.connect(self._resetAdvancedRendererSettings)
+        defaultButton.clicked.connect(self._resetMoreRendererSettings)
 
-        self._ui.settingsAdvancedDialog.setLayout(layout)
-        self._ui.settingsAdvancedDialog.show()
+        self._ui.settingsMoreDialog.setLayout(layout)
+        self._ui.settingsMoreDialog.show()
 
-    def _applyAdvancedRendererSettings(self):
-        for widget in self._ui.settingsAdvancedWidgets:
+    def _applyMoreRendererSettings(self):
+        for widget in self._ui.settingsMoreWidgets:
             if isinstance(widget, QtWidgets.QCheckBox):
                 self._stageView.SetRendererSetting(widget.key, widget.isChecked())
             if isinstance(widget, QtWidgets.QSpinBox):
@@ -1461,8 +1481,8 @@ class AppController(QtCore.QObject):
         for action in self._ui.settingsFlagActions:
             action.setChecked(self._stageView.GetRendererSetting(action.key))
 
-    def _resetAdvancedRendererSettings(self):
-        for widget in self._ui.settingsAdvancedWidgets:
+    def _resetMoreRendererSettings(self):
+        for widget in self._ui.settingsMoreWidgets:
             if isinstance(widget, QtWidgets.QCheckBox):
                 widget.setChecked(widget.defValue)
             if isinstance(widget, QtWidgets.QSpinBox):
@@ -1574,17 +1594,25 @@ class AppController(QtCore.QObject):
         previously fetched from the stage is invalid. In the future, more
         granular updates will be supported by listening to UsdNotice objects on
         the active stage.
+
+        If a prim resync is needed then we fully update the prim view,
+        otherwise can just do a simplified update to the prim view.
         """
-        self._resetPrimView()
-        self._updatePropertyView()
+        with BusyContext():
+            if self._hasPrimResync:
+                self._resetPrimView()
+                self._hasPrimResync = False
+            else:
+                self._resetPrimViewVis(selItemsOnly=False)
 
-        self._populatePropertyInspector()
-        self._updateMetadataView()
-        self._updateLayerStackView()
-        self._updateCompositionView()
+            self._updatePropertyView()
+            self._populatePropertyInspector()
+            self._updateMetadataView()
+            self._updateLayerStackView()
+            self._updateCompositionView()
 
-        if self._stageView:
-            self._stageView.update()
+            if self._stageView:
+                self._stageView.update()
 
     def updateGUI(self):
         """Will schedule a full refresh/resync of the GUI contents.
@@ -1977,13 +2005,15 @@ class AppController(QtCore.QObject):
 
         self._refreshCameraListAndMenu(preserveCurrCamera = False)
 
-    def _updateForStageChanges(self):
+    def _updateForStageChanges(self, hasPrimResync=True):
         """Assuming there have been authoring changes to the already-loaded
         stage, make the minimal updates to the UI required to maintain a
         consistent state.  This may still be over-zealous until we know
         what actually changed, but we should be able to preserve camera and
         playback positions (unless viewing through a stage camera that no
         longer exists"""
+
+        self._hasPrimResync = hasPrimResync or self._hasPrimResync
 
         self._clearCaches(preserveCamera=True)
 
@@ -2375,7 +2405,6 @@ class AppController(QtCore.QObject):
             Glf.TextureRegistry.Reset()
             # reset timeline, and playback settings from stage metadata
             self._reloadFixedUI(resetStageDataOnly=True)
-            self._updateForStageChanges()
         except Exception as err:
             self.statusMessage('Error occurred rereading all layers for Stage: %s' % err)
         finally:
@@ -3593,7 +3622,7 @@ class AppController(QtCore.QObject):
             tableWidget.setCellWidget(rowIndex, 1, combo)
             combo.currentIndexChanged.connect(
                 lambda i, combo=combo: combo.updateVariantSelection(
-                    i, self._updateForStageChanges, self._printTiming))
+                    i, self._printTiming))
             rowIndex += 1
 
         tableWidget.resizeColumnToContents(0)
@@ -4128,9 +4157,6 @@ class AppController(QtCore.QObject):
                     sdfPrim = Sdf.CreatePrimInLayer(layer, path)
                     sdfPrim.active = active
 
-            # Refresh primView to support the stage changes.
-            self.updateGUI()
-
             pathNames = ", ".join(path.name for path in paths)
             if active:
                 self.editComplete("Activated {}.".format(pathNames))
@@ -4590,33 +4616,14 @@ class AppController(QtCore.QObject):
             self._stageView.updateBboxPurposes()
             self._stageView.updateView()
 
-    def _resetPrimViewDrawMode(self, rootItem=None):
-        """Updates browser's "Draw Mode" columns. """
-        with Timer() as t:
-            primView = self._ui.primView
-            primView.setUpdatesEnabled(False)
-            # Update draw-model for the entire prim tree if the given 
-            # rootItem is None.
-            if rootItem is None:
-                rootItem = primView.invisibleRootItem().child(0)
-            if rootItem.childCount() == 0:
-                self._populateChildren(rootItem)
-            rootsToProcess = [rootItem.child(i) for i in 
-                    xrange(rootItem.childCount())]
-            for item in rootsToProcess:
-                PrimViewItem.propagateDrawMode(item, primView)
-            primView.setUpdatesEnabled(True)
-        if self._printTiming:
-            t.PrintTime("update draw mode column")
-
-    def _drawModeChanged(self, primViewItem):
-        self._updatePropertyView()
-        self._resetPrimViewDrawMode(rootItem=primViewItem)
-        if self._stageView:
-            self._stageView.updateView()
-
     def _HUDInfoChanged(self):
         """Called when a HUD setting that requires info refresh has changed."""
         if self._isHUDVisible():
             self._updateHUDPrimStats()
             self._updateHUDGeomCounts()
+
+    def _onPrimsChanged(self, primsChange, propertiesChange):
+        """Called when prims in the USD stage have changed."""
+        from rootDataModel import ChangeNotice
+        self._updateForStageChanges(
+            hasPrimResync=(primsChange==ChangeNotice.RESYNC))
