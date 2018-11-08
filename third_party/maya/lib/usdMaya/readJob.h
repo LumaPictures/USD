@@ -78,7 +78,8 @@ private:
     // usdImport, and an 'Expanded' representation-style import, respectively.
     // It would be great if we could combine these into a single traversal at
     // some point.
-    bool _DoImport(UsdPrimRange& range, const UsdPrim& usdRootPrim);
+    bool _DoImport(UsdPrimRange& range, const UsdPrim& usdRootPrim,
+        const UsdStageRefPtr& stage);
     bool _DoImportWithProxies(UsdPrimRange& range);
 
     // These are helper methods for the proxy import method.
