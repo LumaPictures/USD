@@ -23,7 +23,6 @@
 //
 #include "usdMaya/readJob.h"
 
-#include "usdMaya/primReaderRegistry.h"
 #include "usdMaya/shadingModeRegistry.h"
 #include "usdMaya/stageCache.h"
 #include "usdMaya/stageNode.h"
@@ -37,7 +36,6 @@
 #include "pxr/usd/sdf/path.h"
 #include "pxr/usd/sdf/primSpec.h"
 #include "pxr/usd/usd/prim.h"
-#include "pxr/usd/usd/primRange.h"
 #include "pxr/usd/usd/stage.h"
 #include "pxr/usd/usd/stageCacheContext.h"
 #include "pxr/usd/usd/timeCode.h"
@@ -272,44 +270,97 @@ UsdMaya_ReadJob::Read(std::vector<MDagPath>* addedDagPaths)
     return (status == MS::kSuccess);
 }
 
+void UsdMaya_ReadJob::_DoImportPrimIt(
+    UsdPrimRange::iterator& primIt, const UsdPrim& usdRootPrim,
+    UsdMayaPrimReaderContext& readCtx, _PrimReaders& primReaders) {
+    const UsdPrim prim = *primIt;
+    // The iterator will hit each prim twice. IsPostVisit tells us if
+    // this is the pre-visit (Read) step or post-visit (PostReadSubtree)
+    // step.
+    if (primIt.IsPostVisit()) {
+        // This is the PostReadSubtree step, if the PrimReader has
+        // specified one.
+        auto primReaderIt = primReaders.find(prim.GetPath());
+        if (primReaderIt != primReaders.end()) {
+            primReaderIt->second->PostReadSubtree(&readCtx);
+        }
+    } else {
+        // This is the normal Read step (pre-visit).
+        UsdMayaPrimReaderArgs args(prim, mArgs);
+        // If we are NOT importing on behalf of an assembly, then we'll
+        // create reference assembly nodes that target the asset file
+        // and the root prims of those assets directly. This ensures
+        // that a re-export will work correctly, since USD references
+        // can only target root prims.
+        std::string assetIdentifier;
+        SdfPath assetPrimPath;
+        if (UsdMayaTranslatorModelAssembly::ShouldImportAsAssembly(
+            usdRootPrim,
+            prim,
+            &assetIdentifier,
+            &assetPrimPath)) {
+            const bool isSceneAssembly =
+                mMayaRootDagPath.node().hasFn(MFn::kAssembly);
+            if (isSceneAssembly) {
+                // If we ARE importing on behalf of an assembly, we use
+                // the file path of the top-level assembly and the path
+                // to the prim within that file when creating the
+                // reference assembly.
+                assetIdentifier = mFileName;
+                assetPrimPath = prim.GetPath();
+            }
+
+            // Note that if assemblyRep == "Import", the assembly reader
+            // will NOT run and we will fall through to the prim reader
+            // below.
+            MObject parentNode = readCtx.GetMayaNode(
+                prim.GetPath().GetParentPath(), false);
+            if (UsdMayaTranslatorModelAssembly::Read(
+                prim,
+                assetIdentifier,
+                assetPrimPath,
+                parentNode,
+                args,
+                &readCtx,
+                mArgs.assemblyRep)) {
+                if (readCtx.GetPruneChildren()) {
+                    primIt.PruneChildren();
+                }
+                return;
+            }
+        }
+
+        TfToken typeName = prim.GetTypeName();
+        if (UsdMayaPrimReaderRegistry::ReaderFactoryFn factoryFn
+            = UsdMayaPrimReaderRegistry::FindOrFallback(typeName)) {
+            UsdMayaPrimReaderSharedPtr primReader = factoryFn(args);
+            if (primReader) {
+                primReader->Read(&readCtx);
+                if (primReader->HasPostReadSubtree()) {
+                    primReaders[prim.GetPath()] = primReader;
+                }
+                if (readCtx.GetPruneChildren()) {
+                    primIt.PruneChildren();
+                }
+            }
+        }
+    }
+}
 
 bool
 UsdMaya_ReadJob::_DoImport(UsdPrimRange& rootRange, const UsdPrim& usdRootPrim,
     const UsdStageRefPtr& stage)
 {
+    const bool buildSources = mArgs.instanceMode ==
+                              UsdMayaJobImportArgsTokens->BuildSources;
     // Masters are not iterated when using UsdPrimRange
-    if (mArgs.instanceMode == UsdMayaJobImportArgsTokens->BuildSources) {
-        std::unordered_map<SdfPath, UsdMayaPrimReaderSharedPtr,
-            SdfPath::Hash> primReaders;
+    if (buildSources) {
         for (const auto& master: stage->GetMasters()) {
+            _PrimReaders primReaders;
             const UsdPrimRange range = UsdPrimRange::PreAndPostVisit(master);
             for (auto primIt = range.begin(); primIt != range.end(); ++primIt) {
-                const UsdPrim& prim = *primIt;
-                if (!primIt.IsPostVisit()) {
-                    UsdMayaPrimReaderArgs args(prim, mArgs);
-                    UsdMayaPrimReaderContext readCtx(&mNewNodeRegistry);
-
-                    TfToken typeName = prim.GetTypeName();
-                    if (UsdMayaPrimReaderRegistry::ReaderFactoryFn factoryFn
-                        = UsdMayaPrimReaderRegistry::FindOrFallback(typeName)) {
-                        UsdMayaPrimReaderSharedPtr primReader = factoryFn(args);
-                        if (primReader) {
-                            primReader->Read(&readCtx);
-                            if (primReader->HasPostReadSubtree()) {
-                                primReaders[prim.GetPath()] = primReader;
-                            }
-                            if (readCtx.GetPruneChildren()) {
-                                primIt.PruneChildren();
-                            }
-                        }
-                    }
-                } else {
-                    UsdMayaPrimReaderContext postReadCtx(&mNewNodeRegistry);
-                    auto primReaderIt = primReaders.find(prim.GetPath());
-                    if (primReaderIt != primReaders.end()) {
-                        primReaderIt->second->PostReadSubtree(&postReadCtx);
-                    }
-                }
+                UsdMayaPrimReaderContext readCtx(&mNewNodeRegistry);
+                _DoImportPrimIt(primIt, usdRootPrim, readCtx, primReaders);
             }
         }
     }
@@ -321,8 +372,7 @@ UsdMaya_ReadJob::_DoImport(UsdPrimRange& rootRange, const UsdPrim& usdRootPrim,
         const UsdPrim& rootPrim = *rootIt;
         rootIt.PruneChildren();
 
-        std::unordered_map<SdfPath, UsdMayaPrimReaderSharedPtr,
-                SdfPath::Hash> primReaders;
+        _PrimReaders primReaders;
         const UsdPrimRange range =
             mArgs.instanceMode == UsdMayaJobImportArgsTokens->Flatten ?
                 UsdPrimRange::PreAndPostVisit(rootPrim,
@@ -330,123 +380,48 @@ UsdMaya_ReadJob::_DoImport(UsdPrimRange& rootRange, const UsdPrim& usdRootPrim,
                 UsdPrimRange::PreAndPostVisit(rootPrim);
         for (auto primIt = range.begin(); primIt != range.end(); ++primIt) {
             const UsdPrim& prim = *primIt;
+            UsdMayaPrimReaderContext readCtx(&mNewNodeRegistry);
 
-            // The iterator will hit each prim twice. IsPostVisit tells us if
-            // this is the pre-visit (Read) step or post-visit (PostReadSubtree)
-            // step.
-            if (!primIt.IsPostVisit()) {
-                // This is the normal Read step (pre-visit).
-                UsdMayaPrimReaderArgs args(prim, mArgs);
-                UsdMayaPrimReaderContext readCtx(&mNewNodeRegistry);
+            if (buildSources && prim.IsInstance()) {
+                if (!primIt.IsPostVisit()) { continue; }
+                const auto master = prim.GetMaster();
+                if (!master) { continue; }
 
-                // If we are NOT importing on behalf of an assembly, then we'll
-                // create reference assembly nodes that target the asset file
-                // and the root prims of those assets directly. This ensures
-                // that a re-export will work correctly, since USD references
-                // can only target root prims.
-                std::string assetIdentifier;
-                SdfPath assetPrimPath;
-                if (UsdMayaTranslatorModelAssembly::ShouldImportAsAssembly(
-                        usdRootPrim,
-                        prim,
-                        &assetIdentifier,
-                        &assetPrimPath)) {
-                    const bool isSceneAssembly =
-                            mMayaRootDagPath.node().hasFn(MFn::kAssembly);
-                    if (isSceneAssembly) {
-                        // If we ARE importing on behalf of an assembly, we use
-                        // the file path of the top-level assembly and the path
-                        // to the prim within that file when creating the
-                        // reference assembly.
-                        assetIdentifier = mFileName;
-                        assetPrimPath = prim.GetPath();
-                    }
-
-                    // Note that if assemblyRep == "Import", the assembly reader
-                    // will NOT run and we will fall through to the prim reader
-                    // below.
-                    MObject parentNode = readCtx.GetMayaNode(
-                            prim.GetPath().GetParentPath(), false);
-                    if (UsdMayaTranslatorModelAssembly::Read(
-                            prim,
-                            assetIdentifier,
-                            assetPrimPath,
-                            parentNode,
-                            args,
-                            &readCtx,
-                            mArgs.assemblyRep)) {
-                        if (readCtx.GetPruneChildren()) {
-                            primIt.PruneChildren();
-                        }
-                        continue;
-                    }
-                }
-
-                if (mArgs.instanceMode ==
-                    UsdMayaJobImportArgsTokens->BuildSources &&
-                        prim.IsInstance()) {
-                    const auto master = prim.GetMaster();
-                    if (!master) { continue; }
-
-                    const auto masterPath = master.GetPath();
-                    MObject masterObject =
-                        readCtx.GetMayaNode(masterPath, false);
-                    if (masterObject == MObject::kNullObj) {
-                        continue;
-                    }
-
-                    MFnDagNode dgNode(masterObject);
-                    MDagPath path;
-                    dgNode.getPath(path);
-                    MStatus status;
-                    MObject duplicate = dgNode.duplicate(true, true, &status);
-                    if (!status) {
-                        continue;
-                    }
-
-                    const auto primPath = prim.GetPath();
-                    // TODO: Move this function to translatorUtil.cpp!
-                    MDagModifier dagMod;
-                    dagMod.reparentNode(
-                        duplicate,
-                        readCtx.GetMayaNode(primPath.GetParentPath(), false));
-                    dagMod.renameNode(duplicate, primPath.GetName().c_str());
-                    dagMod.doIt();
-
-                    // Read xformable attributes from the
-                    // UsdPrim on to the transform node.
-                    const UsdPrim prim =
-                        stage->GetPrimAtPath(primPath);
-                    UsdGeomXformable xformable(prim);
-                    UsdMayaPrimReaderArgs readerArgs(prim, mArgs);
-                    UsdMayaTranslatorXformable::Read(
-                        xformable, duplicate, readerArgs, &readCtx);
+                const auto masterPath = master.GetPath();
+                MObject masterObject =
+                    readCtx.GetMayaNode(masterPath, false);
+                if (masterObject == MObject::kNullObj) {
                     continue;
                 }
 
-                TfToken typeName = prim.GetTypeName();
-                if (UsdMayaPrimReaderRegistry::ReaderFactoryFn factoryFn
-                        = UsdMayaPrimReaderRegistry::FindOrFallback(typeName)) {
-                    UsdMayaPrimReaderSharedPtr primReader = factoryFn(args);
-                    if (primReader) {
-                        primReader->Read(&readCtx);
-                        if (primReader->HasPostReadSubtree()) {
-                            primReaders[prim.GetPath()] = primReader;
-                        }
-                        if (readCtx.GetPruneChildren()) {
-                            primIt.PruneChildren();
-                        }
-                    }
+                MFnDagNode dgNode(masterObject);
+                MDagPath path;
+                dgNode.getPath(path);
+                MStatus status;
+                MObject duplicate = dgNode.duplicate(true, true, &status);
+                if (!status) {
+                    continue;
                 }
-            }
-            else {
-                // This is the PostReadSubtree step, if the PrimReader has
-                // specified one.
-                UsdMayaPrimReaderContext postReadCtx(&mNewNodeRegistry);
-                auto primReaderIt = primReaders.find(prim.GetPath());
-                if (primReaderIt != primReaders.end()) {
-                    primReaderIt->second->PostReadSubtree(&postReadCtx);
-                }
+
+                const auto primPath = prim.GetPath();
+                // TODO: Move this function to translatorUtil.cpp!
+                MDagModifier dagMod;
+                dagMod.reparentNode(
+                    duplicate,
+                    readCtx.GetMayaNode(primPath.GetParentPath(), false));
+                dagMod.renameNode(duplicate, primPath.GetName().c_str());
+                dagMod.doIt();
+
+                // Read xformable attributes from the
+                // UsdPrim on to the transform node.
+                const UsdPrim prim =
+                    stage->GetPrimAtPath(primPath);
+                UsdGeomXformable xformable(prim);
+                UsdMayaPrimReaderArgs readerArgs(prim, mArgs);
+                UsdMayaTranslatorXformable::Read(
+                    xformable, duplicate, readerArgs, &readCtx);
+            } else {
+                _DoImportPrimIt(primIt, usdRootPrim, readCtx, primReaders);
             }
         }
     }
