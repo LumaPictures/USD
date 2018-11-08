@@ -126,7 +126,7 @@ TF_DECLARE_PUBLIC_TOKENS(
     (Full) \
     (Import) \
     /* instanceMode values */ \
-    (Ignore) \
+    (AsTransform) \
     (Flatten) \
     (BuildSources) \
     ((Unloaded, ""))
