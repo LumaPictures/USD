@@ -276,6 +276,45 @@ UsdMaya_ReadJob::Read(std::vector<MDagPath>* addedDagPaths)
 bool
 UsdMaya_ReadJob::_DoImport(UsdPrimRange& rootRange, const UsdPrim& usdRootPrim)
 {
+    auto createInstance = [] (
+        UsdMayaPrimReaderContext& readCtx,
+        const SdfPath& target,
+        const SdfPath& source,
+        const UsdMayaJobImportArgs& args,
+        UsdStageWeakPtr stage) {
+        if (readCtx.GetMayaNode(target, false) != MObject::kNullObj) {
+            return;
+        }
+
+        MObject sourceObject = readCtx.GetMayaNode(source, false);
+        if (sourceObject == MObject::kNullObj) {
+            return;
+        }
+
+        MFnDagNode dgNode(sourceObject);
+        MDagPath path;
+        dgNode.getPath(path);
+        MStatus status;
+        MObject duplicate = dgNode.duplicate(true, true, &status);
+        if (!status) {
+            return;
+        }
+
+        // TODO: Move this function to translatorUtil.cpp!
+        MDagModifier dagMod;
+        dagMod.reparentNode(duplicate,
+                            readCtx.GetMayaNode(target.GetParentPath(), false));
+        dagMod.renameNode(duplicate, target.GetName().c_str());
+        dagMod.doIt();
+
+        // Read xformable attributes from the UsdPrim on to the transform node.
+        const UsdPrim prim =
+            stage->GetPrimAtPath(target);
+        UsdGeomXformable xformable(prim);
+        UsdMayaPrimReaderArgs readerArgs(prim, args);
+        UsdMayaTranslatorXformable::Read(
+            xformable, duplicate, readerArgs, &readCtx);
+    };
     std::unordered_map<SdfPath, SdfPath, SdfPath::Hash> instances;
     // We want both pre- and post- visit iterations over the prims in this
     // method. To do so, iterate over all the root prims of the input range,
@@ -341,32 +380,36 @@ UsdMaya_ReadJob::_DoImport(UsdPrimRange& rootRange, const UsdPrim& usdRootPrim)
                     }
                 }
 
-                const SdfPath sceneMaster = [&prim] () -> SdfPath {
-                    if (!prim.IsInstance() || !prim.GetMaster()) { return {}; }
-                    const SdfPrimSpecHandleVector primStack =
-                        prim.GetPrimStack();
-                    SdfPath ret;
-                    for (const auto& spec : primStack) {
-                        const SdfPath specPath = spec->GetPath();
-                        if (specPath.IsEmpty()) { continue; }
-                        const UsdPrim specPrim =
-                            prim.GetStage()->GetPrimAtPath(specPath);
-                        if (specPrim && !specPrim.IsInstance()) {
-                            if (ret.IsEmpty()) {
-                                ret = specPath;
-                            } else {
-                                return {};
+                if (mArgs.instanceMode !=
+                        UsdMayaJobImportArgsTokens->AsTransform &&
+                    prim.IsInstance()) {
+                    const SdfPath sceneMaster = [&prim] () -> SdfPath {
+                        if (!prim.GetMaster()) { return {}; }
+                        const SdfPrimSpecHandleVector primStack =
+                            prim.GetPrimStack();
+                        SdfPath ret;
+                        for (const auto& spec : primStack) {
+                            const SdfPath specPath = spec->GetPath();
+                            if (specPath.IsEmpty()) { continue; }
+                            const UsdPrim specPrim =
+                                prim.GetStage()->GetPrimAtPath(specPath);
+                            if (specPrim && !specPrim.IsInstance()) {
+                                if (ret.IsEmpty()) {
+                                    ret = specPath;
+                                } else {
+                                    return {};
+                                }
                             }
                         }
+
+                        return ret;
+                    } ();
+
+                    if (!sceneMaster.IsEmpty()) {
+                        instances[prim.GetPath()] = sceneMaster;
+                        primIt.PruneChildren();
+                        continue;
                     }
-
-                    return ret;
-                } ();
-
-                if (!sceneMaster.IsEmpty()) {
-                    instances[prim.GetPath()] = sceneMaster;
-                    primIt.PruneChildren();
-                    continue;
                 }
 
                 TfToken typeName = prim.GetTypeName();
@@ -398,37 +441,9 @@ UsdMaya_ReadJob::_DoImport(UsdPrimRange& rootRange, const UsdPrim& usdRootPrim)
 
     UsdMayaPrimReaderContext readCtx(&mNewNodeRegistry);
     for (const auto& instanceIt : instances) {
-        if (readCtx.GetMayaNode(instanceIt.first, false) != MObject::kNullObj) {
-            continue;
-        }
-
-        MObject sourceObject = readCtx.GetMayaNode(instanceIt.second, false);
-        if (sourceObject == MObject::kNullObj) {
-            continue;
-        }
-
-        MFnDagNode dgNode(sourceObject);
-        MDagPath path;
-        dgNode.getPath(path);
-        MStatus status;
-        MObject duplicate = dgNode.duplicate(true, true, &status);
-        if (!status) {
-            continue;
-        }
-
-        // TODO: Move this function to translatorUtil.cpp!
-        MDagModifier dagMod;
-        dagMod.reparentNode(duplicate,
-            readCtx.GetMayaNode(instanceIt.first.GetParentPath(), false));
-        dagMod.renameNode(duplicate, instanceIt.first.GetName().c_str());
-        dagMod.doIt();
-
-        // Read xformable attributes from the UsdPrim on to the transform node.
-        const UsdPrim prim =
-            usdRootPrim.GetStage()->GetPrimAtPath(instanceIt.first);
-        UsdGeomXformable xformable(prim);
-        UsdMayaPrimReaderArgs args(prim, mArgs);
-        UsdMayaTranslatorXformable::Read(xformable, duplicate, args, &readCtx);
+        createInstance(
+            readCtx, instanceIt.first,
+            instanceIt.second, mArgs, usdRootPrim.GetStage());
     }
 
     return true;

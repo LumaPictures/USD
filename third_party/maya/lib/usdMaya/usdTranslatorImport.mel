@@ -120,7 +120,7 @@ global proc int usdTranslatorImport (string $parent,
             menuItem -l "Import" -ann "Import";
 
         optionMenuGrp -l "Instance Mode:" instanceModePopup;
-            menuItem -l "Ignore" -ann "Ignore";
+            menuItem -l "As Transform" -ann "AsTransform";
             menuItem -l "Flatten" -ann "Flatten";
             menuItem -l "Build Sources" -ann "BuildSources";
 
