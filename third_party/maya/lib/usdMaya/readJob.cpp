@@ -383,9 +383,13 @@ UsdMaya_ReadJob::_DoImport(UsdPrimRange& rootRange, const UsdPrim& usdRootPrim,
             UsdMayaPrimReaderContext readCtx(&mNewNodeRegistry);
 
             if (buildSources && prim.IsInstance()) {
-                if (!primIt.IsPostVisit()) { continue; }
+                if (!primIt.IsPostVisit()) {
+                    continue;
+                }
                 const auto master = prim.GetMaster();
-                if (!master) { continue; }
+                if (!master) {
+                    continue;
+                }
 
                 const auto masterPath = master.GetPath();
                 MObject masterObject =
@@ -394,10 +398,12 @@ UsdMaya_ReadJob::_DoImport(UsdPrimRange& rootRange, const UsdPrim& usdRootPrim,
                     continue;
                 }
 
-                MFnDagNode dgNode(masterObject);
-                MDagPath path;
-                dgNode.getPath(path);
                 MStatus status;
+                MFnDagNode dgNode(masterObject, &status);
+                if (!status) {
+                    continue;
+                }
+                dgNode.findPlug("visibility").setBool(false);
                 MObject duplicate = dgNode.duplicate(true, true, &status);
                 if (!status) {
                     continue;
