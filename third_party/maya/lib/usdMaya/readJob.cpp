@@ -386,12 +386,12 @@ UsdMaya_ReadJob::_DoImport(UsdPrimRange& rootRange, const UsdPrim& usdRootPrim,
                 if (!primIt.IsPostVisit()) {
                     continue;
                 }
-                const auto master = prim.GetMaster();
+                const UsdPrim master = prim.GetMaster();
                 if (!master) {
                     continue;
                 }
 
-                const auto masterPath = master.GetPath();
+                const SdfPath masterPath = master.GetPath();
                 MObject masterObject =
                     readCtx.GetMayaNode(masterPath, false);
                 if (masterObject == MObject::kNullObj) {
@@ -399,33 +399,35 @@ UsdMaya_ReadJob::_DoImport(UsdPrimRange& rootRange, const UsdPrim& usdRootPrim,
                 }
 
                 MStatus status;
-                MFnDagNode dgNode(masterObject, &status);
+                MFnDagNode masterNode(masterObject, &status);
                 if (!status) {
                     continue;
                 }
-                dgNode.findPlug("visibility").setBool(false);
-                MObject duplicate = dgNode.duplicate(true, true, &status);
+                masterNode.findPlug("visibility").setBool(false);
+                const auto primPath = prim.GetPath();
+                MObject parentObject =
+                    readCtx.GetMayaNode(primPath.GetParentPath(), false);
+                MFnDagNode duplicateNode;
+                MObject duplicateObject = duplicateNode.create(
+                    "transform", primPath.GetName().c_str(),
+                    parentObject, &status);
                 if (!status) {
                     continue;
                 }
 
-                const auto primPath = prim.GetPath();
-                // TODO: Move this function to translatorUtil.cpp!
-                MDagModifier dagMod;
-                dagMod.reparentNode(
-                    duplicate,
-                    readCtx.GetMayaNode(primPath.GetParentPath(), false));
-                dagMod.renameNode(duplicate, primPath.GetName().c_str());
-                dagMod.doIt();
+                const unsigned int childCount = masterNode.childCount();
+                for (unsigned int child = 0; child < childCount; ++child) {
+                    MObject childObject = masterNode.child(child);
+                    duplicateNode.addChild(
+                        childObject, MFnDagNode::kNextPos, true);
+                }
 
                 // Read xformable attributes from the
                 // UsdPrim on to the transform node.
-                const UsdPrim prim =
-                    stage->GetPrimAtPath(primPath);
                 UsdGeomXformable xformable(prim);
                 UsdMayaPrimReaderArgs readerArgs(prim, mArgs);
                 UsdMayaTranslatorXformable::Read(
-                    xformable, duplicate, readerArgs, &readCtx);
+                    xformable, duplicateObject, readerArgs, &readCtx);
             } else {
                 _DoImportPrimIt(primIt, usdRootPrim, readCtx, primReaders);
             }
