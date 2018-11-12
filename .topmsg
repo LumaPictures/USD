@@ -1,2 +1,2 @@
 From: Pal Mezei <sirpalee@gmail.com>
-Subject: [PATCH] tg/simple_features/invert_simple_light_direction
+Subject: [USD] Invert the value of Simple Light's position when used as a directional light.
