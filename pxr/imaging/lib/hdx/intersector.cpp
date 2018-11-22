@@ -249,22 +249,23 @@ public:
     HdxIntersector_DrawTask(HdRenderPassSharedPtr const &renderPass,
                 HdRenderPassStateSharedPtr const &renderPassState,
                 TfTokenVector const &renderTags)
-    : HdTask()
+    : HdTask(SdfPath::EmptyPath())
     , _renderPass(renderPass)
     , _renderPassState(renderPassState)
     , _renderTags(renderTags)
     {
     }
 
-protected:
-    virtual void _Sync(HdTaskContext* ctx) override
+    virtual void Sync(HdSceneDelegate*,
+                      HdTaskContext*,
+                      HdDirtyBits*) override
     {
         _renderPass->Sync();
         _renderPassState->Sync(
             _renderPass->GetRenderIndex()->GetResourceRegistry());
     }
 
-    virtual void _Execute(HdTaskContext* ctx) override
+    virtual void Execute(HdTaskContext* ctx) override
     {
         // Try to extract render tags from the context in case
         // there are render tags passed to the graph that 
