@@ -45,14 +45,18 @@ HdxDrawTargetResolveTask::HdxDrawTargetResolveTask(HdSceneDelegate* delegate,
 }
 
 void
-HdxDrawTargetResolveTask::_Sync(HdTaskContext* ctx)
+HdxDrawTargetResolveTask::Sync(HdSceneDelegate* delegate,
+                               HdTaskContext* ctx,
+                               HdDirtyBits* dirtyBits)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
+
+    *dirtyBits = HdChangeTracker::Clean;
 }
 
 void
-HdxDrawTargetResolveTask::_Execute(HdTaskContext* ctx)
+HdxDrawTargetResolveTask::Execute(HdTaskContext* ctx)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
