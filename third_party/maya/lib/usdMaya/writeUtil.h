@@ -125,18 +125,30 @@ struct UsdMayaWriteUtil
 
     /// Given an \p attrPlug, reads its value and returns it as a wrapped
     /// VtValue. The type of the value is determined by consulting the given
-    /// \p typeName; if the value cannot be converted into a \p typeName, then
-    /// returns an empty VtValue.
+    /// \p typeName. If the value cannot be converted into a \p typeName, then
+    /// an empty VtValue is returned.
+    ///
+    /// For type names with color roles, the value read from Maya will be
+    /// converted to a linear color value if \p linearizeColors is true.
     PXRUSDMAYA_API
     static VtValue GetVtValue(
             const MPlug& attrPlug,
-            const SdfValueTypeName& typeName);
+            const SdfValueTypeName& typeName,
+            const bool linearizeColors = true);
 
+    /// Given an \p attrPlug, reads its value and returns it as a wrapped
+    /// VtValue. The type of the value is determined by consulting the given
+    /// \p type. If the value cannot be converted into a \p typeName, then an
+    /// empty VtValue is returned.
+    ///
+    /// For types with color roles, the value read from Maya will be converted
+    /// to a linear color value if \p linearizeColors is true.
     PXRUSDMAYA_API
     static VtValue GetVtValue(
             const MPlug& attrPlug,
             const TfType& type,
-            const TfToken& role);
+            const TfToken& role,
+            const bool linearizeColors = true);
 
     /// Given an \p attrPlug, determine it's value and set it on \p usdAttr at
     /// \p usdTime.
@@ -229,6 +241,25 @@ struct UsdMayaWriteUtil
             const size_t numPrototypes,
             const UsdTimeCode& usdTime,
             UsdUtilsSparseValueWriter *valueWriter=nullptr);
+
+    /// Get the name of the USD prim under which exported materials are
+    /// authored.
+    ///
+    /// By default, this scope is named "Materials", but it can be configured
+    /// in the UsdMaya metadata of a plugInfo.json file like so:
+    /// 
+    /// "UsdMaya": {
+    ///     "UsdExport": {
+    ///         "materialsScopeName": "SomeScopeName"
+    ///     }
+    /// }
+    ///
+    /// Note that this name can also be specified as a parameter during export
+    /// and the value returned by this function will not account for that. In
+    /// that case, the value should be read from the export args for that
+    /// particular export instead.
+    PXRUSDMAYA_API
+    static TfToken GetMaterialsScopeName();
 
     /// \}
 
