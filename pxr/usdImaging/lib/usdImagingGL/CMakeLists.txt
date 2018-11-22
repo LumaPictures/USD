@@ -48,7 +48,6 @@ pxr_library(usdImagingGL
     PUBLIC_CLASSES
         drawModeAdapter
         engine
-        gl
         hydraMaterialAdapter
         package
         renderParams
@@ -70,7 +69,9 @@ pxr_library(usdImagingGL
 
     PYMODULE_CPPFILES
         module.cpp
-        wrapGL.cpp
+        wrapEngine.cpp
+        wrapRenderParams.cpp
+        wrapRendererSettings.cpp
 
     PYMODULE_FILES
         __init__.py

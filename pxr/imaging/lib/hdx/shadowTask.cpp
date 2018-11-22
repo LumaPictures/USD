@@ -54,113 +54,20 @@ HdStShaderCodeSharedPtr HdxShadowTask::_overrideShader;
 
 HdxShadowTask::HdxShadowTask(HdSceneDelegate* delegate, SdfPath const& id)
     : HdSceneTask(delegate, id)
+    , _passes()
+    , _renderPassStates()
     , _params()
 {
 }
 
-void
-HdxShadowTask::_Execute(HdTaskContext* ctx)
+HdxShadowTask::~HdxShadowTask()
 {
-    static const TfTokenVector SHADOW_RENDER_TAGS =
-    {
-        HdTokens->geometry,
-        HdxRenderTagsTokens->interactiveOnlyGeom
-    };
-
-    HD_TRACE_FUNCTION();
-    HF_MALLOC_TAG_FUNCTION();
-    GLF_GROUP_FUNCTION();
-
-    // Extract the lighting context information from the task context
-    GlfSimpleLightingContextRefPtr lightingContext;
-    if (!_GetTaskContextData(ctx, 
-            HdxTokens->lightingContext, &lightingContext)) {
-        return;
-    }
-
-    if (_params.depthBiasEnable) {
-        glEnable(GL_POLYGON_OFFSET_FILL);
-        glPolygonOffset(_params.depthBiasSlopeFactor, 
-            _params.depthBiasConstantFactor);
-    } else {
-        glDisable(GL_POLYGON_OFFSET_FILL);
-    }
-
-    // XXX: Move conversion to sync time once Task header becomes private.
-    glDepthFunc(HdStGLConversions::GetGlDepthFunc(_params.depthFunc));
-    glEnable(GL_PROGRAM_POINT_SIZE);
-
-    // Generate the actual shadow maps
-    GlfSimpleShadowArrayRefPtr const shadows = lightingContext->GetShadows();
-    // This ensures we don't segfault if the shadows and passes are out of sync.
-    // The TF_VERIFY is in Sync for making sure they match but we handle
-    // failure gracefully here.
-    const size_t shadowCount = 
-        std::min(shadows->GetNumLayers(), _passes.size());
-    for(size_t shadowId = 0; shadowId < shadowCount; shadowId++) {
-
-        // Bind the framebuffer that will store shadowId shadow map
-        shadows->BeginCapture(shadowId, true);
-
-        // Render the actual geometry in the collection
-        _passes[shadowId]->Execute(
-            _renderPassStates[shadowId], 
-            SHADOW_RENDER_TAGS);
-
-        // Unbind the buffer and move on to the next shadow map
-        shadows->EndCapture(shadowId);
-    }
-
-    // restore GL states to default
-    glDisable(GL_PROGRAM_POINT_SIZE);
-    glDisable(GL_POLYGON_OFFSET_FILL);
 }
 
 void
-HdxShadowTask::_CreateOverrideShader()
-{
-    static std::mutex shaderCreateLock;
-
-    if (!_overrideShader) {
-        std::lock_guard<std::mutex> lock(shaderCreateLock);
-        if (!_overrideShader) {
-            _overrideShader = HdStShaderCodeSharedPtr(new HdStGLSLFXShader(
-                GlfGLSLFXSharedPtr(new GlfGLSLFX(
-                    HdStPackageFallbackSurfaceShader()))));
-        }
-    }
-}
-
-void
-HdxShadowTask::_SetHdStRenderPassState(HdxShadowTaskParams const &params,
-    HdStRenderPassState *renderPassState)
-{
-    if (params.enableSceneMaterials) {
-        renderPassState->SetOverrideShader(HdStShaderCodeSharedPtr());
-    } else {
-        if (!_overrideShader) {
-            _CreateOverrideShader();
-        }
-        renderPassState->SetOverrideShader(_overrideShader);
-    }
-}
-
-void
-HdxShadowTask::_UpdateDirtyParams(HdRenderPassStateSharedPtr &renderPassState,
-    HdxShadowTaskParams const &params)
-{
-    renderPassState->SetOverrideColor(params.overrideColor);
-    renderPassState->SetWireframeColor(params.wireframeColor);
-    renderPassState->SetCullStyle(HdInvertCullStyle(params.cullStyle));
-
-    if (HdStRenderPassState* extendedState =
-            dynamic_cast<HdStRenderPassState*>(renderPassState.get())) {
-        _SetHdStRenderPassState(params, extendedState);
-    }
-}
-
-void
-HdxShadowTask::_Sync(HdTaskContext* ctx)
+HdxShadowTask::Sync(HdSceneDelegate* delegate,
+                    HdTaskContext* ctx,
+                    HdDirtyBits* dirtyBits)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
@@ -176,7 +83,6 @@ HdxShadowTask::_Sync(HdTaskContext* ctx)
 
     GlfSimpleLightVector const glfLights = lightingContext->GetLights();
     GlfSimpleShadowArrayRefPtr const shadows = lightingContext->GetShadows();
-    HdSceneDelegate *const delegate = GetDelegate();
     HdRenderIndex &renderIndex = delegate->GetRenderIndex();
 
     _TaskDirtyState dirtyState;
@@ -303,6 +209,109 @@ HdxShadowTask::_Sync(HdTaskContext* ctx)
         _renderPassStates[passId]->Sync(
             renderIndex.GetResourceRegistry());
         _passes[passId]->Sync();
+    }
+
+    *dirtyBits = HdChangeTracker::Clean;
+}
+
+void
+HdxShadowTask::Execute(HdTaskContext* ctx)
+{
+    static const TfTokenVector SHADOW_RENDER_TAGS =
+    {
+        HdTokens->geometry,
+        HdxRenderTagsTokens->interactiveOnlyGeom
+    };
+
+    HD_TRACE_FUNCTION();
+    HF_MALLOC_TAG_FUNCTION();
+    GLF_GROUP_FUNCTION();
+
+    // Extract the lighting context information from the task context
+    GlfSimpleLightingContextRefPtr lightingContext;
+    if (!_GetTaskContextData(ctx,
+            HdxTokens->lightingContext, &lightingContext)) {
+        return;
+    }
+
+    if (_params.depthBiasEnable) {
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(_params.depthBiasSlopeFactor,
+            _params.depthBiasConstantFactor);
+    } else {
+        glDisable(GL_POLYGON_OFFSET_FILL);
+    }
+
+    // XXX: Move conversion to sync time once Task header becomes private.
+    glDepthFunc(HdStGLConversions::GetGlDepthFunc(_params.depthFunc));
+    glEnable(GL_PROGRAM_POINT_SIZE);
+
+    // Generate the actual shadow maps
+    GlfSimpleShadowArrayRefPtr const shadows = lightingContext->GetShadows();
+    // This ensures we don't segfault if the shadows and passes are out of sync.
+    // The TF_VERIFY is in Sync for making sure they match but we handle
+    // failure gracefully here.
+    const size_t shadowCount =
+        std::min(shadows->GetNumLayers(), _passes.size());
+    for(size_t shadowId = 0; shadowId < shadowCount; shadowId++) {
+
+        // Bind the framebuffer that will store shadowId shadow map
+        shadows->BeginCapture(shadowId, true);
+
+        // Render the actual geometry in the collection
+        _passes[shadowId]->Execute(
+            _renderPassStates[shadowId],
+            SHADOW_RENDER_TAGS);
+
+        // Unbind the buffer and move on to the next shadow map
+        shadows->EndCapture(shadowId);
+    }
+
+    // restore GL states to default
+    glDisable(GL_PROGRAM_POINT_SIZE);
+    glDisable(GL_POLYGON_OFFSET_FILL);
+}
+
+void
+HdxShadowTask::_CreateOverrideShader()
+{
+    static std::mutex shaderCreateLock;
+
+    if (!_overrideShader) {
+        std::lock_guard<std::mutex> lock(shaderCreateLock);
+        if (!_overrideShader) {
+            _overrideShader = HdStShaderCodeSharedPtr(new HdStGLSLFXShader(
+                GlfGLSLFXSharedPtr(new GlfGLSLFX(
+                    HdStPackageFallbackSurfaceShader()))));
+        }
+    }
+}
+
+void
+HdxShadowTask::_SetHdStRenderPassState(HdxShadowTaskParams const &params,
+    HdStRenderPassState *renderPassState)
+{
+    if (params.enableSceneMaterials) {
+        renderPassState->SetOverrideShader(HdStShaderCodeSharedPtr());
+    } else {
+        if (!_overrideShader) {
+            _CreateOverrideShader();
+        }
+        renderPassState->SetOverrideShader(_overrideShader);
+    }
+}
+
+void
+HdxShadowTask::_UpdateDirtyParams(HdRenderPassStateSharedPtr &renderPassState,
+    HdxShadowTaskParams const &params)
+{
+    renderPassState->SetOverrideColor(params.overrideColor);
+    renderPassState->SetWireframeColor(params.wireframeColor);
+    renderPassState->SetCullStyle(HdInvertCullStyle(params.cullStyle));
+
+    if (HdStRenderPassState* extendedState =
+            dynamic_cast<HdStRenderPassState*>(renderPassState.get())) {
+        _SetHdStRenderPassState(params, extendedState);
     }
 }
 
