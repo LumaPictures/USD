@@ -16,7 +16,7 @@ class UsdGeomImagePlane;
 class MayaImagePlaneWriter : public UsdMayaPrimWriter {
 public:
     MayaImagePlaneWriter(
-        const MDagPath & iDag, const SdfPath& uPath,
+        const MFnDependencyNode& depNodeFn, const SdfPath& uPath,
         UsdMayaWriteJobContext& jobCtx);
     virtual ~MayaImagePlaneWriter();
 
