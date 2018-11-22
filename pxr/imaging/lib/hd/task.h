@@ -48,23 +48,34 @@ typedef std::vector<HdTaskSharedPtr> HdTaskSharedPtrVector;
 typedef boost::shared_ptr<class HdSceneTask> HdSceneTaskSharedPtr;
 typedef std::vector<HdSceneTaskSharedPtr> HdSceneTaskSharedPtrVector;
 
-// We want to use token as a key not std::string, so use an unordered_map over VtDictionary
-typedef std::unordered_map<TfToken, VtValue, TfToken::HashFunctor> HdTaskContext;
+// We want to use token as a key not std::string, so use an unordered_map over
+// VtDictionary
+typedef std::unordered_map<TfToken, VtValue, TfToken::HashFunctor>
+                                                                  HdTaskContext;
 
 class HdTask {
 public:
+    /// Construct a new task.
+    /// If the task is going to be added to the render index, id
+    /// should be an absolute scene path.
+    /// If the task isn't going to be added to the render index
+    /// an empty path should be used for id.
     HD_API
-    HdTask();
+    HdTask(SdfPath const& id);
+
     HD_API
     virtual ~HdTask();
 
-    /// Sync the resources. Syncs this task, then child tasks, if applicable.
-    HD_API
-    void Sync(HdTaskContext* ctx);
+    /// Sync Phase:  Obtain task state from Scene delegate based on
+    /// change processing.
+    virtual void Sync(HdSceneDelegate* delegate,
+                      HdTaskContext* ctx,
+                      HdDirtyBits* dirtyBits) = 0;
 
-    /// Execute the task. Runs this task, then child tasks, if applicable.
-    HD_API
-    void Execute(HdTaskContext* ctx);
+    /// Execute Phase: Runs the task.
+    virtual void Execute(HdTaskContext* ctx) = 0;
+
+    SdfPath const& GetId() const { return _id; }
 
 protected:
     /// Extracts a typed value out of the task context at the given id.
@@ -75,26 +86,16 @@ protected:
     ///
     /// outValue must not be null.
     template <class T>
-    static bool _GetTaskContextData(HdTaskContext const* ctx, TfToken const &id, T *outValue);
-
-
-    // Protected versions of Sync and Execute are provided for derived classes
-    // to override.
-    HD_API
-    virtual void _Sync( HdTaskContext* ctx) = 0;
-    HD_API
-    virtual void _Execute(HdTaskContext* ctx) = 0;
-
-    // _MarkClean is a hook for when Sync() is done running.
-    HD_API
-    virtual void _MarkClean();
-
-    // Child task API: _SyncChildren is responsible for populating _children.
-    HD_API
-    virtual void _SyncChildren(HdTaskContext* ctx, HdTaskSharedPtrVector* children);
+    static bool _GetTaskContextData(HdTaskContext const* ctx,
+                                    TfToken const &id,
+                                    T *outValue);
 
 private:
-    HdTaskSharedPtrVector _children;
+    SdfPath _id;
+
+    HdTask()                           = delete;
+    HdTask(const HdTask &)             = delete;
+    HdTask &operator =(const HdTask &) = delete;
 };
 
 // Inline template body
@@ -139,7 +140,6 @@ public:
     HD_API
     HdSceneTask(HdSceneDelegate* delegate, SdfPath const& id);
 
-    SdfPath const&         GetId()       const { return _id; }
     HdSceneDelegate*       GetDelegate()       { return _delegate; }
 
 protected:
@@ -148,11 +148,6 @@ protected:
         HdDirtyBits bits;
         int         collectionVersion;
     };
-
-    HD_API
-    virtual void _MarkClean();
-    HD_API
-    virtual void _SyncChildren(HdTaskContext* ctx, HdTaskSharedPtrVector* children);
 
     /// Obtains the set of dirty bits for the task.
     HD_API
@@ -178,7 +173,6 @@ protected:
 
 private:
     HdSceneDelegate* _delegate;
-    SdfPath _id;
 };
 
 template <class T> bool
@@ -199,11 +193,6 @@ HdSceneTask::_GetSceneDelegateValue(TfToken const& valueId, T* outValue)
 
     return true;
 }
-
-// Task parameters for scene based synchronization
-struct HdTaskParams {
-};
-
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
