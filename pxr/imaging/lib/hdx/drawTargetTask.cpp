@@ -81,16 +81,27 @@ HdxDrawTargetTask::HdxDrawTargetTask(HdSceneDelegate* delegate,
  , _currentDrawTargetSetVersion(0)
  , _renderPassesInfo()
  , _renderPasses()
+ , _overrideColor()
+ , _wireframeColor()
+ , _enableLighting(false)
+ , _alphaThreshold(0.0f)
  , _depthBiasUseDefault(true)
  , _depthBiasEnable(false)
  , _depthBiasConstantFactor(0.0f)
  , _depthBiasSlopeFactor(1.0f)
  , _depthFunc(HdCmpFuncLEqual)
+ , _cullStyle(HdCullStyleBackUnlessDoubleSided)
+{
+}
+
+HdxDrawTargetTask::~HdxDrawTargetTask()
 {
 }
 
 void
-HdxDrawTargetTask::_Sync(HdTaskContext* ctx)
+HdxDrawTargetTask::Sync(HdSceneDelegate* delegate,
+                        HdTaskContext* ctx,
+                        HdDirtyBits* dirtyBits)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
@@ -124,7 +135,6 @@ HdxDrawTargetTask::_Sync(HdTaskContext* ctx)
         _depthFunc               = params.depthFunc;
     }
 
-    HdSceneDelegate* delegate = GetDelegate();
     HdRenderIndex &renderIndex = delegate->GetRenderIndex();
     HdChangeTracker& changeTracker = renderIndex.GetChangeTracker();
 
@@ -290,10 +300,12 @@ HdxDrawTargetTask::_Sync(HdTaskContext* ctx)
         renderPassState->Sync(renderIndex.GetResourceRegistry());
         renderPass->Sync();
     }
+
+    *dirtyBits = HdChangeTracker::Clean;
 }
 
 void
-HdxDrawTargetTask::_Execute(HdTaskContext* ctx)
+HdxDrawTargetTask::Execute(HdTaskContext* ctx)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
