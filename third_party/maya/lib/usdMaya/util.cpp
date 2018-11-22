@@ -701,16 +701,14 @@ _GetColorAndTransparencyFromDepNode(
 }
 
 static
-void
+bool
 _getMayaShadersColor(
         const MObjectArray& shaderObjs,
         VtVec3fArray* RGBData,
         VtFloatArray* AlphaData)
 {
-    MStatus status;
-
-    if (shaderObjs.length() == 0) {
-        return;
+    if (shaderObjs.length() == 0u) {
+        return false;
     }
 
     if (RGBData) {
@@ -720,15 +718,17 @@ _getMayaShadersColor(
         AlphaData->resize(shaderObjs.length());
     }
 
-    for (unsigned int i = 0; i < shaderObjs.length(); ++i) {
+    bool gotValues = false;
+
+    for (unsigned int i = 0u; i < shaderObjs.length(); ++i) {
         // Initialize RGB and Alpha to (1,1,1,1)
         if (RGBData) {
-            (*RGBData)[i][0] = 1.0;
-            (*RGBData)[i][1] = 1.0;
-            (*RGBData)[i][2] = 1.0;
+            (*RGBData)[i][0u] = 1.0f;
+            (*RGBData)[i][1u] = 1.0f;
+            (*RGBData)[i][2u] = 1.0f;
         }
         if (AlphaData) {
-            (*AlphaData)[i] = 1.0;
+            (*AlphaData)[i] = 1.0f;
         }
 
         if (shaderObjs[i].isNull()) {
@@ -738,25 +738,23 @@ _getMayaShadersColor(
             continue;
         }
 
-        // first, we assume the shader is a lambert and try that API.  if
-        // not, we try our next best guess.
-        bool gotValues = _GetColorAndTransparencyFromLambert(
+        // First, we assume the shader is a lambert and try that API. If not,
+        // we try our next best guess.
+        const bool gotShaderValues =
+            _GetColorAndTransparencyFromLambert(
                 shaderObjs[i],
-                RGBData ?  &(*RGBData)[i] : nullptr,
-                AlphaData ?  &(*AlphaData)[i] : nullptr)
+                RGBData ? &(*RGBData)[i] : nullptr,
+                AlphaData ? &(*AlphaData)[i] : nullptr)
 
             || _GetColorAndTransparencyFromDepNode(
                 shaderObjs[i],
-                RGBData ?  &(*RGBData)[i] : nullptr,
-                AlphaData ?  &(*AlphaData)[i] : nullptr);
+                RGBData ? &(*RGBData)[i] : nullptr,
+                AlphaData ? &(*AlphaData)[i] : nullptr);
 
-        if (!gotValues) {
-            TF_RUNTIME_ERROR(
-                    "Failed to get shaders colors at index %d. "
-                    "Unable to retrieve shader base color.",
-                    i);
-        }
+        gotValues |= gotShaderValues;
     }
+
+    return gotValues;
 }
 
 static
@@ -1013,7 +1011,7 @@ UsdMayaUtil::CompressFaceVaryingPrimvarIndices(
 }
 
 bool
-UsdMayaUtil::IsAuthored(MPlug& plug)
+UsdMayaUtil::IsAuthored(const MPlug& plug)
 {
     MStatus status;
 
@@ -1026,8 +1024,12 @@ UsdMayaUtil::IsAuthored(MPlug& plug)
         return true;
     }
 
+    // MPlug::getSetAttrCmds() is currently not declared const, so we have to
+    // make a copy of plug here.
+    MPlug plugCopy(plug);
+
     MStringArray setAttrCmds;
-    status = plug.getSetAttrCmds(setAttrCmds, MPlug::kChanged);
+    status = plugCopy.getSetAttrCmds(setAttrCmds, MPlug::kChanged);
     CHECK_MSTATUS_AND_RETURN(status, false);
 
     for (unsigned int i = 0u; i < setAttrCmds.length(); ++i) {
@@ -1599,6 +1601,17 @@ UsdMayaUtil::SetNotes(
 
     depNode.findPlug(attrObj, true).setString(notes.c_str());
     return true;
+}
+
+bool
+UsdMayaUtil::SetHiddenInOutliner(MFnDependencyNode& depNode, const bool hidden)
+{
+    MPlug plug = depNode.findPlug("hiddenInOutliner", true);
+    if (!plug.isNull()) {
+        plug.setBool(hidden);
+        return true;
+    }
+    return false;
 }
 
 UsdMayaUtil::MDataHandleHolder::MDataHandleHolder(
