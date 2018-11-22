@@ -60,19 +60,22 @@ class UsdImaging_DrawTask final : public HdTask
 public:
     UsdImaging_DrawTask(HdRenderPassSharedPtr const &renderPass,
                         HdRenderPassStateSharedPtr const &renderPassState)
-        : HdTask()
+        : HdTask(SdfPath::EmptyPath())
         , _renderPass(renderPass)
         , _renderPassState(renderPassState)
     {
     }
 
-protected:
-    virtual void _Sync(HdTaskContext* ctx) override {
+    virtual void Sync(HdSceneDelegate* delegate,
+                      HdTaskContext* ctx,
+                      HdDirtyBits* dirtyBits) override {
         _renderPass->Sync();
         _renderPassState->Sync(
             _renderPass->GetRenderIndex()->GetResourceRegistry());
+
+        *dirtyBits = HdChangeTracker::Clean;
     }
-    virtual void _Execute(HdTaskContext* ctx) override {
+    virtual void Execute(HdTaskContext* ctx) override {
         _renderPassState->Bind();
         _renderPass->Execute(_renderPassState);
         _renderPassState->Unbind();
