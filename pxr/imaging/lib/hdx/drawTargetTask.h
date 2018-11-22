@@ -49,16 +49,17 @@ class HdxDrawTargetTask  : public HdSceneTask {
 public:
     HDX_API
     HdxDrawTargetTask(HdSceneDelegate* delegate, SdfPath const& id);
-    virtual ~HdxDrawTargetTask() = default;
+    virtual ~HdxDrawTargetTask();
 
-protected:
     /// Sync the render pass resources
     HDX_API
-    virtual void _Sync(HdTaskContext* ctx);
+    virtual void Sync(HdSceneDelegate* delegate,
+                      HdTaskContext* ctx,
+                      HdDirtyBits* dirtyBits) override;
 
     /// Execute render pass task
     HDX_API
-    virtual void _Execute(HdTaskContext* ctx);
+    virtual void Execute(HdTaskContext* ctx) override;
 
 private:
     struct RenderPassInfo {
