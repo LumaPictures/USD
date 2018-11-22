@@ -46,8 +46,8 @@ TF_DEFINE_PRIVATE_TOKENS(
 );
 
 MayaImagePlaneWriter::MayaImagePlaneWriter(
-    const MDagPath & iDag, const SdfPath& uPath, UsdMayaWriteJobContext& jobCtx)
-    : UsdMayaPrimWriter(iDag, uPath, jobCtx)
+    const MFnDependencyNode& depNodeFn, const SdfPath& uPath, UsdMayaWriteJobContext& jobCtx)
+    : UsdMayaPrimWriter(depNodeFn, uPath, jobCtx)
 {
     auto primSchema =
         UsdGeomImagePlane::Define(GetUsdStage(), GetUsdPath());
