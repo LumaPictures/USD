@@ -340,11 +340,8 @@ void CompressFaceVaryingPrimvarIndices(
 /// default (or since being brought in from a reference for plugs on nodes from
 /// referenced files), or if the plug has a connection. Otherwise, it is
 /// considered unauthored.
-///
-/// Note that MPlug::getSetAttrCmds() is currently not declared const, so
-/// IsAuthored() here must take a non-const MPlug.
 PXRUSDMAYA_API
-bool IsAuthored(MPlug& plug);
+bool IsAuthored(const MPlug& plug);
 
 PXRUSDMAYA_API
 MPlug GetConnected(const MPlug& plug);
@@ -471,6 +468,9 @@ TfRefPtr<MDataHandleHolder> GetPlugDataHandle(const MPlug& plug);
 
 PXRUSDMAYA_API
 bool SetNotes(MFnDependencyNode& depNode, const std::string& notes);
+
+PXRUSDMAYA_API
+bool SetHiddenInOutliner(MFnDependencyNode& depNode, const bool hidden);
 
 /// Reads values from the given \p argData into a VtDictionary, using the
 /// \p guideDict to figure out which keys and what type of values should be read
