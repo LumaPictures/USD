@@ -806,7 +806,7 @@ UsdImagingDelegate::SetTime(UsdTimeCode time)
         return;
     }
 
-    TF_DEBUG(USDIMAGING_UPDATES).Msg("[Update] Update for time (%f)",
+    TF_DEBUG(USDIMAGING_UPDATES).Msg("[Update] Update for time (%f)\n",
         time.GetValue());
 
     _time = time;
@@ -874,7 +874,7 @@ UsdImagingDelegate::ApplyPendingUpdates()
         return;
     }
 
-    TF_DEBUG(USDIMAGING_UPDATES).Msg("[Update] Update for scene edits");
+    TF_DEBUG(USDIMAGING_UPDATES).Msg("[Update] Update for scene edits\n");
 
     // Need to invalidate all caches if any stage objects have changed. This
     // invalidation is overly conservative, but correct.
@@ -1122,7 +1122,6 @@ UsdImagingDelegate::_ResyncPrim(SdfPath const& rootPath,
 
                 // The prim wasn't in the _primInfoMap, this could happen
                 // because the prim just came into existence.
-
                 _AdapterSharedPtr adapter = _AdapterLookup(*iter);
                 if (!adapter) {
                     // Special case for adding UsdGeomSubset prims
@@ -1161,8 +1160,6 @@ UsdImagingDelegate::_ResyncPrim(SdfPath const& rootPath,
 
     // Ensure we resync all prims that may have previously existed, but were
     // removed with this change.
-
-
     SdfPathVector affectedPrims;
     HdPrimGather gather;
 
@@ -1250,8 +1247,13 @@ UsdImagingDelegate::_RefreshObject(SdfPath const& usdPath,
 
         // If either model:drawMode or model:applyDrawMode changes, we need to
         // repopulate the whole subtree starting at the owning prim.
+        // If the binding has changed we need to make sure we are resyncing
+        // the prim so the material gets an opportunity to populate itself.
+        // This is very conservative but it is correct.
         if (attrName == UsdGeomTokens->modelDrawMode ||
-            attrName == UsdGeomTokens->modelApplyDrawMode) {
+            attrName == UsdGeomTokens->modelApplyDrawMode ||
+            TfStringStartsWith(attrName.GetString(),
+                UsdShadeTokens->materialBinding.GetString())) {
             _ResyncPrim(usdPath.GetPrimPath(), proxy, true);
             return;
         }
@@ -1264,9 +1266,7 @@ UsdImagingDelegate::_RefreshObject(SdfPath const& usdPath,
         // from plugins (such as the PointInstancer).
         if (attrName == UsdGeomTokens->visibility
             || attrName == UsdGeomTokens->purpose
-            || UsdGeomXformable::IsTransformationAffectedByAttrNamed(attrName)
-            || TfStringStartsWith(attrName.GetString(),
-                                  UsdShadeTokens->materialBinding.GetString()))
+            || UsdGeomXformable::IsTransformationAffectedByAttrNamed(attrName))
         {
             // Because these are inherited attributes, we must update all
             // children.
@@ -1309,7 +1309,15 @@ UsdImagingDelegate::_RefreshObject(SdfPath const& usdPath,
         // may or may not find an associated primInfo for every prim in
         // affectedPrims. If we find no primInfo, the prim that was previously
         // affected by this refresh no longer exists and can be ignored.
+        //
+        // It is also possible that we find a primInfo, but the prim it refers
+        // to has been deleted from the stage and is no longer valid. Such a
+        // prim may end up in the affectedPrims during the refresh of a
+        // collection that previously pointed directly to a prim that has
+        // been deleted. The primInfo for this prim will still be in the index
+        // because we haven't had the index process removals yet.
         if (primInfo != nullptr &&
+            primInfo->usdPrim.IsValid() &&
             TF_VERIFY(primInfo->adapter, "%s", affectedPrimPath.GetText())) {
             _AdapterSharedPtr &adapter = primInfo->adapter;
 
