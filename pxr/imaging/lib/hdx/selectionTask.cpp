@@ -43,7 +43,7 @@ typedef std::vector<HdBufferSourceSharedPtr> HdBufferSourceSharedPtrVector;
 
 HdxSelectionTask::HdxSelectionTask(HdSceneDelegate* delegate,
                                    SdfPath const& id)
-    : HdSceneTask(delegate, id)
+    : HdTask(id)
     , _lastVersion(-1)
     , _hasSelection(false)
     , _params({false, GfVec4f(), GfVec4f()})
@@ -73,7 +73,7 @@ HdxSelectionTask::Sync(HdSceneDelegate* delegate,
 
     bool paramsChanged = bits & HdChangeTracker::DirtyParams;
     if (paramsChanged) {
-        _GetSceneDelegateValue(HdTokens->params, &_params);
+        _GetTaskParams(delegate, &_params);
     }
 
     HdxSelectionTrackerSharedPtr sel;
