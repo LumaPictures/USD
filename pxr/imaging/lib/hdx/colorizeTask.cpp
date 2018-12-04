@@ -30,7 +30,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 HdxColorizeTask::HdxColorizeTask(HdSceneDelegate* delegate, SdfPath const& id)
- : HdSceneTask(delegate, id)
+ : HdTask(id)
  , _aovName()
  , _renderBufferId()
  , _renderBuffer(nullptr)
@@ -167,20 +167,18 @@ HdxColorizeTask::Sync(HdSceneDelegate* delegate,
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
-    HdDirtyBits bits = _GetTaskDirtyBits();
-
     bool validate = false;
-    if (bits & HdChangeTracker::DirtyParams) {
+    if ((*dirtyBits) & HdChangeTracker::DirtyParams) {
         HdxColorizeTaskParams params;
 
-        if (_GetSceneDelegateValue(HdTokens->params, &params)) {
+        if (_GetTaskParams(delegate, &params)) {
             _aovName = params.aovName;
             _renderBufferId = params.renderBuffer;
             validate = true;
         }
     }
 
-    HdRenderIndex &renderIndex = GetDelegate()->GetRenderIndex();
+    HdRenderIndex &renderIndex = delegate->GetRenderIndex();
     _renderBuffer = static_cast<HdRenderBuffer*>(
         renderIndex.GetBprim(HdPrimTypeTokens->renderBuffer, _renderBufferId));
 
