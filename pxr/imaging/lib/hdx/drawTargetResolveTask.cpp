@@ -40,7 +40,11 @@ typedef std::vector<HdxDrawTargetRenderPassUniquePtr>
 
 HdxDrawTargetResolveTask::HdxDrawTargetResolveTask(HdSceneDelegate* delegate,
                                                    SdfPath const& id)
- : HdSceneTask(delegate, id)
+ : HdTask(id)
+{
+}
+
+HdxDrawTargetResolveTask::~HdxDrawTargetResolveTask()
 {
 }
 

@@ -51,7 +51,7 @@ static const GfVec2i _defaultShadowRes = GfVec2i(1024, 1024);
 // -------------------------------------------------------------------------- //
 
 HdxSimpleLightTask::HdxSimpleLightTask(HdSceneDelegate* delegate, SdfPath const& id)
-    : HdSceneTask(delegate, id) 
+    : HdTask(id) 
     , _cameraId()
     , _lightIds()
     , _lightIncludePaths()
@@ -86,14 +86,12 @@ HdxSimpleLightTask::Sync(HdSceneDelegate* delegate,
     (*ctx)[HdxTokens->lightingShader] =
         boost::dynamic_pointer_cast<HdStLightingShader>(_lightingShader);
 
-    _TaskDirtyState dirtyState;
-    _GetTaskDirtyState(HdTokens->geometry, &dirtyState);
 
     HdRenderIndex &renderIndex = delegate->GetRenderIndex();
 
-    if (dirtyState.bits & HdChangeTracker::DirtyParams) {
+    if ((*dirtyBits) & HdChangeTracker::DirtyParams) {
         HdxSimpleLightTaskParams params;
-        if (!_GetSceneDelegateValue(HdTokens->params, &params)) {
+        if (!_GetTaskParams(delegate, &params)) {
             return;
         }
 
