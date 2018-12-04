@@ -45,10 +45,12 @@ typedef boost::shared_ptr<class HdxSimpleLightingShader> HdxSimpleLightingShader
 // Not strictly necessary here.
 // But without it, would require users of the class to include it anyway
 
-class HdxDrawTargetTask  : public HdSceneTask {
+class HdxDrawTargetTask  : public HdTask {
 public:
     HDX_API
     HdxDrawTargetTask(HdSceneDelegate* delegate, SdfPath const& id);
+
+    HDX_API
     virtual ~HdxDrawTargetTask();
 
     /// Sync the render pass resources
@@ -94,6 +96,9 @@ private:
 
     // Viewer's Render Style
     HdCullStyle _cullStyle;
+
+    // Alpha sample alpha to coverage
+    bool _enableSampleAlphaToCoverage;
 
     HdxDrawTargetTask()                                      = delete;
     HdxDrawTargetTask(const HdxDrawTargetTask &)             = delete;
