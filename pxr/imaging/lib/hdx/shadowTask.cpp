@@ -53,7 +53,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 HdStShaderCodeSharedPtr HdxShadowTask::_overrideShader;
 
 HdxShadowTask::HdxShadowTask(HdSceneDelegate* delegate, SdfPath const& id)
-    : HdSceneTask(delegate, id)
+    : HdTask(id)
     , _passes()
     , _renderPassStates()
     , _params()
@@ -85,13 +85,10 @@ HdxShadowTask::Sync(HdSceneDelegate* delegate,
     GlfSimpleShadowArrayRefPtr const shadows = lightingContext->GetShadows();
     HdRenderIndex &renderIndex = delegate->GetRenderIndex();
 
-    _TaskDirtyState dirtyState;
-    _GetTaskDirtyState(HdTokens->geometry, &dirtyState);
-
-    const bool dirtyParams = dirtyState.bits & HdChangeTracker::DirtyParams;
+    const bool dirtyParams = (*dirtyBits) & HdChangeTracker::DirtyParams;
     if (dirtyParams) {
         // Extract the new shadow task params from exec
-        if (!_GetSceneDelegateValue(HdTokens->params, &_params)) {
+        if (!_GetTaskParams(delegate, &_params)) {
             return;
         }
     }
