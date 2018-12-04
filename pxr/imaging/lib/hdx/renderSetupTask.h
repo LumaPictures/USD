@@ -59,7 +59,7 @@ class HdStRenderPassState;
 /// create a render setup task internally.  See the HdxRenderTask documentation
 /// for details.
 ///
-class HdxRenderSetupTask : public HdSceneTask {
+class HdxRenderSetupTask : public HdTask {
 public:
     HDX_API
     HdxRenderSetupTask(HdSceneDelegate* delegate, SdfPath const& id);
@@ -70,13 +70,14 @@ public:
 
     // APIs used from HdxRenderTask to manage the sync process.
     HDX_API
-    void SyncParams(HdxRenderTaskParams const &params);
+    void SyncParams(HdSceneDelegate* delegate,
+                    HdxRenderTaskParams const &params);
     HDX_API
-    void SyncCamera();
+    void SyncCamera(HdSceneDelegate* delegate);
     HDX_API
-    void SyncAovBindings();
+    void SyncAovBindings(HdSceneDelegate* delegate);
     HDX_API
-    void SyncRenderPassState();
+    void SyncRenderPassState(HdSceneDelegate* delegate);
 
     HdRenderPassStateSharedPtr const &GetRenderPassState() const {
         return _renderPassState;
@@ -111,6 +112,9 @@ private:
 
     void _SetHdStRenderPassState(HdxRenderTaskParams const& params,
                                  HdStRenderPassState *renderPassState);
+
+    HdRenderPassStateSharedPtr &_GetRenderPassState(HdSceneDelegate* delegate);
+
 
     HdxRenderSetupTask() = delete;
     HdxRenderSetupTask(const HdxRenderSetupTask &) = delete;
