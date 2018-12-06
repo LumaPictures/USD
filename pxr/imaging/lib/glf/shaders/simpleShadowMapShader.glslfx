@@ -49,10 +49,21 @@ uniform bool useShadows;
 uniform sampler2DArray shadowTexture;
 uniform sampler2DArrayShadow shadowCompareTexture;
 
-struct Shadow {
-    mat4 eyeToShadowMatrix;
-    vec4 basis[3];
+struct ShadowMatrix {
+    mat4 viewToShadowMatrix;
+    vec4 basis0;
+    vec4 basis1;
+    vec4 basis2;
+    // Bias is generally negative
     float bias;
+    // All these values should be positive
+    float radius;
+    float near;
+    float far;
+    float left;
+    float right;
+    float top;
+    float bottom;
 };
 
 uniform Shadow shadow[NUM_LIGHTS];
@@ -66,14 +77,15 @@ shadowSample(int index, vec4 coord)
 
 // shadowCompare() returns filtered result of comparing shadow depth and coord.z
 float
-shadowCompare(int index, vec4 coord)
+shadowCompare(int index, vec3 uvz)
 {
-    return texture(shadowCompareTexture, vec4(coord.x/coord.w, coord.y/coord.w, index, coord.z));
+    return texture(shadowCompareTexture,
+                   vec4(uvz.xy, index, uvz.z));
 }
 
 #ifndef SHADOW_FILTER
 float
-shadowFilter(int index, vec4 coord, vec4 Peye)
+shadowFilter(int index, vec3 coord, vec4 Peye)
 {
     return shadowCompare(index, coord);
 }
@@ -83,7 +95,7 @@ float
 shadowing(int index, vec4 Peye, float slope)
 {
     float result = 1.0;
-    vec4 coord = shadow[index].eyeToShadowMatrix * Peye;
+    vec4 coord = shadow[index].viewToShadowMatrix * Peye;
 
     // clamping at 1 because zero bias results in self shadowing, and
     // clamping at 2 to avoid shadows from dissapearing as angle gets very steep.
@@ -92,9 +104,9 @@ shadowing(int index, vec4 Peye, float slope)
     // coord.xy : homogenous shadow uv coordinate
     // coord.z / coord.w : non-linear NDC "depth": -1 at near to 1 at far
     // coord.w : z-depth cordinate of shadow receiver, from light
-    float dReceiver = coord.z/coord.w;
-    coord.z = min(1, dReceiver + (shadow[index].bias * slope));
-    return shadowFilter(index, coord, Peye);
+    coord /= coord.w;
+    coord.z = min(1, coord.z + (shadow[index].bias * slope));
+    return shadowFilter(index, coord.xyz, Peye);
 }
 
 #ifdef REQUIRE_SHADOW_FILTER_WIDTH
