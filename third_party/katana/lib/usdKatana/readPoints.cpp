@@ -84,7 +84,7 @@ PxrUsdKatanaReadPoints(
         const auto& motionSampleTimes = data.GetMotionSampleTimes(points.GetPointsAttr());
 
         const auto numMotionSampleTimes = motionSampleTimes.size();
-        if (numMotionSampleTimes < 2)
+        if (numMotionSampleTimes < 2 || data.GetDisableVelocityBlur())
         {
             return std::make_tuple(
                 PxrUsdKatanaGeomGetPAttr(points, data),
@@ -104,7 +104,8 @@ PxrUsdKatanaReadPoints(
         VtVec3fArray velocitySample;
 
         const auto numPosSamples =
-            points.ComputePositionsAtTimes(&positionSamples, sampleTimes, currentTime, 1.0f, &velocitySample);
+            points.ComputePositionsAtTimes(
+                &positionSamples, sampleTimes, currentTime, static_cast<float>(data.GetVelocityScale()), &velocitySample);
 
         FnKat::FloatBuilder posBuilder(3);
 
