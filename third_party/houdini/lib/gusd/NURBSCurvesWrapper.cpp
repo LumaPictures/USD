@@ -39,6 +39,7 @@
 #include <GT/GT_GEOPrimPacked.h>
 
 #include <numeric>
+#include <iostream>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
