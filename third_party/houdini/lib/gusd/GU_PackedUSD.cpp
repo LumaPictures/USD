@@ -69,6 +69,8 @@
 
 #include <mutex>
 
+#include <iostream>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 using std::cout;
