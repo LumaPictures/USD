@@ -1,5 +1,5 @@
 //
-// Copyright 2016 Pixar
+// Copyright 2018 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,35 +21,35 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
+#ifndef HDX_PROGRESSIVE_TASK_H
+#define HDX_PROGRESSIVE_TASK_H
+
 #include "pxr/pxr.h"
-#include <boost/python/def.hpp>
-#include <boost/python/return_value_policy.hpp>
+#include "pxr/imaging/hdx/api.h"
+#include "pxr/imaging/hd/task.h"
 
-#include "pxr/usd/usdUtils/pipeline.h"
+PXR_NAMESPACE_OPEN_SCOPE
 
-#include "pxr/usd/usd/prim.h"
+/// \class HdxProgressiveTask
+///
+/// This is an interface class that declares that derived tasks implement
+/// some form of progressive rendering, as queried by the virtual
+/// IsConverged().
+///
+/// Applications with data-driven task lists can determine their convergence
+/// state by determining which tasks are progressive tasks and then querying
+/// specifically those tasks.
+class HdxProgressiveTask : public HdTask {
+public:
+    HDX_API
+    HdxProgressiveTask(SdfPath const& id);
 
-#include "pxr/base/tf/pyResultConversions.h"
+    HDX_API
+    virtual ~HdxProgressiveTask();
 
-using namespace boost::python;
+    virtual bool IsConverged() const = 0;
+};
 
-PXR_NAMESPACE_USING_DIRECTIVE
+PXR_NAMESPACE_CLOSE_SCOPE
 
-void wrapPipeline()
-{
-    def("GetAlphaAttributeNameForColor", UsdUtilsGetAlphaAttributeNameForColor, arg("colorAttrName"));
-    def("GetModelNameFromRootLayer", UsdUtilsGetModelNameFromRootLayer);
-    def("GetRegisteredVariantSets", 
-            UsdUtilsGetRegisteredVariantSets, 
-            return_value_policy<TfPySequenceToList>());
-    def("GetPrimAtPathWithForwarding", UsdUtilsGetPrimAtPathWithForwarding, 
-        (arg("stage"), arg("path")));
-    def("UninstancePrimAtPath", UsdUtilsUninstancePrimAtPath, 
-        (arg("stage"), arg("path")));
-    def("GetPrimaryUVSetName", UsdUtilsGetPrimaryUVSetName);
-    def("GetPrefName", UsdUtilsGetPrefName);
-    def(
-        "GetMaterialsScopeName",
-        UsdUtilsGetMaterialsScopeName,
-        arg("forceDefault")=false);
-}
+#endif // HDX_PROGRESSIVE_TASK_H
