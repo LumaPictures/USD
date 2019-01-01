@@ -38,6 +38,8 @@
 #include <GT/GT_DABool.h>
 #include <SYS/SYS_Version.h>
 
+#include <iostream>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 using std::cout;
@@ -1070,7 +1072,7 @@ GusdPrimWrapper::loadPrimvars(
 
     {
         UsdGeomPrimvar colorPrimvar = prim.GetPrimvar(GusdTokens->Cd);
-        if (colorPrimvar && colorPrimvar.GetAttr().HasAuthoredValueOpinion()) {
+        if (colorPrimvar && colorPrimvar.GetAttr().HasAuthoredValue()) {
             hasCdPrimvar = true;
         }
 
@@ -1084,7 +1086,7 @@ GusdPrimWrapper::loadPrimvars(
                 // Try to find "displayColor" instead.
                 colorPrimvar = prim.GetPrimvar(UsdGeomTokens->primvarsDisplayColor);
                 if (colorPrimvar &&
-                    colorPrimvar.GetAttr().HasAuthoredValueOpinion()) {
+                    colorPrimvar.GetAttr().HasAuthoredValue()) {
                     authoredPrimvars.push_back(colorPrimvar);
                 }
             }
