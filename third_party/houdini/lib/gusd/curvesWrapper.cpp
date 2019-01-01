@@ -329,12 +329,9 @@ GusdCurvesWrapper::refine(
     if( !refineForViewport ) {
 
         UsdAttribute widthsAttr = usdCurves.GetWidthsAttr();
-        if(widthsAttr && widthsAttr.HasAuthoredValueOpinion() ) {
-
-            VtFloatArray usdWidths;
-            widthsAttr.Get(&usdWidths, m_time);
-
-            _validateData( "pscale", "widths", 
+        VtFloatArray usdWidths;
+        if(widthsAttr.HasAuthoredValue() && widthsAttr.Get(&usdWidths, m_time) ) {
+           _validateData( "pscale", "widths", 
                         usdCurves.GetPrim().GetPath().GetText(),
                         new GusdGT_VtArray<fpreal32>(usdWidths),
                         usdCurves.GetWidthsInterpolation(),
@@ -349,10 +346,9 @@ GusdCurvesWrapper::refine(
 
         // velocities
         UsdAttribute velAttr = usdCurves.GetVelocitiesAttr();
-        if( velAttr && velAttr.HasAuthoredValueOpinion() ) {
-
-            VtVec3fArray usdVelocities;
-            velAttr.Get(&usdVelocities, m_time);
+        VtVec3fArray usdVelocities;
+        if( velAttr.HasAuthoredValue() && 
+            velAttr.Get(&usdVelocities, m_time) ) {
 
             GT_DataArrayHandle gtVelocities = 
                 new GusdGT_VtArray<GfVec3f>(usdVelocities,GT_TYPE_VECTOR);
@@ -362,9 +358,8 @@ GusdCurvesWrapper::refine(
 
         // normals
         UsdAttribute normAttr = usdCurves.GetNormalsAttr();
-        if(normAttr && normAttr.HasAuthoredValueOpinion()) {
-            VtVec3fArray usdNormals;
-            normAttr.Get(&usdNormals, m_time);
+        VtVec3fArray usdNormals;
+        if(normAttr.HasAuthoredValue() && normAttr.Get(&usdNormals, m_time) ) {
 
             _validateData( "N", "normals", 
                         usdCurves.GetPrim().GetPath().GetText(),
@@ -395,11 +390,11 @@ GusdCurvesWrapper::refine(
     else {
 
         UsdGeomPrimvar colorPrimvar = usdCurves.GetPrimvar(GusdTokens->Cd);
-        if( !colorPrimvar || !colorPrimvar.GetAttr().HasAuthoredValueOpinion() ) {
+        if( !colorPrimvar || !colorPrimvar.GetAttr().HasAuthoredValue() ) {
             colorPrimvar = usdCurves.GetPrimvar(GusdTokens->displayColor);
         }
 
-        if( colorPrimvar && colorPrimvar.GetAttr().HasAuthoredValueOpinion()) {
+        if( colorPrimvar && colorPrimvar.GetAttr().HasAuthoredValue()) {
 
             // cerr << "curve color primvar " << colorPrimvar.GetBaseName() << "\t" << colorPrimvar.GetTypeName() << "\t" << colorPrimvar.GetInterpolation() << endl;
 
@@ -458,11 +453,11 @@ GusdCurvesWrapper::refine(
         }
 
         UsdGeomPrimvar alphaPrimvar = usdCurves.GetPrimvar(GusdTokens->Alpha);
-        if( !alphaPrimvar || !alphaPrimvar.GetAttr().HasAuthoredValueOpinion() ) {
+        if( !alphaPrimvar || !alphaPrimvar.GetAttr().HasAuthoredValue() ) {
             alphaPrimvar = usdCurves.GetPrimvar(GusdTokens->displayOpacity);
         }
 
-        if( alphaPrimvar && alphaPrimvar.GetAttr().HasAuthoredValueOpinion()) {
+        if( alphaPrimvar && alphaPrimvar.GetAttr().HasAuthoredValue()) {
 
             // cerr << "curve color primvar " << alphaPrimvar.GetBaseName() << "\t" << alphaPrimvar.GetTypeName() << "\t" << alphaPrimvar.GetInterpolation() << endl;
 
