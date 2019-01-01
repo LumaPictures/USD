@@ -139,8 +139,8 @@ refine(GT_Refine& refiner, const GT_RefineParms* parms) const
     
     // normals
     UsdAttribute normalsAttr = points.GetNormalsAttr();
-    if(normalsAttr && normalsAttr.HasAuthoredValueOpinion()) {
-        normalsAttr.Get(&vtVec3Array, m_time);
+    if(normalsAttr.HasAuthoredValue() && normalsAttr.Get(&vtVec3Array, m_time)) {
+        
         if( vtVec3Array.size() < usdPoints.size() ) {
             TF_WARN( "Not enough values found for normals in %s. Expected %zd, got %zd.",
                      points.GetPrim().GetPath().GetText(),
@@ -155,8 +155,8 @@ refine(GT_Refine& refiner, const GT_RefineParms* parms) const
 
     // widths
     UsdAttribute widthsAttr = points.GetWidthsAttr();
-    if( widthsAttr && widthsAttr.HasAuthoredValueOpinion()) {
-        widthsAttr.Get(&vtFloatArray, m_time);
+    if( widthsAttr.HasAuthoredValue() && widthsAttr.Get(&vtFloatArray, m_time)) {
+        
         if( vtFloatArray.size() < usdPoints.size() ) {
             TF_WARN( "Not enough values found for widths in %s. Expected %zd, got %zd.",
                      points.GetPrim().GetPath().GetText(),
@@ -176,8 +176,8 @@ refine(GT_Refine& refiner, const GT_RefineParms* parms) const
     if( !refineForViewport ) {
         // velocities
         UsdAttribute velAttr = points.GetVelocitiesAttr();
-        if (velAttr && velAttr.HasAuthoredValueOpinion()) {
-            velAttr.Get(&vtVec3Array, m_time);
+        if ( velAttr.HasAuthoredValue() && velAttr.Get(&vtVec3Array, m_time) ) {
+            
             if( vtVec3Array.size() < usdPoints.size() ) {
                 TF_WARN( "Not enough values found for velocities in %s. Expected %zd, got %zd.",
                          points.GetPrim().GetPath().GetText(),
