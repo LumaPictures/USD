@@ -2070,6 +2070,8 @@ UsdStage::LoadAndUnload(const SdfPathSet &loadSet,
     }
 
     UsdNotice::ObjectsChanged(self, &resyncChanges, &infoChanges).Send(self);
+
+    UsdNotice::StageContentsChanged(self).Send(self);
 }
 
 void
@@ -3425,6 +3427,7 @@ UsdStage::MuteAndUnmuteLayers(const std::vector<std::string> &muteLayers,
 
     UsdNotice::ObjectsChanged(self, &resyncChanges, &infoChanges)
         .Send(self);
+    UsdNotice::StageContentsChanged(self).Send(self);
 }
 
 const std::vector<std::string>&
@@ -4751,7 +4754,7 @@ _CopyPrim(const UsdPrim &usdPrim,
     // and GetAuthoredProperties to consider clips.
     auto hasValue = [](const UsdProperty& prop){
         return prop.Is<UsdAttribute>()
-               && prop.As<UsdAttribute>().HasAuthoredValueOpinion();
+               && prop.As<UsdAttribute>().HasAuthoredValue();
     };
     
     for (auto const &prop : usdPrim.GetProperties()) {

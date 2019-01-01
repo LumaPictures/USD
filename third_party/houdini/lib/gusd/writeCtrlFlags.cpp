@@ -29,11 +29,6 @@
 #include <GT/GT_GEOPrimPacked.h>
 #include <GT/GT_AttributeList.h>
 
-#include <iostream>
-
-using std::cerr;
-using std::endl;
-
 PXR_NAMESPACE_OPEN_SCOPE
 
 void

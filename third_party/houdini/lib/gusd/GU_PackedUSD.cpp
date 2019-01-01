@@ -68,6 +68,7 @@
 #include <UT/UT_Map.h>
 
 #include <mutex>
+#include <iostream>
 
 #include <iostream>
 
