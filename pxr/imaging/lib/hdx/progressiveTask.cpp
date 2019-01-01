@@ -1,5 +1,5 @@
 //
-// Copyright 2016 Pixar
+// Copyright 2018 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,34 +21,17 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-
-#include "pxr/pxr.h"
-#include "pxr/base/tf/flyweight.h"
-
-#include <string>
-#include <utility>
+#include "pxr/imaging/hdx/progressiveTask.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-// Flyweight pools must be globally unique across the whole system.  We can't
-// just put static data members in the template, since there may be one instance
-// per shared library.  Instead, the global data is all stored here, in this one
-// translation unit, which ensures that there will be one unique pool for each
-// flyweight type.
-
-Tf_FlyweightDataBase *
-Tf_TrySetFlyweightData(std::string const &poolName, Tf_FlyweightDataBase *data)
+HdxProgressiveTask::HdxProgressiveTask(SdfPath const& id)
+    : HdTask(id)
 {
-    using std::string;
-    using std::make_pair;
-    using DataHashMap = tbb::concurrent_hash_map<
-        string, Tf_FlyweightDataBase *>;
+}
 
-    static DataHashMap _globalDataMap;
-
-    DataHashMap::accessor acc;
-    _globalDataMap.insert(acc, make_pair(poolName, data));
-    return acc->second;
+HdxProgressiveTask::~HdxProgressiveTask()
+{
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
