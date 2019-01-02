@@ -183,13 +183,6 @@ void HydraKatana::draw(ViewportWrapperPtr viewport)
     glGetDoublev(GL_VIEWPORT, &glviewport[0]);
     m_taskController->SetCameraViewport(glviewport);
 
-    // Near/Far planes
-    double nearPlane = 0.0;
-    double farPlane = 0.0;
-    camera->getNearFar(nearPlane, farPlane);
-    assert(nearPlane >= 0.01 && farPlane > nearPlane);
-    m_renderTaskParams.drawingRange = GfVec2f((float)nearPlane, (float)farPlane);
-
     // Set Task Params
     m_taskController->SetRenderParams(m_renderTaskParams);
 
