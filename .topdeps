@@ -20,3 +20,4 @@ tg/simple_features/cards_sprite_display
 tg/simple_features/embree_3_support
 tg/simple_features/maya_importing_instances
 tg/bugfixes/usd_houdini_update
+tg/simple_features/cxx14
