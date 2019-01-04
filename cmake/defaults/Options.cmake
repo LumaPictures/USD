@@ -96,6 +96,12 @@ set(PXR_LIB_PREFIX "lib"
     "Prefix for build library name"
 )
 
+set(PXR_CXX_STD "11"
+    CACHE
+    STRING
+    "Which C++ standard / version to use, as an integer - ie, 14 means use c++14."
+)
+
 option(BUILD_SHARED_LIBS "Build shared libraries." ON)
 option(PXR_BUILD_MONOLITHIC "Build a monolithic library." OFF)
 set(PXR_MONOLITHIC_IMPORT ""
