@@ -155,8 +155,9 @@ _HasPlugin(
 }
 
 static void
-_LoadAllPlugins(std::once_flag& once_flag, const std::vector<TfToken>& scope) {
-    std::call_once(once_flag, [&scope](){        
+_LoadAllPlugins(std::once_flag& once_flag, const std::vector<TfToken>& scope)
+{
+    std::call_once(once_flag, [&scope](){
         PlugPluginPtrVector plugins = PlugRegistry::GetInstance().GetAllPlugins();
         std::string mayaPlugin;
         TF_FOR_ALL(plugIter, plugins) {
@@ -246,7 +247,8 @@ UsdMaya_RegistryHelper::LoadShadingModePlugins() {
 }
 
 void
-UsdMaya_RegistryHelper::LoadUserAttributeWriterPlugins() {
+UsdMaya_RegistryHelper::LoadUserAttributeWriterPlugins()
+{
     static std::once_flag _userAttributeWritersLoaded;
     static std::vector<TfToken> scope = {_tokens->UsdMaya, _tokens->UserAttributeWriterPlugin};
     _LoadAllPlugins(_userAttributeWritersLoaded, scope);

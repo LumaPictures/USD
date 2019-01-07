@@ -80,12 +80,13 @@ struct UsdMaya_RegistryHelper
     /// 
     /// "UsdMaya" : {
     ///     "UserAttributeWriter" : {
-    ///         "mayaPlugin" : "arnoldShaderExporter"
+    ///         "mayaPlugin" : "customAttributeWriter"
     ///     }
     /// }
     ///
     /// At that scope, it expects a dictionary with one key: "mayaPlugin".
-    /// usdMaya will try to load the "mayaPlugin" when shading modes are first accessed.
+    /// usdMaya will try to load the "mayaPlugin" when user attribute
+    /// writers are first accessed.
     static void
     LoadUserAttributeWriterPlugins();
 
