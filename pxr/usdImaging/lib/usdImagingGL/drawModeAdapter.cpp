@@ -322,11 +322,12 @@ UsdImagingGLDrawModeAdapter::TrackVariability(UsdPrim const& prim,
     };
 
     auto checkForTextureVariability =
-        [&textureAttrs, &prim, &timeVaryingBits, this] (HdDirtyBits dirtyBits) {
+        [&textureAttrs, &prim, &timeVaryingBits, this]
+            (HdDirtyBits dirtyBits) {
         for (const TfToken& attr: textureAttrs) {
             if (_IsVarying(prim, attr, dirtyBits,
-                           UsdImagingTokens->usdVaryingTexture, timeVaryingBits,
-                           true)) {
+                           UsdImagingTokens->usdVaryingTexture,
+                           timeVaryingBits, true)) {
                 break;
             }
         }
