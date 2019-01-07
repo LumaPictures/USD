@@ -331,8 +331,7 @@ class ExportedAttribute(object):
     @staticmethod
     def GetUserAttributeWriters():
         if ExportedAttribute.userAttributeWriters is None:
-            r = cmds.usdListUserAttributeWriters()
-            ExportedAttribute.userAttributeWriters = [] if r is None else r
+            ExportedAttribute.userAttributeWriters = cmds.usdListUserAttributeWriters() or []
         return ExportedAttribute.userAttributeWriters
 
     @staticmethod
