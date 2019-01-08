@@ -1,2 +1,2 @@
 From: Pal Mezei <sirpalee@gmail.com>
-Subject: [PATCH] tg/simple_features/usdvolimaging_tokens_api
+Subject: [UsdVolImaging] Fixing UsdVolImaging API defines and exposing private tokens.
