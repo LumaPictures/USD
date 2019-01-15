@@ -272,7 +272,7 @@ UsdMaya_ReadJob::Read(std::vector<MDagPath>* addedDagPaths)
 
 void UsdMaya_ReadJob::_DoImportPrimIt(
     UsdPrimRange::iterator& primIt, const UsdPrim& usdRootPrim,
-    UsdMayaPrimReaderContext& readCtx, _PrimReaders& primReaders) {
+    UsdMayaPrimReaderContext& readCtx, _PrimReaderMap& primReaderMap) {
     const UsdPrim prim = *primIt;
     // The iterator will hit each prim twice. IsPostVisit tells us if
     // this is the pre-visit (Read) step or post-visit (PostReadSubtree)
@@ -280,8 +280,8 @@ void UsdMaya_ReadJob::_DoImportPrimIt(
     if (primIt.IsPostVisit()) {
         // This is the PostReadSubtree step, if the PrimReader has
         // specified one.
-        auto primReaderIt = primReaders.find(prim.GetPath());
-        if (primReaderIt != primReaders.end()) {
+        auto primReaderIt = primReaderMap.find(prim.GetPath());
+        if (primReaderIt != primReaderMap.end()) {
             primReaderIt->second->PostReadSubtree(&readCtx);
         }
     } else {
@@ -337,7 +337,7 @@ void UsdMaya_ReadJob::_DoImportPrimIt(
             if (primReader) {
                 primReader->Read(&readCtx);
                 if (primReader->HasPostReadSubtree()) {
-                    primReaders[prim.GetPath()] = primReader;
+                    primReaderMap[prim.GetPath()] = primReader;
                 }
                 if (readCtx.GetPruneChildren()) {
                     primIt.PruneChildren();
@@ -352,15 +352,15 @@ UsdMaya_ReadJob::_DoImport(UsdPrimRange& rootRange, const UsdPrim& usdRootPrim,
     const UsdStageRefPtr& stage)
 {
     const bool buildSources = mArgs.instanceMode ==
-                              UsdMayaJobImportArgsTokens->BuildSources;
+                              UsdMayaJobImportArgsTokens->buildSources;
     // Masters are not iterated when using UsdPrimRange
     if (buildSources) {
         for (const auto& master: stage->GetMasters()) {
-            _PrimReaders primReaders;
+            _PrimReaderMap primReaderMap;
             const UsdPrimRange range = UsdPrimRange::PreAndPostVisit(master);
             for (auto primIt = range.begin(); primIt != range.end(); ++primIt) {
                 UsdMayaPrimReaderContext readCtx(&mNewNodeRegistry);
-                _DoImportPrimIt(primIt, usdRootPrim, readCtx, primReaders);
+                _DoImportPrimIt(primIt, usdRootPrim, readCtx, primReaderMap);
             }
         }
     }
@@ -372,9 +372,9 @@ UsdMaya_ReadJob::_DoImport(UsdPrimRange& rootRange, const UsdPrim& usdRootPrim,
         const UsdPrim& rootPrim = *rootIt;
         rootIt.PruneChildren();
 
-        _PrimReaders primReaders;
+        _PrimReaderMap primReaderMap;
         const UsdPrimRange range =
-            mArgs.instanceMode == UsdMayaJobImportArgsTokens->Flatten ?
+            mArgs.instanceMode == UsdMayaJobImportArgsTokens->flatten ?
                 UsdPrimRange::PreAndPostVisit(rootPrim,
                     UsdTraverseInstanceProxies(UsdPrimAllPrimsPredicate)) :
                 UsdPrimRange::PreAndPostVisit(rootPrim);
@@ -429,7 +429,7 @@ UsdMaya_ReadJob::_DoImport(UsdPrimRange& rootRange, const UsdPrim& usdRootPrim,
                 UsdMayaTranslatorXformable::Read(
                     xformable, duplicateObject, readerArgs, &readCtx);
             } else {
-                _DoImportPrimIt(primIt, usdRootPrim, readCtx, primReaders);
+                _DoImportPrimIt(primIt, usdRootPrim, readCtx, primReaderMap);
             }
         }
     }
