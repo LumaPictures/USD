@@ -567,11 +567,11 @@ UsdMayaJobImportArgs::UsdMayaJobImportArgs(
         instanceMode(
             _Token(userArgs,
                 UsdMayaJobImportArgsTokens->instanceMode,
-                UsdMayaJobImportArgsTokens->AsTransform,
+                UsdMayaJobImportArgsTokens->asTransform,
                 {
-                    UsdMayaJobImportArgsTokens->AsTransform,
-                    UsdMayaJobImportArgsTokens->Flatten,
-                    UsdMayaJobImportArgsTokens->BuildSources
+                    UsdMayaJobImportArgsTokens->asTransform,
+                    UsdMayaJobImportArgsTokens->flatten,
+                    UsdMayaJobImportArgsTokens->buildSources
                 })),
         useAsAnimationCache(
             _Boolean(userArgs,
@@ -614,7 +614,7 @@ const VtDictionary& UsdMayaJobImportArgs::GetDefaultDictionary()
         d[UsdMayaJobImportArgsTokens->shadingMode] =
                 UsdMayaShadingModeTokens->displayColor.GetString();
         d[UsdMayaJobImportArgsTokens->instanceMode] =
-                UsdMayaJobImportArgsTokens->AsTransform.GetString();
+                UsdMayaJobImportArgsTokens->asTransform.GetString();
         d[UsdMayaJobImportArgsTokens->useAsAnimationCache] = false;
 
         // plugInfo.json site defaults.
