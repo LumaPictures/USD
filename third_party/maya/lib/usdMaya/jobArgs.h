@@ -120,10 +120,15 @@ TF_DECLARE_PUBLIC_TOKENS(
     (metadata) \
     (shadingMode) \
     (useAsAnimationCache) \
+    (instanceMode) \
     /* assemblyRep values */ \
     (Collapsed) \
     (Full) \
     (Import) \
+    /* instanceMode values */ \
+    (asTransform) \
+    (flatten) \
+    (buildSources) \
     ((Unloaded, ""))
 
 TF_DECLARE_PUBLIC_TOKENS(
@@ -260,6 +265,7 @@ struct UsdMayaJobImportArgs
     const TfToken::Set includeAPINames;
     const TfToken::Set includeMetadataKeys;
     TfToken shadingMode; // XXX can we make this const?
+    const TfToken instanceMode;
     const bool useAsAnimationCache;
 
     const bool importWithProxyShapes;
