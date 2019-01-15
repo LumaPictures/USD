@@ -1,5 +1,10 @@
 set(PXR_PACKAGE usdKatana)
 
+set(vtKatana_LIBRARY "")
+if (NOT ${KATANA_API_VERSION} VERSION_LESS "3.0.0")
+    set(vtKatana_LIBRARY "vtKatana")
+endif()
+
 pxr_shared_library(${PXR_PACKAGE}
     LIBRARIES
         plug
@@ -22,7 +27,9 @@ pxr_shared_library(${PXR_PACKAGE}
         usdUtils
         cameraUtil
         katanaAttrfncApi
-        ${Boost_SYSTEM_LIBRARY} 
+        ${vtKatana_LIBRARY}
+        ${Boost_SYSTEM_LIBRARY}
+        ${Boost_THREAD_LIBRARY}
 
     INCLUDE_DIRS
         ${Boost_INCLUDE_DIRS}
