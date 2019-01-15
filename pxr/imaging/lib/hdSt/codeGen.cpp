@@ -1645,7 +1645,7 @@ HdSt_CodeGen::_GenerateDrawingCoord()
     if (_metaData.drawingCoordIBinding.binding.IsValid()) {
         _genVS << "  for (int i = 0; i < HD_INSTANCER_NUM_LEVELS; ++i) {\n"
                << "    dc.instanceCoords[i] = drawingCoordI[i] \n"
-               << "      + GetInstanceIndex().indices[i+1]; \n"
+               << "      + dc.instanceIndex[i+1]; \n"
                << "  }\n";
     }
 
@@ -2197,7 +2197,11 @@ HdSt_CodeGen::_GenerateElementPrimvar()
             << "  if (primitiveEdgeID == -1) {\n"
             << "    return -1;\n"
             << "  }\n"
-            << "  return HdGet_edgeIndices()[abs(primitiveEdgeID)];\n;"
+            << "  "
+            << _GetUnpackedType(_metaData.edgeIndexBinding.dataType, false)
+            << " edgeIndices = HdGet_edgeIndices();\n"
+            << "  int coord = abs(primitiveEdgeID);\n"
+            << "  return edgeIndices[coord];\n"
             << "}\n";
 
         // Primitive EdgeID getter
