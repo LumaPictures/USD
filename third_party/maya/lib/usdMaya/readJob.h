@@ -73,7 +73,7 @@ public:
 
 private:
     // Types
-    using _PrimReaders =
+    using _PrimReaderMap =
         std::unordered_map<SdfPath, UsdMayaPrimReaderSharedPtr, SdfPath::Hash>;
 
     // XXX: Activating the 'Expanded' representation of a USD reference
@@ -88,7 +88,7 @@ private:
     bool _DoImportWithProxies(UsdPrimRange& range);
     void _DoImportPrimIt(
         UsdPrimRange::iterator& primIt, const UsdPrim& usdRootPrim,
-        UsdMayaPrimReaderContext& readCtx, _PrimReaders& primReaders);
+        UsdMayaPrimReaderContext& readCtx, _PrimReaderMap& primReaders);
 
     // These are helper methods for the proxy import method.
     bool _ProcessProxyPrims(
