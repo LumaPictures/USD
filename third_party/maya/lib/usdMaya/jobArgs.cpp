@@ -40,7 +40,6 @@
 #include <maya/MDagPath.h>
 #include <maya/MGlobal.h>
 #include <maya/MNodeClass.h>
-
 #include <maya/MTypeId.h>
 
 #include <ostream>
