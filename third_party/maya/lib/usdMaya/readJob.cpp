@@ -348,7 +348,8 @@ void UsdMaya_ReadJob::_DoImportPrimIt(
 }
 
 bool
-UsdMaya_ReadJob::_DoImport(UsdPrimRange& rootRange, const UsdPrim& usdRootPrim,
+UsdMaya_ReadJob::_DoImport(
+    UsdPrimRange& rootRange, const UsdPrim& usdRootPrim,
     const UsdStageRefPtr& stage)
 {
     const bool buildSources = mArgs.instanceMode ==
@@ -358,7 +359,8 @@ UsdMaya_ReadJob::_DoImport(UsdPrimRange& rootRange, const UsdPrim& usdRootPrim,
         for (const auto& master: stage->GetMasters()) {
             _PrimReaderMap primReaderMap;
             const UsdPrimRange range = UsdPrimRange::PreAndPostVisit(master);
-            for (auto primIt = range.begin(); primIt != range.end(); ++primIt) {
+            for (auto primIt = range.begin();
+                 primIt != range.end(); ++primIt) {
                 UsdMayaPrimReaderContext readCtx(&mNewNodeRegistry);
                 _DoImportPrimIt(primIt, usdRootPrim, readCtx, primReaderMap);
             }
@@ -403,7 +405,6 @@ UsdMaya_ReadJob::_DoImport(UsdPrimRange& rootRange, const UsdPrim& usdRootPrim,
                 if (!status) {
                     continue;
                 }
-                masterNode.findPlug("visibility").setBool(false);
                 const auto primPath = prim.GetPath();
                 MObject parentObject =
                     readCtx.GetMayaNode(primPath.GetParentPath(), false);
@@ -432,6 +433,20 @@ UsdMaya_ReadJob::_DoImport(UsdPrimRange& rootRange, const UsdPrim& usdRootPrim,
                 _DoImportPrimIt(primIt, usdRootPrim, readCtx, primReaderMap);
             }
         }
+    }
+
+    if (buildSources) {
+        MDGModifier dgMod;
+        UsdMayaPrimReaderContext readCtx(&mNewNodeRegistry);
+        for (const auto& master: stage->GetMasters()) {
+            const SdfPath masterPath = master.GetPath();
+            MObject masterObject =
+                readCtx.GetMayaNode(masterPath, false);
+            if (masterObject != MObject::kNullObj) {
+                dgMod.deleteNode(masterObject);
+            }
+        }
+        dgMod.doIt();
     }
 
     return true;
