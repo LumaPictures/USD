@@ -747,7 +747,7 @@ UsdGeomXformable::GetLocalTransformation(
         return false;
 
     if (opOrderVec.size() == 0) {
-        return result;
+        return true;
     }
     
     for (VtTokenArray::reverse_iterator it = opOrderVec.rbegin() ; 
