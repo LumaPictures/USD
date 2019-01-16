@@ -16,9 +16,11 @@ pxr_plugin(${PXR_PACKAGE}
         usdShade
         usdUtils
         gusd
+        ${USD_ARNOLD_LIBRARY}
 
     INCLUDE_DIRS
         ${HOUDINI_INCLUDE_DIRS}
+        ${USD_ARNOLD_INCLUDE_DIR}
 
     PRIVATE_CLASSES
         OBJ_usdcamera
