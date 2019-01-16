@@ -12,9 +12,13 @@ pxr_library(usdGeom
         usd
         work
         ${Boost_PYTHON_LIBRARY}
+        ${OIIO_LIBRARIES}
+        ${OPENEXR_LIBRARIES}
 
     INCLUDE_DIRS
         ${Boost_INCLUDE_DIRS}
+        ${OIIO_INCLUDE_DIRS}
+        ${OPENEXR_INCLUDE_DIRS}
 
     PUBLIC_CLASSES
         debugCodes
@@ -34,6 +38,7 @@ pxr_library(usdGeom
         collectionAPI
         faceSetAPI
         imageable
+        imagePlane
         gprim
         mesh
         metrics
@@ -76,6 +81,7 @@ pxr_library(usdGeom
         wrapFaceSetAPI.cpp
         wrapGprim.cpp
         wrapImageable.cpp
+        wrapImagePlane.cpp
         wrapMesh.cpp
         wrapMetrics.cpp
         wrapModelAPI.cpp

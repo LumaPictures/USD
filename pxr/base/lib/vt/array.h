@@ -48,6 +48,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <memory>
+#include <initializer_list>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
