@@ -560,6 +560,72 @@ class "Gprim" (
         )
 }
 
+class ImagePlane "ImagePlane" (
+    inherits = </Gprim>
+    doc = """
+        Basic schema to represent image planes.
+    """
+) {
+    asset info:filename = @@ (
+        customData = {
+            string apiName = "filename"
+        }
+        doc = "Asset path to the file containg the image data."
+    )
+    double frame = 0.0 (
+        doc = "The frame offset for animated textures."
+    )
+    token fit = "best" (
+        allowedTokens = ["fill", "best", "horizontal", "vertical", "to size"]
+        doc = "Fitting mode for the image plane."
+    )
+    float2 offset = (0.0, 0.0) (
+        doc = "Image plane offset in inches."
+    )
+    float3 imageCenter = (0.0, 0.0, 0.0) (
+        doc = "3D offset for the image plane."
+    )
+    float2 size = (-1.0, -1.0) (
+        doc = "Image plane size in inches. Less than zero means equal to the camera aperture size."
+    )
+    float rotate = 0.0 (
+        doc = "Rotation value for the image plane. Specified in degrees."
+    )
+    int2 coverage = (0, 0) (
+        doc = "Coverage of the image in pixels. 0 is equal to the image's size."
+    )
+    int2 coverageOrigin = (0, 0) (
+        doc = "Coverage origin in pixels. Clamped to -image's size and image's size."
+    )
+    bool useFrameExtension = false (
+        doc = "Using frame extension"
+    )
+    int frameOffset = 0 (
+        doc = "Frame offset"
+    )
+    int frameCache = 45 (
+        doc = "Precached frame count"
+    )
+    float width = 0.0 (
+        doc = "Width"
+    )
+    float height = 0.0 (
+        doc = "Height"
+    )
+    float alphaGain = 1.0 (
+        doc = "Alpha Gain"
+    )
+    float depth = 100.0 (
+        doc = "Depth"
+    )
+    float squeezeCorrection = 1.0 (
+        doc = "Squeeze Correction"
+    )
+    rel camera (
+        doc = "Link to the camera from where aperture sizes are queried."
+    )
+}
+
 class Cube "Cube" (
     inherits = </Gprim>
     doc = """Defines a primitive rectilinear cube centered at the origin.

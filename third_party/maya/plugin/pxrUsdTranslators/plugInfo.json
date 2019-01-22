@@ -14,7 +14,8 @@
                             "UsdGeomXform",
                             "UsdShadeMaterial",
                             "UsdSkelRoot",
-                            "UsdSkelSkeleton"
+                            "UsdSkelSkeleton",
+                            "UsdGeomImagePlane"
                         ]
                     },
                     "PrimWriter": {
@@ -29,7 +30,8 @@
                             "nParticle",
                             "nurbsCurve",
                             "nurbsSurface",
-                            "particle"
+                            "particle",
+                            "imagePlane"
                         ]
                     }
                 }

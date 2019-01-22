@@ -49,6 +49,7 @@ pxr_library(usdImaging
         domeLightAdapter
         fieldAdapter
         gprimAdapter
+        imagePlaneAdapter
         instanceAdapter
         lightAdapter
         materialAdapter
