@@ -299,8 +299,16 @@ GlfSimpleLightingContext::BindUniformBlocks(GlfBindingMapPtr const &bindingMap)
             float basis0[4];
             float basis1[4];
             float basis2[4];
+            // Bias is generally negative
             float bias;
-            float padding[3];
+            // All these values should be positive
+            float radius;
+            float near;
+            float far;
+            float left;
+            float right;
+            float top;
+            float bottom;
         };
 
         struct Shadow {
@@ -347,18 +355,37 @@ GlfSimpleLightingContext::BindUniformBlocks(GlfBindingMapPtr const &bindingMap)
                     _shadows->GetWorldToShadowMatrix(shadowIndex);
 
                 double invBlur = 1.0/(std::max(0.0001F, light.GetShadowBlur()));
-                GfMatrix4d mat = viewToShadowMatrix.GetInverse();
-                GfVec4f xVec = GfVec4f(mat.GetRow(0) * invBlur);
-                GfVec4f yVec = GfVec4f(mat.GetRow(1) * invBlur);
-                GfVec4f zVec = GfVec4f(mat.GetRow(2));
+                GfMatrix4d shadowToViewMatrix = viewToShadowMatrix.GetInverse();
+                GfVec4f xVec = GfVec4f(shadowToViewMatrix.GetRow(0) * invBlur);
+                GfVec4f yVec = GfVec4f(shadowToViewMatrix.GetRow(1) * invBlur);
+                GfVec4f zVec = GfVec4f(shadowToViewMatrix.GetRow(2));
 
                 shadowData->shadow[shadowIndex].bias = light.GetShadowBias();
                 setMatrix(shadowData->shadow[shadowIndex].viewToShadowMatrix,
                           viewToShadowMatrix);
+
+                // TODO: add a separate light radius parameter to simple light?
+                shadowData->shadow[shadowIndex].radius = light.GetShadowBlur();
                 setVec4(shadowData->shadow[shadowIndex].basis0, xVec);
                 setVec4(shadowData->shadow[shadowIndex].basis1, yVec);
                 setVec4(shadowData->shadow[shadowIndex].basis2, zVec);
 
+                // Note that while GetWorldToShadowMatrix returns a matrix that
+                // maps into 0-to-1, GetProjectionMatrix maps to -1-to-1.
+                // Also, remember that depths in "normal" light space are in
+                // -Z.
+                GfMatrix4d inverseProjectionMatrix =
+                        _shadows->GetProjectionMatrix(shadowIndex).GetInverse();
+                GfVec3f nearTopRightPt = inverseProjectionMatrix.Transform(GfVec3f(1,1,-1));
+                GfVec3f nearBottomLeftPt = inverseProjectionMatrix.Transform(GfVec3f(-1,-1,-1));
+                GfVec3f farPt = inverseProjectionMatrix.Transform(GfVec3f(0,0,1));
+                // All these values should be positive
+                shadowData->shadow[shadowIndex].near = -nearTopRightPt[2];
+                shadowData->shadow[shadowIndex].far = -farPt[2];
+                shadowData->shadow[shadowIndex].right = nearTopRightPt[0];
+                shadowData->shadow[shadowIndex].top = nearTopRightPt[1];
+                shadowData->shadow[shadowIndex].left = nearBottomLeftPt[0];
+                shadowData->shadow[shadowIndex].bottom = nearBottomLeftPt[1];
                 shadowExists = true;
             }
         }
