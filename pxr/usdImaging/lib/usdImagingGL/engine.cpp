@@ -118,6 +118,8 @@ UsdImagingGLEngine::UsdImagingGLEngine()
     , _invisedPrimPaths()
     , _isPopulated(false)
     , _renderTags()
+    , _restoreViewport(0)
+    , _useFloatPointDrawTarget(false)
 {
     if (IsHydraEnabled()) {
 
@@ -153,6 +155,8 @@ UsdImagingGLEngine::UsdImagingGLEngine(
     , _invisedPrimPaths(invisedPaths)
     , _isPopulated(false)
     , _renderTags()
+    , _restoreViewport(0)
+    , _useFloatPointDrawTarget(false)
 {
     if (IsHydraEnabled()) {
 
@@ -852,6 +856,36 @@ UsdImagingGLEngine::SetRendererSetting(TfToken const& id, VtValue const& value)
     _renderIndex->GetRenderDelegate()->SetRenderSetting(id, value);
 }
 
+void 
+UsdImagingGLEngine::SetEnableFloatPointDrawTarget(bool state)
+{
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return;
+    }
+
+    _useFloatPointDrawTarget = state;
+}
+
+//----------------------------------------------------------------------------
+// Color Correction
+//----------------------------------------------------------------------------
+void 
+UsdImagingGLEngine::SetColorCorrectionSettings(
+    TfToken const& id,
+    GfVec2i const& framebufferResolution)
+{
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return;
+    }
+
+    TF_VERIFY(_taskController);
+
+    HdxColorCorrectionTaskParams hdParams;
+    hdParams.framebufferSize = framebufferResolution;
+    hdParams.colorCorrectionMode = id;
+    _taskController->SetColorCorrectionParams(hdParams);
+}
+
 //----------------------------------------------------------------------------
 // Resource Information
 //----------------------------------------------------------------------------
@@ -889,6 +923,11 @@ UsdImagingGLEngine::_Render(const UsdImagingGLRenderParams &params)
     }
 
     TF_VERIFY(_delegate);
+
+    // Render into our interal framebuffer for color management / post-effects.
+    _BindInternalDrawTarget(params);
+    SetColorCorrectionSettings(params.colorCorrectionMode, 
+                               params.renderResolution);
 
     // Forward scene materials enable option to delegate
     _delegate->SetSceneMaterialsEnabled(params.enableSceneMaterials);
@@ -941,18 +980,6 @@ UsdImagingGLEngine::_Render(const UsdImagingGLRenderParams &params)
     //  * showGuides, showRender, showProxy
     //  * gammaCorrectColors
 
-    if (params.applyRenderState) {
-        // drawmode.
-        // XXX: Temporary solution until shader-based styling implemented.
-        switch (params.drawMode) {
-        case UsdImagingGLDrawMode::DRAW_POINTS:
-            glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-            break;
-        default:
-            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-            break;
-        }
-    }
 
     VtValue selectionValue(_selTracker);
     _engine.SetTaskContextData(HdxTokens->selectionState, selectionValue);
@@ -973,6 +1000,9 @@ UsdImagingGLEngine::_Render(const UsdImagingGLRenderParams &params)
     } else {
         glPopAttrib(); // GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT
     }
+
+    // Copy the results into the client applications framebuffer.
+    _RestoreClientDrawTarget(params);
 }
 
 bool 
@@ -1072,8 +1102,10 @@ UsdImagingGLEngine::_UpdateHydraCollection(
     // choose repr
     HdReprSelector reprSelector = HdReprSelector(HdReprTokens->smoothHull);
     bool refined = params.complexity > 1.0;
-
-    if (params.drawMode == UsdImagingGLDrawMode::DRAW_GEOM_FLAT ||
+    
+    if (params.drawMode == UsdImagingGLDrawMode::DRAW_POINTS) {
+        reprSelector = HdReprSelector(HdReprTokens->points);
+    } else if (params.drawMode == UsdImagingGLDrawMode::DRAW_GEOM_FLAT ||
         params.drawMode == UsdImagingGLDrawMode::DRAW_SHADED_FLAT) {
         // Flat shading
         reprSelector = HdReprSelector(HdReprTokens->hull);
@@ -1266,6 +1298,96 @@ UsdImagingGLEngine::_GetDefaultRendererPluginId()
     return TfToken();
 }
 
+void 
+UsdImagingGLEngine::_BindInternalDrawTarget(
+    UsdImagingGLRenderParams const& params)
+{
+    if (!_useFloatPointDrawTarget) {
+        return;
+    }
+
+    glGetIntegerv(GL_VIEWPORT, _restoreViewport.data());
+    GfVec2i drawTargetSize = GfVec2i(_restoreViewport[2], _restoreViewport[3]);
+
+    // Bind our internal drawtarget to control the render bitdepth.
+    // We want to render (linear-colors), do color-correction and other post-
+    // effects at a higher bitdepth then may be bound by the client.
+    if(!_drawTarget) {
+        bool requestMSAA = glIsEnabled(GL_MULTISAMPLE);
+        _drawTarget = GlfDrawTarget::New(drawTargetSize, requestMSAA);
+        _drawTarget->Bind();
+        _drawTarget->AddAttachment("color", GL_RGBA, GL_FLOAT, GL_RGBA16F);
+        _drawTarget->AddAttachment("depth", GL_DEPTH_COMPONENT, GL_FLOAT, 
+                                   GL_DEPTH_COMPONENT32F);
+    } else {
+        _drawTarget->Bind();
+
+        // The clients viewport may have changed size.
+        _drawTarget->SetSize(drawTargetSize);
+    }
+
+    // Remove any offset applied to the viewport so clearing and rendering
+    // happens in the correct region. (UsdView CameraMask mode messes with this)
+    glViewport(0, 0, _restoreViewport[2], _restoreViewport[3]);
+
+    // Clear our internal drawTarget with the clearcolor set by client
+    glClearBufferfv(GL_COLOR, 0, params.clearColor.data());
+    GLfloat clearDepth[1] = {1.0f};
+    glClearBufferfv(GL_DEPTH, 0, clearDepth);
+}
+
+void 
+UsdImagingGLEngine::_RestoreClientDrawTarget(
+    UsdImagingGLRenderParams const& params)
+{
+    if (!_useFloatPointDrawTarget || !_drawTarget) {
+        return;
+    }
+
+    // Restore the clients framebuffer and copy the contents of our internal
+    // framebuffer into the clients framebuffer.
+    // We need to blit depth because the client may do additional compositing
+    // on top of the render, such as drawing bounding boxes.
+    _drawTarget->Unbind();
+    _drawTarget->Resolve();
+
+    // Restore viewport set by client/app
+    glViewport(_restoreViewport[0], 
+               _restoreViewport[1], 
+               _restoreViewport[2], 
+               _restoreViewport[3]);
+
+    // Depth test must always pass to ensure that all pixels are transfered
+    // from our drawTarget to the clients when HdxCompositor draws its triangle.
+    GLboolean restoreDepthEnabled = glIsEnabled(GL_DEPTH_TEST);
+    glEnable(GL_DEPTH_TEST);
+
+    // Depth test must be ALWAYS instead of disabling the depth_test because
+    // we still want to write to the depth buffer. Disabling depth_test disables
+    // depth_buffer writes and we need to copy depth to client buffer.
+    GLint restoreDepthFunc;
+    glGetIntegerv(GL_DEPTH_FUNC, &restoreDepthFunc);
+    glDepthFunc(GL_ALWAYS);
+
+    // Any alpha blending the client wanted should have happened into our 
+    // internal FB. When copying back to client buffer disable blending.
+    GLboolean restoreblendEnabled;
+    glGetBooleanv(GL_BLEND, &restoreblendEnabled);
+    glDisable(GL_BLEND);
+
+    GLuint colorId = _drawTarget->GetAttachment("color")->GetGlTextureName();
+    GLuint depthId = _drawTarget->GetAttachment("depth")->GetGlTextureName();
+    _compositor.Draw(colorId, depthId, /*remapDepth*/ false);
+
+    if (restoreblendEnabled) {
+        glEnable(GL_BLEND);
+    }
+
+    glDepthFunc(restoreDepthFunc);
+    if (!restoreDepthEnabled) {
+        glDisable(GL_DEPTH_TEST);
+    }
+}
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
