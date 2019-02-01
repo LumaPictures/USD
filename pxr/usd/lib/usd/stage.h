@@ -2097,6 +2097,7 @@ private:
     friend class UsdEditTarget;
     friend class UsdInherits;
     friend class UsdObject;
+    friend class UsdPayloads;
     friend class UsdPrim;
     friend class UsdProperty;
     friend class UsdReferences;
