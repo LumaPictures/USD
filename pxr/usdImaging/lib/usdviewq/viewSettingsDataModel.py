@@ -25,8 +25,9 @@
 from qt import QtCore
 from pxr import UsdGeom, Sdf
 
-from common import (RenderModes, PickModes, SelectionHighlightModes,
-    CameraMaskModes, Complexities, PrintWarning)
+from common import (RenderModes, ColorCorrectionModes, PickModes, 
+                    SelectionHighlightModes, CameraMaskModes, Complexities, 
+                    PrintWarning)
 
 import settings2
 from settings2 import StateSource
@@ -99,6 +100,7 @@ class ViewSettingsDataModel(QtCore.QObject, StateSource):
         self._redrawOnScrub = self.stateProperty("redrawOnScrub", default=True)
         self._authoredStepsOnly = self.stateProperty("authoredStepsOnly", default=True)
         self._renderMode = self.stateProperty("renderMode", default=RenderModes.SMOOTH_SHADED)
+        self._colorCorrectionMode = self.stateProperty("colorCorrectionMode", default=ColorCorrectionModes.SRGB)
         self._pickMode = self.stateProperty("pickMode", default=PickModes.PRIMS)
 
         # We need to store the trinary selHighlightMode state here,
@@ -157,6 +159,7 @@ class ViewSettingsDataModel(QtCore.QObject, StateSource):
         state["redrawOnScrub"] = self._redrawOnScrub
         state["authoredStepsOnly"] = self._authoredStepsOnly
         state["renderMode"] = self._renderMode
+        state["colorCorrectionMode"] = self._colorCorrectionMode
         state["pickMode"] = self._pickMode
         state["selectionHighlightMode"] = self._selHighlightMode
         state["highlightColor"] = self._highlightColorName
@@ -261,6 +264,15 @@ class ViewSettingsDataModel(QtCore.QObject, StateSource):
     @visibleViewSetting
     def renderMode(self, value):
         self._renderMode = value
+
+    @property
+    def colorCorrectionMode(self):
+        return self._colorCorrectionMode
+
+    @colorCorrectionMode.setter
+    @visibleViewSetting
+    def colorCorrectionMode(self, value):
+        self._colorCorrectionMode = value
 
     @property
     def pickMode(self):
