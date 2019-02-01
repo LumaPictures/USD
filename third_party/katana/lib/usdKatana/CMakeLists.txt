@@ -28,7 +28,12 @@ pxr_shared_library(${PXR_PACKAGE}
         cameraUtil
         katanaAttrfncApi
         ${vtKatana_LIBRARY}
-        ${Boost_THREAD_LIBRARY} 
+        ${Boost_SYSTEM_LIBRARY}
+        ${Boost_THREAD_LIBRARY}
+
+    INCLUDE_DIRS
+        ${Boost_INCLUDE_DIRS}
+        ${TBB_INCLUDE_DIRS}
 
     PUBLIC_CLASSES
         attrMap

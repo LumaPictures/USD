@@ -2,6 +2,8 @@ set(PXR_INSTALL_SUBDIR "third_party/maya")
 
 pxr_add_extra_plugins(plugin)
 
+pxr_setup_third_party_python_init()
+
 # Additional defines for building against Maya
 add_definitions(-D_BOOL -DREQUIRE_IOSTREAM)
 
