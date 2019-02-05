@@ -69,7 +69,7 @@ _IsHydraEnabled()
     // Make sure there is an OpenGL context when 
     // trying to initialize Hydra/Reference
     GlfGLContextSharedPtr context = GlfGLContext::GetCurrentGLContext();
-    if (!context) {
+    if (!context || !context->IsValid()) {
         TF_CODING_ERROR("OpenGL context required, using reference renderer");
         return false;
     }
@@ -878,12 +878,23 @@ UsdImagingGLEngine::SetColorCorrectionSettings(
         return;
     }
 
+    if (!IsColorCorrectionCapable()) {
+        return;
+    }
+
     TF_VERIFY(_taskController);
 
     HdxColorCorrectionTaskParams hdParams;
     hdParams.framebufferSize = framebufferResolution;
     hdParams.colorCorrectionMode = id;
     _taskController->SetColorCorrectionParams(hdParams);
+}
+
+bool 
+UsdImagingGLEngine::IsColorCorrectionCapable()
+{
+    return GlfContextCaps::GetInstance().floatingPointBuffersEnabled && 
+           _IsHydraEnabled();
 }
 
 //----------------------------------------------------------------------------
@@ -1302,6 +1313,11 @@ void
 UsdImagingGLEngine::_BindInternalDrawTarget(
     UsdImagingGLRenderParams const& params)
 {
+    // Avoid GL errors in MacOS (e.g. Hydra with Embree)
+    if (!GlfContextCaps::GetInstance().floatingPointBuffersEnabled) {
+        return;
+    }
+
     if (!_useFloatPointDrawTarget) {
         return;
     }
@@ -1340,6 +1356,11 @@ void
 UsdImagingGLEngine::_RestoreClientDrawTarget(
     UsdImagingGLRenderParams const& params)
 {
+    // Avoid GL errors in MacOS (e.g. Hydra with Embree)
+    if (!GlfContextCaps::GetInstance().floatingPointBuffersEnabled) {
+        return;
+    }
+
     if (!_useFloatPointDrawTarget || !_drawTarget) {
         return;
     }
