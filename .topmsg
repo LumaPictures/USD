@@ -1,0 +1,4 @@
+From: Paul Molodowitch <paulm@lumapictures.com>
+Subject: [hdx] TaskController::TestIntersections allows selection by nearestToCamera
+
+...not just nearestToCenter
