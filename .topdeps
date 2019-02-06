@@ -21,5 +21,4 @@ tg/simple_features/embree_3_support
 tg/simple_features/maya_importing_instances
 tg/bugfixes/usd_houdini_update
 tg/simple_features/cxx14
-tg/bugfixes/mtx_test_mix
 tg/simple_features/katana_texcoord_to_vector
