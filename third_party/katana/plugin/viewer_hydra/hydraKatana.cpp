@@ -207,7 +207,7 @@ bool HydraKatana::pick(ViewportWrapperPtr viewport,
 
     // Define the hit mode
     HdxIntersector::HitMode hitMode = HdxIntersector::HitMode::HitFirst;
-    TfToken intersectionMode = HdxIntersectionModeTokens->nearest;
+    TfToken intersectionMode = HdxIntersectionModeTokens->nearestToCenter;
     if (deepPicking)
     {
         hitMode = HdxIntersector::HitMode::HitAll;
