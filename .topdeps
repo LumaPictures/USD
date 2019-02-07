@@ -22,3 +22,4 @@ tg/simple_features/maya_importing_instances
 tg/bugfixes/usd_houdini_update
 tg/simple_features/cxx14
 tg/simple_features/katana_texcoord_to_vector
+tg/simple_features/hdx_nearestToCamera
