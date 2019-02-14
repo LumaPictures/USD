@@ -30,6 +30,7 @@
 -- glsl HdxRenderPass.RenderColorShadowsOutput
 
 layout (location = 0) out vec4 colorOut;
+layout (location = 1) out vec4 normalOut;
 
 vec4 ApplyColorOverrides(vec4 color)
 {
@@ -44,6 +45,11 @@ vec4 ApplyColorOverridesPostLighting(vec4 color)
 void RenderColor(vec4 color)
 {
     colorOut = color;
+}
+
+void RenderNormal(vec3 normal)
+{
+    normalOut = vec4(normal, 1.0);
 }
 
 --- --------------------------------------------------------------------------
@@ -87,10 +93,16 @@ vec4 ApplyColorOverridesPostLighting(vec4 color)
 }
 
 layout (location = 0) out vec4 colorOut;
+layout (location = 1) out vec4 normalOut;
 
 void RenderColor(vec4 color)
 {
     colorOut = color;
+}
+
+void RenderNormal(vec3 normal)
+{
+    normalOut = vec4(normal, 1.0);
 }
 
 --- --------------------------------------------------------------------------
@@ -162,4 +174,8 @@ void RenderColor(vec4 color)
         pointIdOut = IntToVec4(pointId);
     }
     
+}
+
+void RenderNormal(vec3 normal)
+{
 }

@@ -559,4 +559,5 @@ void main(void)
     }
 
     RenderColor(color);
+    RenderNormal(Neye);
 }

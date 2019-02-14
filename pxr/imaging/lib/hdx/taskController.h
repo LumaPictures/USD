@@ -203,6 +203,10 @@ public:
     HDX_API
     void SetShadowParams(HdxShadowTaskParams const& params);
 
+    /// Turns the ambient occlusion task on or off.
+    HDX_API
+    void SetEnableAmbientOcclusion(bool enable);
+
     /// -------------------------------------------------------
     /// Progressive Image Generation
 
@@ -238,6 +242,7 @@ private:
     void _CreateShadowTask();
     void _CreateColorizeTask();
     void _CreateColorCorrectionTask();
+    void _CreateAmbientOcclusionTask();
 
     SdfPath _GetAovPath(TfToken const& aov);
 
@@ -299,6 +304,7 @@ private:
     SdfPath _shadowTaskId;
     SdfPath _colorizeTaskId;
     SdfPath _colorCorrectionTaskId;
+    SdfPath _ambientOcclusionTaskId;
 
     // Generated cameras
     SdfPath _cameraId;
