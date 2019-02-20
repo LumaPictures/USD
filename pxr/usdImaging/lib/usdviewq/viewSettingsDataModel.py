@@ -98,7 +98,7 @@ class ViewSettingsDataModel(QtCore.QObject, StateSource):
         self._defaultMaterialAmbient = self.stateProperty("defaultMaterialAmbient", default=DEFAULT_AMBIENT)
         self._defaultMaterialSpecular = self.stateProperty("defaultMaterialSpecular", default=DEFAULT_SPECULAR)
         self._redrawOnScrub = self.stateProperty("redrawOnScrub", default=True)
-        self._authoredStepsOnly = self.stateProperty("authoredStepsOnly", default=True)
+        self._authoredStepsOnly = False
         self._renderMode = self.stateProperty("renderMode", default=RenderModes.SMOOTH_SHADED)
         self._colorCorrectionMode = self.stateProperty("colorCorrectionMode", default=ColorCorrectionModes.SRGB)
         self._pickMode = self.stateProperty("pickMode", default=PickModes.PRIMS)
@@ -157,7 +157,6 @@ class ViewSettingsDataModel(QtCore.QObject, StateSource):
         state["defaultMaterialAmbient"] = self._defaultMaterialAmbient
         state["defaultMaterialSpecular"] = self._defaultMaterialSpecular
         state["redrawOnScrub"] = self._redrawOnScrub
-        state["authoredStepsOnly"] = self._authoredStepsOnly
         state["renderMode"] = self._renderMode
         state["colorCorrectionMode"] = self._colorCorrectionMode
         state["pickMode"] = self._pickMode
