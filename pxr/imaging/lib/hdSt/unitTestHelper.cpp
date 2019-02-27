@@ -72,6 +72,12 @@ public:
             _renderPass->GetRenderIndex()->GetResourceRegistry());
     }
 
+    virtual void Prepare(HdTaskContext* ctx,
+                         HdRenderIndex* renderIndex) override
+    {
+
+    }
+
     virtual void Execute(HdTaskContext* ctx) override
     {
         _renderPassState->Bind();
@@ -297,7 +303,7 @@ HdSt_TestLightingShader::HdSt_TestLightingShader()
     _sceneAmbient    = GfVec3f(0.04, 0.04, 0.04);
 
     std::stringstream ss(lightingShader);
-    _glslfx.reset(new GlfGLSLFX(ss));
+    _glslfx.reset(new HioGlslfx(ss));
 }
 
 HdSt_TestLightingShader::~HdSt_TestLightingShader()

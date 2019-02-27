@@ -135,8 +135,9 @@ UsdImagingBasisCurvesAdapter::TrackVariability(UsdPrim const& prim,
 bool
 UsdImagingBasisCurvesAdapter::_IsBuiltinPrimvar(TfToken const& primvarName) const
 {
-    return (primvarName == UsdImagingTokens->primvarsNormals ||
-            primvarName == UsdImagingTokens->primvarsWidths);
+    return (primvarName == HdTokens->normals ||
+            primvarName == HdTokens->widths) ||
+        UsdImagingGprimAdapter::_IsBuiltinPrimvar(primvarName);
 }
 
 void 
