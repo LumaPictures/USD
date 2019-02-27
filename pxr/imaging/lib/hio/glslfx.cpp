@@ -551,9 +551,6 @@ HioGlslfx::GetMetadata() const
 string
 HioGlslfx::_GetSource(const TfToken &shaderStageKey) const
 {
-    TF_DEBUG(GLF_DEBUG_GLSLFX).Msg("Getting source for: %s (%s)\n",
-            shaderStageKey.GetText(),
-            GetFilePath().c_str());
     if (!_config) {
         return "";
     }
@@ -566,9 +563,6 @@ HioGlslfx::_GetSource(const TfToken &shaderStageKey) const
     for (std::string const& key : sourceKeys) {
         // now look up the keys and concatenate them together..
         _SourceMap::const_iterator cit = _sourceMap.find(key);
-
-        TF_DEBUG(GLF_DEBUG_GLSLFX).Msg("  Appending source for key: %s\n",
-                key.c_str());
 
         if (cit == _sourceMap.end()) {
             TF_RUNTIME_ERROR("Can't find shader source for <%s> with the key "
