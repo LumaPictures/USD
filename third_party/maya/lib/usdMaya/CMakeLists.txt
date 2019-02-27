@@ -240,7 +240,7 @@ pxr_install_test_dir(
     DEST testPointBasedDeformerNode
 )
 pxr_register_test(testPointBasedDeformerNode
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testPointBasedDeformerNode"
     TESTENV testPointBasedDeformerNode
     ENV
@@ -255,7 +255,7 @@ pxr_install_test_dir(
     DEST testUsdExportAsClip
 )
 pxr_register_test(testUsdExportAsClip
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportAsClip"
     TESTENV testUsdExportAsClip
     ENV
@@ -270,7 +270,7 @@ pxr_install_test_dir(
     DEST testUsdExportAssembly
 )
 pxr_register_test(testUsdExportAssembly
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportAssembly"
     TESTENV testUsdExportAssembly
     ENV
@@ -285,7 +285,7 @@ pxr_install_test_dir(
     DEST testUsdExportCamera
 )
 pxr_register_test(testUsdExportCamera
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportCamera"
     TESTENV testUsdExportCamera
     ENV
@@ -300,7 +300,7 @@ pxr_install_test_dir(
     DEST testUsdExportColorSets
 )
 pxr_register_test(testUsdExportColorSets
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportColorSets"
     TESTENV testUsdExportColorSets
     ENV
@@ -315,7 +315,7 @@ pxr_install_test_dir(
     DEST testUsdExportConnected
 )
 pxr_register_test(testUsdExportConnected
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportConnected"
     TESTENV testUsdExportConnected
     ENV
@@ -331,7 +331,7 @@ pxr_install_test_dir(
     DEST testUsdExportDisplayColor
 )
 pxr_register_test(testUsdExportDisplayColor
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportDisplayColor"
     TESTENV testUsdExportDisplayColor
     ENV
@@ -346,7 +346,7 @@ pxr_install_test_dir(
     DEST testUsdExportEulerFilter
 )
 pxr_register_test(testUsdExportEulerFilter
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportEulerFilter"
     TESTENV testUsdExportEulerFilter
     ENV
@@ -361,7 +361,7 @@ pxr_install_test_dir(
     DEST testUsdExportFilterTypes
 )
 pxr_register_test(testUsdExportFilterTypes
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportFilterTypes"
     TESTENV testUsdExportFilterTypes
     ENV
@@ -376,7 +376,7 @@ pxr_install_test_dir(
     DEST testUsdExportFrameOffset
 )
 pxr_register_test(testUsdExportFrameOffset
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportFrameOffset"
     TESTENV testUsdExportFrameOffset
     ENV
@@ -391,7 +391,7 @@ pxr_install_test_dir(
     DEST testUsdExportInstances
 )
 pxr_register_test(testUsdExportInstances
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportInstances"
     TESTENV testUsdExportInstances
     ENV
@@ -406,7 +406,7 @@ pxr_install_test_dir(
     DEST testUsdExportLocator
 )
 pxr_register_test(testUsdExportLocator
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportLocator"
     TESTENV testUsdExportLocator
     ENV
@@ -421,7 +421,7 @@ pxr_install_test_dir(
     DEST testUsdExportMesh
 )
 pxr_register_test(testUsdExportMesh
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportMesh"
     TESTENV testUsdExportMesh
     ENV
@@ -436,7 +436,7 @@ pxr_install_test_dir(
     DEST testUsdExportNurbsCurve
 )
 pxr_register_test(testUsdExportNurbsCurve
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportNurbsCurve"
     TESTENV testUsdExportNurbsCurve
     ENV
@@ -447,7 +447,7 @@ pxr_register_test(testUsdExportNurbsCurve
 )
 
 pxr_register_test(testUsdExportOpenLayer
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportOpenLayer"
     ENV
         MAYA_PLUG_IN_PATH=${CMAKE_INSTALL_PREFIX}/third_party/maya/plugin
@@ -461,7 +461,7 @@ pxr_install_test_dir(
     DEST testUsdExportOverImport
 )
 pxr_register_test(testUsdExportOverImport
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportOverImport"
     TESTENV testUsdExportOverImport
     ENV
@@ -476,7 +476,7 @@ pxr_install_test_dir(
     DEST testUsdExportPackage
 )
 pxr_register_test(testUsdExportPackage
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportPackage"
     TESTENV testUsdExportPackage
     ENV
@@ -491,7 +491,7 @@ pxr_install_test_dir(
     DEST testUsdExportParentScope
 )
 pxr_register_test(testUsdExportParentScope
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportParentScope"
     TESTENV testUsdExportParentScope
     ENV
@@ -506,7 +506,7 @@ pxr_install_test_dir(
     DEST testUsdExportParticles
 )
 pxr_register_test(testUsdExportParticles
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportParticles"
     TESTENV testUsdExportParticles
     ENV
@@ -521,7 +521,7 @@ pxr_install_test_dir(
     DEST testUsdExportPointInstancer
 )
 pxr_register_test(testUsdExportPointInstancer
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportPointInstancer"
     TESTENV testUsdExportPointInstancer
     ENV
@@ -536,7 +536,7 @@ pxr_install_test_dir(
     DEST testUsdExportPref
 )
 pxr_register_test(testUsdExportPref
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportPref"
     TESTENV testUsdExportPref
     ENV
@@ -551,7 +551,7 @@ pxr_install_test_dir(
     DEST testUsdExportRenderLayerMode
 )
 pxr_register_test(testUsdExportRenderLayerMode
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportRenderLayerMode"
     TESTENV testUsdExportRenderLayerMode
     ENV
@@ -569,7 +569,7 @@ pxr_register_test(testUsdExportRenderLayerMode
 #     DEST testUsdExportRfMLight
 # )
 # pxr_register_test(testUsdExportRfMLight
-#     CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+#     CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
 #     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportRfMLight"
 #     TESTENV testUsdExportRfMLight
 #     ENV
@@ -598,7 +598,7 @@ pxr_install_test_dir(
     DEST testUsdExportSelection
 )
 pxr_register_test(testUsdExportSelection
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportSelection"
     TESTENV testUsdExportSelection
     ENV
@@ -613,7 +613,7 @@ pxr_install_test_dir(
     DEST testUsdExportShadingInstanced
 )
 pxr_register_test(testUsdExportShadingInstanced
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportShadingInstanced"
     TESTENV testUsdExportShadingInstanced
     ENV
@@ -628,7 +628,7 @@ pxr_install_test_dir(
     DEST testUsdExportShadingModeDisplayColor
 )
 pxr_register_test(testUsdExportShadingModeDisplayColor
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportShadingModeDisplayColor"
     TESTENV testUsdExportShadingModeDisplayColor
     ENV
@@ -643,7 +643,7 @@ pxr_install_test_dir(
     DEST testUsdExportShadingModePxrRis
 )
 pxr_register_test(testUsdExportShadingModePxrRis
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportShadingModePxrRis"
     TESTENV testUsdExportShadingModePxrRis
     ENV
@@ -658,7 +658,7 @@ pxr_install_test_dir(
     DEST testUsdExportSkeleton
 )
 pxr_register_test(testUsdExportSkeleton
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportSkeleton"
     TESTENV testUsdExportSkeleton
     ENV
@@ -669,7 +669,7 @@ pxr_register_test(testUsdExportSkeleton
 )
 
 pxr_register_test(testUsdExportStripNamespaces
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportStripNamespaces"
     TESTENV testUsdExportStripNamespaces
     ENV
@@ -684,7 +684,7 @@ pxr_install_test_dir(
     DEST testUsdExportUVSets
 )
 pxr_register_test(testUsdExportUVSets
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportUVSets"
     TESTENV testUsdExportUVSets
     ENV
@@ -700,7 +700,7 @@ pxr_install_test_dir(
     DEST testUsdExportUVSetsFloat
 )
 pxr_register_test(testUsdExportUVSetsFloat
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportUVSets"
     TESTENV testUsdExportUVSetsFloat
     ENV
@@ -716,7 +716,7 @@ pxr_install_test_dir(
     DEST testUsdExportVisibilityDefault
 )
 pxr_register_test(testUsdExportVisibilityDefault
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdExportVisibilityDefault"
     TESTENV testUsdExportVisibilityDefault
     ENV
@@ -732,7 +732,7 @@ pxr_install_test_dir(
     DEST testUsdImportAsAssemblies
 )
 pxr_register_test(testUsdImportAsAssemblies
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImportAsAssemblies"
     TESTENV testUsdImportAsAssemblies
     ENV
@@ -747,7 +747,7 @@ pxr_install_test_dir(
     DEST testUsdImportCamera
 )
 pxr_register_test(testUsdImportCamera
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImportCamera"
     TESTENV testUsdImportCamera
     ENV
@@ -762,7 +762,7 @@ pxr_install_test_dir(
     DEST testUsdImportColorSets
 )
 pxr_register_test(testUsdImportColorSets
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImportColorSets"
     TESTENV testUsdImportColorSets
     ENV
@@ -777,7 +777,7 @@ pxr_install_test_dir(
     DEST testUsdImportFrameRange
 )
 pxr_register_test(testUsdImportFrameRange
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImportFrameRange"
     TESTENV testUsdImportFrameRange
     ENV
@@ -792,7 +792,7 @@ pxr_install_test_dir(
     DEST testUsdImportMesh
 )
 pxr_register_test(testUsdImportMesh
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImportMesh"
     TESTENV testUsdImportMesh
     ENV
@@ -807,7 +807,7 @@ pxr_install_test_dir(
     DEST testUsdImportNestedAssemblyAnimation
 )
 pxr_register_test(testUsdImportNestedAssemblyAnimation
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImportNestedAssemblyAnimation"
     TESTENV testUsdImportNestedAssemblyAnimation
     ENV
@@ -824,7 +824,7 @@ pxr_register_test(testUsdImportNestedAssemblyAnimation
 #     DEST testUsdImportRfMLight
 # )
 # pxr_register_test(testUsdImportRfMLight
-#     CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+#     CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
 #     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImportRfMLight"
 #     TESTENV testUsdImportRfMLight
 #     ENV
@@ -839,7 +839,7 @@ pxr_install_test_dir(
     DEST testUsdImportSessionLayer
 )
 pxr_register_test(testUsdImportSessionLayer
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImportSessionLayer"
     TESTENV testUsdImportSessionLayer
     ENV
@@ -854,7 +854,7 @@ pxr_install_test_dir(
     DEST testUsdImportShadingModeDisplayColor
 )
 pxr_register_test(testUsdImportShadingModeDisplayColor
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImportShadingModeDisplayColor"
     TESTENV testUsdImportShadingModeDisplayColor
     ENV
@@ -869,7 +869,7 @@ pxr_install_test_dir(
     DEST testUsdImportShadingModePxrRis
 )
 pxr_register_test(testUsdImportShadingModePxrRis
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImportShadingModePxrRis"
     TESTENV testUsdImportShadingModePxrRis
     ENV
@@ -884,7 +884,7 @@ pxr_install_test_dir(
     DEST testUsdImportSkeleton
 )
 pxr_register_test(testUsdImportSkeleton
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImportSkeleton"
     TESTENV testUsdImportSkeleton
     ENV
@@ -899,7 +899,7 @@ pxr_install_test_dir(
     DEST testUsdTranslateTypelessDefs
 )
 pxr_register_test(testUsdTranslateTypelessDefs
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdTranslateTypelessDefs"
     TESTENV testUsdTranslateTypelessDefs
     ENV
@@ -914,7 +914,7 @@ pxr_install_test_dir(
     DEST testUsdImportUVSets
 )
 pxr_register_test(testUsdImportUVSets
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImportUVSets"
     TESTENV testUsdImportUVSets
     ENV
@@ -930,7 +930,7 @@ pxr_install_test_dir(
     DEST testUsdImportUVSetsFloat
 )
 pxr_register_test(testUsdImportUVSetsFloat
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImportUVSets"
     TESTENV testUsdImportUVSetsFloat
     ENV
@@ -946,7 +946,7 @@ pxr_install_test_dir(
     DEST testUsdImportXforms
 )
 pxr_register_test(testUsdImportXforms
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImportXforms"
     TESTENV testUsdImportXforms
     ENV
@@ -961,7 +961,7 @@ pxr_install_test_dir(
     DEST testUsdMayaAppDir
 )
 pxr_register_test(testUsdMayaAppDir
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdMayaAppDir"
     TESTENV testUsdMayaAppDir
     ENV
@@ -972,7 +972,7 @@ pxr_register_test(testUsdMayaAppDir
 )
 
 pxr_register_test(testUsdMayaBlockSceneModificationContext
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdMayaBlockSceneModificationContext"
     ENV
         MAYA_PLUG_IN_PATH=${CMAKE_INSTALL_PREFIX}/third_party/maya/plugin
@@ -982,7 +982,7 @@ pxr_register_test(testUsdMayaBlockSceneModificationContext
 )
 
 pxr_register_test(testUsdMayaDiagnosticDelegate
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdMayaDiagnosticDelegate"
     ENV
         MAYA_PLUG_IN_PATH=${CMAKE_INSTALL_PREFIX}/third_party/maya/plugin
@@ -996,7 +996,7 @@ pxr_install_test_dir(
     DEST testUsdMayaGetVariantSetSelections
 )
 pxr_register_test(testUsdMayaGetVariantSetSelections
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdMayaGetVariantSetSelections"
     TESTENV testUsdMayaGetVariantSetSelections
     ENV
@@ -1011,7 +1011,7 @@ pxr_install_test_dir(
     DEST testUsdMayaModelKindProcessor
 )
 pxr_register_test(testUsdMayaModelKindProcessor
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdMayaModelKindProcessor"
     TESTENV testUsdMayaModelKindProcessor
     ENV
@@ -1026,7 +1026,7 @@ pxr_install_test_dir(
     DEST testUsdMayaProxyShape
 )
 pxr_register_test(testUsdMayaProxyShape
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdMayaProxyShape"
     TESTENV testUsdMayaProxyShape
     ENV
@@ -1041,7 +1041,7 @@ pxr_install_test_dir(
     DEST testUsdMayaReferenceAssemblyEdits
 )
 pxr_register_test(testUsdMayaReferenceAssemblyEdits
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdMayaReferenceAssemblyEdits"
     TESTENV testUsdMayaReferenceAssemblyEdits
     ENV
@@ -1055,23 +1055,23 @@ pxr_install_test_dir(
     SRC testenv/UsdMayaUserExportedAttributesTest
     DEST testUsdMayaUserExportedAttributes
 )
-# pxr_register_test(testUsdMayaUserExportedAttributes
-#     CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
-#     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdMayaUserExportedAttributes"
-#     TESTENV testUsdMayaUserExportedAttributes
-#     ENV
-#         MAYA_PLUG_IN_PATH=${CMAKE_INSTALL_PREFIX}/third_party/maya/plugin
-#         MAYA_SCRIPT_PATH=${CMAKE_INSTALL_PREFIX}/third_party/maya/share/usd/plugins/usdMaya/resources
-#         MAYA_DISABLE_CIP=1
-#         MAYA_APP_DIR=<PXR_TEST_DIR>/maya_profile
-# )
+pxr_register_test(testUsdMayaUserExportedAttributes
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdMayaUserExportedAttributes"
+    TESTENV testUsdMayaUserExportedAttributes
+    ENV
+        MAYA_PLUG_IN_PATH=${CMAKE_INSTALL_PREFIX}/third_party/maya/plugin
+        MAYA_SCRIPT_PATH=${CMAKE_INSTALL_PREFIX}/third_party/maya/share/usd/plugins/usdMaya/resources
+        MAYA_DISABLE_CIP=1
+        MAYA_APP_DIR=<PXR_TEST_DIR>/maya_profile
+)
 
 pxr_install_test_dir(
     SRC testenv/UsdMayaAdaptorGeomTest
     DEST testUsdMayaAdaptorGeom
 )
 pxr_register_test(testUsdMayaAdaptorGeom
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdMayaAdaptorGeom"
     TESTENV testUsdMayaAdaptorGeom
     ENV
@@ -1086,7 +1086,7 @@ pxr_install_test_dir(
     DEST testUsdMayaAdaptorMetadata
 )
 pxr_register_test(testUsdMayaAdaptorMetadata
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdMayaAdaptorMetadata"
     TESTENV testUsdMayaAdaptorMetadata
     ENV
@@ -1101,7 +1101,7 @@ pxr_install_test_dir(
     DEST testUsdReferenceAssemblyChangeRepresentations
 )
 pxr_register_test(testUsdReferenceAssemblyChangeRepresentations
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdReferenceAssemblyChangeRepresentations"
     TESTENV testUsdReferenceAssemblyChangeRepresentations
     ENV
@@ -1116,7 +1116,7 @@ pxr_install_test_dir(
     DEST testUsdReferenceAssemblySelection
 )
 pxr_register_test(testUsdReferenceAssemblySelection
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdReferenceAssemblySelection"
     TESTENV testUsdReferenceAssemblySelection
     ENV
@@ -1127,7 +1127,7 @@ pxr_register_test(testUsdReferenceAssemblySelection
 )
 
 pxr_register_test(testUsdMayaXformStack
-    CUSTOM_PYTHON "${MAYA_BASE_DIR}/bin/mayapy"
+    CUSTOM_PYTHON ${MAYA_PY_EXECUTABLE}
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdMayaXformStack"
     TESTENV testUsdMayaXformStack
     ENV
