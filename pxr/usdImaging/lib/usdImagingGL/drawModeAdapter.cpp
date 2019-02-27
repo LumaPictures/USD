@@ -350,14 +350,6 @@ UsdImagingGLDrawModeAdapter::TrackVariability(UsdPrim const& prim,
         return;
     }
 
-    if (_IsMaterialPath(cachePath)) {
-        checkForTextureVariability(
-            HdMaterial::DirtySurfaceShader | HdMaterial::DirtyParams);
-        return;
-    }
-
-    checkForTextureVariability(HdChangeTracker::DirtyParams);
-
     // WARNING: This method is executed from multiple threads, the value cache
     // has been carefully pre-populated to avoid mutating the underlying
     // container during update.
