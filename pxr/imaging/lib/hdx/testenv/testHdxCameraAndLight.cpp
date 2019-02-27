@@ -68,6 +68,11 @@ public:
             _renderPass->GetRenderIndex()->GetResourceRegistry());
     }
 
+    virtual void Prepare(HdTaskContext* ctx,
+                         HdRenderIndex* renderIndex) override
+    {
+    }
+
     virtual void Execute(HdTaskContext* ctx) override
     {
         _renderPassState->Bind();
@@ -107,7 +112,7 @@ static void CameraAndLightTest()
     SdfPath cube("/geometry");
     delegate->AddCube(cube, tx);
 
-    SdfPath camera("/camera");
+    SdfPath camera("/camera_test");
     SdfPath light("/light");
 
     delegate->AddCamera(camera);
