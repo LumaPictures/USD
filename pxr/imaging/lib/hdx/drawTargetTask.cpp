@@ -142,7 +142,7 @@ HdxDrawTargetTask::Sync(HdSceneDelegate* delegate,
 
     if (_currentDrawTargetSetVersion != drawTargetVersion) {
         HdStDrawTargetPtrConstVector drawTargets;
-        HdStDrawTarget::GetDrawTargets(delegate, &drawTargets);
+        HdStDrawTarget::GetDrawTargets(&renderIndex, &drawTargets);
 
         _renderPassesInfo.clear();
         _renderPasses.clear();
@@ -315,6 +315,12 @@ HdxDrawTargetTask::Sync(HdSceneDelegate* delegate,
     }
 
     *dirtyBits = HdChangeTracker::Clean;
+}
+
+void
+HdxDrawTargetTask::Prepare(HdTaskContext* ctx,
+                           HdRenderIndex* renderIndex)
+{
 }
 
 void
