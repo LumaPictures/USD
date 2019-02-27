@@ -207,6 +207,12 @@ HdxShadowTask::Sync(HdSceneDelegate* delegate,
 }
 
 void
+HdxShadowTask::Prepare(HdTaskContext* ctx,
+                       HdRenderIndex* renderIndex)
+{
+}
+
+void
 HdxShadowTask::Execute(HdTaskContext* ctx)
 {
     static const TfTokenVector SHADOW_RENDER_TAGS =
@@ -273,7 +279,7 @@ HdxShadowTask::_CreateOverrideShader()
         std::lock_guard<std::mutex> lock(shaderCreateLock);
         if (!_overrideShader) {
             _overrideShader = HdStShaderCodeSharedPtr(new HdStGLSLFXShader(
-                GlfGLSLFXSharedPtr(new GlfGLSLFX(
+                HioGlslfxSharedPtr(new HioGlslfx(
                     HdStPackageFallbackSurfaceShader()))));
         }
     }
