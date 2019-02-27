@@ -43,6 +43,10 @@
 
 #include <iostream>
 
+#if SYS_VERSION_FULL_INT >= 0x11050000
+#include <UT/UT_VarEncode.h>
+#endif
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 using std::cout;
@@ -665,10 +669,17 @@ GusdPrimWrapper::updatePrimvarFromGTPrim(
         const GT_Owner owner = attrMapHandle->getOriginalOwner(attrIndex);
         GT_DataArrayHandle attrData = gtAttrs->get(attrIndex);
 
-        TfToken name( attrname );
+#if SYS_VERSION_FULL_INT >= 0x11050000
+        // Decode Houdini geometry attribute names to get back the original
+        // USD primvar name. This allows round tripping of namespaced
+        // primvars from USD -> Houdini -> USD.
+        UT_StringHolder name = UT_VarEncode::decode(attrname);
+#else
+        UT_StringHolder name = attrname;
+#endif
 
         updatePrimvarFromGTPrim( 
-                    TfToken( name ),
+                    TfToken( name.toStdString() ),
                     owner, 
                     interpolation, 
                     time, 
@@ -1051,6 +1062,15 @@ GusdPrimWrapper::loadPrimvars(
             continue;
         }
 
+#if SYS_VERSION_FULL_INT >= 0x11050000
+        // Encode the USD primvar names into something safe for the Houdini
+        // geometry attribute name. This allows round tripping of namespaced
+        // primvars from USD -> Houdini -> USD.
+        UT_StringHolder attrname = UT_VarEncode::encode(name);
+#else
+        UT_StringHolder attrname = name;
+#endif
+
         // usd vertex primvars are assigned to points
         if( primvar.GetInterpolation() == UsdGeomTokens->vertex )
         {
@@ -1066,7 +1086,7 @@ GusdPrimWrapper::loadPrimvars(
                     gtData = new GT_DAIndirect( remapIndicies, gtData );
                 }
                 if( point ) {
-                    *point = (*point)->addAttribute( name.c_str(), gtData, true );
+                    *point = (*point)->addAttribute( attrname.c_str(), gtData, true );
                 }
             }
         }
@@ -1080,7 +1100,7 @@ GusdPrimWrapper::loadPrimvars(
                          gtData->entries(), minVertex );
             }
             else if( vertex ) {           
-                *vertex = (*vertex)->addAttribute( name.c_str(), gtData, true );
+                *vertex = (*vertex)->addAttribute( attrname.c_str(), gtData, true );
             }
         }
         else if( primvar.GetInterpolation() == UsdGeomTokens->uniform )
@@ -1093,13 +1113,13 @@ GusdPrimWrapper::loadPrimvars(
                          gtData->entries(), minUniform );
             }
             else if( primitive ) {
-                *primitive = (*primitive)->addAttribute( name.c_str(), gtData, true );
+                *primitive = (*primitive)->addAttribute( attrname.c_str(), gtData, true );
             }
         }
         else if( primvar.GetInterpolation() == UsdGeomTokens->constant )
         {
             if( constant ) {
-                *constant = (*constant)->addAttribute( name.c_str(), gtData, true );
+                *constant = (*constant)->addAttribute( attrname.c_str(), gtData, true );
             }
         }
     }
