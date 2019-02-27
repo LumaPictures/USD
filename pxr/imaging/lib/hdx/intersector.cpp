@@ -149,7 +149,7 @@ HdxIntersector::_ConfigureSceneMaterials(bool enableSceneMaterials,
     } else {
         if (!_overrideShader) {
             _overrideShader = HdStShaderCodeSharedPtr(new HdStGLSLFXShader(
-                GlfGLSLFXSharedPtr(new GlfGLSLFX(
+                HioGlslfxSharedPtr(new HioGlslfx(
                     HdStPackageFallbackSurfaceShader()))));
         }
         renderPassState->SetOverrideShader(_overrideShader);
@@ -263,6 +263,14 @@ public:
         _renderPass->Sync();
         _renderPassState->Sync(
             _renderPass->GetRenderIndex()->GetResourceRegistry());
+    }
+
+    /// Prepare the tasks resources
+    HDX_API
+    virtual void Prepare(HdTaskContext* ctx,
+                         HdRenderIndex* renderIndex) override
+    {
+
     }
 
     virtual void Execute(HdTaskContext* ctx) override
