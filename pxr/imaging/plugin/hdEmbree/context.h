@@ -29,6 +29,7 @@
 #include "pxr/imaging/hdEmbree/sampler.h"
 
 #include "pxr/base/gf/matrix4f.h"
+#include "pxr/base/vt/array.h"
 
 #if EMBREE_VERSION_MAJOR == 3
 #include <embree3/rtcore.h>
@@ -52,6 +53,8 @@ struct HdEmbreePrototypeContext
     /// A name-indexed map of primvar samplers.
     TfHashMap<TfToken, HdEmbreePrimvarSampler*, TfToken::HashFunctor>
         primvarMap;
+    /// A copy of the primitive params for this rprim.
+    VtIntArray primitiveParams;
 };
 
 ///
@@ -67,6 +70,8 @@ struct HdEmbreeInstanceContext
     /// The scene the prototype geometry lives in, for passing to
     /// rtcInterpolate.
     RTCScene rootScene;
+    /// The instance id of this instance.
+    int32_t instanceId;
 };
 
 
