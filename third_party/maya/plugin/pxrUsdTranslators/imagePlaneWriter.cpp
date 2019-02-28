@@ -12,7 +12,6 @@
 #include "usdMaya/writeJobContext.h"
 #include "usdMaya/writeUtil.h"
 
-#include <pxr/imaging/glf/glslfx.h>
 #include <pxr/usd/usdShade/material.h>
 #include <pxr/usd/usdShade/materialBindingAPI.h>
 #include <pxr/usd/usdShade/shader.h>
@@ -20,6 +19,7 @@
 #include <pxr/usd/usdShade/tokens.h>
 #include <pxr/usd/usdHydra/tokens.h>
 #include <pxr/usd/usdGeom/camera.h>
+#include <pxr/imaging/hio/glslfx.h>
 #include <pxr/usdImaging/usdImaging/tokens.h>
 
 #include <maya/MRenderUtil.h>
@@ -70,7 +70,7 @@ MayaImagePlaneWriter::MayaImagePlaneWriter(
         .Bind(material);
 
     UsdShadeConnectableAPI::ConnectToSource(
-        UsdShadeMaterial(material).CreateSurfaceOutput(GlfGLSLFXTokens->glslfx),
+        UsdShadeMaterial(material).CreateSurfaceOutput(HioGlslfxTokens->glslfx),
         UsdShadeMaterial(shader).CreateSurfaceOutput());
 
     shader.CreateIdAttr().Set(UsdImagingTokens->UsdImagePlaneSurface);

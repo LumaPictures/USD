@@ -20,6 +20,7 @@ pxr_plugin(${PXR_PACKAGE}
         usdImaging
         usdHydra
         vt
+        hio
         ${Boost_PYTHON_LIBRARY}
         ${MAYA_LIBRARIES}
 
