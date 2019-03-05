@@ -20,4 +20,3 @@ tg/simple_features/maya_call_once_deadlock
 tg/simple_features/dirty_all_sprims_bprims
 tg/customization/fix_GetTransform_GetExtent
 tg/customization/katana_hydra_viewer_proxies
-tg/simple_features/dubug_symbol_multiple_definition_trace
