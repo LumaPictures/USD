@@ -12,14 +12,11 @@ tg/simple_features/separate_third_party_builds
 tg/simple_features/maya_motion_vector_export
 tg/simple_features/usdview_shader_search_path
 houdini_variant_selection_fix
-tg/bugfixes/stripNamespaces_mergeTransform_fix
 tg/simple_features/hd_pcss
 tg/simple_features/tex_image_format
-tg/simple_features/animated_textures_for_draw_mode
 tg/simple_features/cards_sprite_display
 tg/simple_features/embree_3_support
 tg/simple_features/maya_importing_instances
 tg/bugfixes/usd_houdini_update
 tg/simple_features/cxx14
 tg/simple_features/katana_texcoord_to_vector
-tg/simple_features/hdx_nearestToCamera
