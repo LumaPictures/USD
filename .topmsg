@@ -1,0 +1,4 @@
+From: Paul Molodowitch <paulm@lumapictures.com>
+Subject: [usdMaya] fix skin import with explicit joint orders
+
+partially addresses https://github.com/PixarAnimationStudios/USD/issues/789
