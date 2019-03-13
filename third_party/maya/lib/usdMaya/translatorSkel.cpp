@@ -1385,7 +1385,7 @@ UsdMayaTranslatorSkel::CreateSkinCluster(
             mapper->Remap(bindXforms, &remappedBindXforms);
         }
 
-        if (joints.size() >= bindXforms.size())
+        if (joints.size() > bindXforms.size())
         {
             TF_WARN("Error - skinned object (%s) had more joints (%lu) "
                     "than the skeleton (%s) had bind xforms (%lu)",
