@@ -6,11 +6,13 @@ pxr_plugin(${PXR_PACKAGE}
     LIBRARIES
         arch
         gf
+        hio
         plug
         sdf
         tf
         vt
         usdMaya
+        usdImaging
         usdShade
         ${MAYA_LIBRARIES}
 
@@ -24,6 +26,7 @@ pxr_plugin(${PXR_PACKAGE}
 
     CPPFILES
         plugin.cpp
+        shadingModePreviewSurface.cpp
 
     PRIVATE_HEADERS
         api.h
