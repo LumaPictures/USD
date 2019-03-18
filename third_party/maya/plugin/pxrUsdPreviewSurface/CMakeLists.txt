@@ -30,6 +30,7 @@ pxr_plugin(${PXR_PACKAGE}
 
     PRIVATE_HEADERS
         api.h
+        debugCodes.h
 
     RESOURCE_FILES
         AEpxrUsdPreviewSurfaceTemplate.mel
