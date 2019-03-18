@@ -403,7 +403,7 @@ _CreateAndPopulateShaderObject(
         if (sourceObj.hasFn(MFn::kPlace2dTexture)
                 && mayaTypeName == _tokens->file) {
             MString cmd;
-            cmd.format("fileTexturePlacementConnect \"^1s\" \"^2s\"",
+            cmd.format("fileTexturePlacementConnectNoEcho \"^1s\" \"^2s\"",
                        depFn.name(), sourceDepFn.name());
             TF_DEBUG(PXRUSDMAYA_PREVIEWSURFACE_IMPORT).Msg(cmd.asChar());
             status = MGlobal::executeCommand(cmd, false, false);
