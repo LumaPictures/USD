@@ -152,7 +152,6 @@ TfToken GetMayaPlugName(const UsdShadeShader& shaderSchema, TfToken attrBase, bo
 MObject
 _CreateAndPopulateShaderObject(
         const UsdShadeShader& shaderSchema,
-        const bool asShader,
         UsdMayaShadingModeImportContext* context,
         MayaTypeNameFunction mayaTypeNameFunction,
         MayaPlugNameFunction mayaPlugNameFunction);
@@ -160,7 +159,6 @@ _CreateAndPopulateShaderObject(
 MObject
 _GetOrCreateShaderObject(
         const UsdShadeShader& shaderSchema,
-        const bool asShader,
         UsdMayaShadingModeImportContext* context)
 {
     MObject shaderObj;
@@ -173,7 +171,7 @@ _GetOrCreateShaderObject(
     }
 
     shaderObj = _CreateAndPopulateShaderObject(
-            shaderSchema, asShader, context, GetMayaTypeName, GetMayaPlugName);
+            shaderSchema, context, GetMayaTypeName, GetMayaPlugName);
     return context->AddCreatedObject(shaderSchema.GetPrim(), shaderObj);
 }
 
@@ -206,7 +204,6 @@ _ImportAttr(const UsdAttribute& usdAttr, const MFnDependencyNode& fnDep,
 MObject
 _CreateAndPopulateShaderObject(
         const UsdShadeShader& shaderSchema,
-        const bool asShader,
         UsdMayaShadingModeImportContext* context,
         MayaTypeNameFunction mayaTypeNameFunction,
         MayaPlugNameFunction mayaPlugNameFunction)
@@ -221,10 +218,20 @@ _CreateAndPopulateShaderObject(
     MStatus status;
     MObject shaderObj;
     MFnDependencyNode depFn;
+
+    UsdMayaShadingNodeType shadingNodeType = UsdMayaShadingNodeType::None;
+    if (mayaTypeName == _tokens->lambert
+            || mayaTypeName == PxrMayaUsdPreviewSurfaceTokens->MayaTypeName) {
+        shadingNodeType = UsdMayaShadingNodeType::Shader;
+    } else if (mayaTypeName == _tokens->file) {
+        shadingNodeType = UsdMayaShadingNodeType::Texture;
+    } else if (mayaTypeName == _tokens->place2dTexture) {
+        shadingNodeType = UsdMayaShadingNodeType::Utility;
+    }
     if (!(UsdMayaTranslatorUtil::CreateShaderNode(
                 MString(shaderSchema.GetPrim().GetName().GetText()),
                 mayaTypeName.GetText(),
-                asShader,
+                shadingNodeType,
                 &status,
                 &shaderObj)
             && depFn.setObject(shaderObj))) {
@@ -352,8 +359,6 @@ _CreateAndPopulateShaderObject(
 
         MObject sourceObj = _GetOrCreateShaderObject(
             sourceShaderSchema,
-            // any "nested" shader objects are not "shaders"
-            false,
             context);
 
         MFnDependencyNode sourceDepFn(sourceObj, &status);
@@ -550,7 +555,8 @@ MObject MakePreviewSurfaceShader(UsdMayaShadingModeImportContext* context) {
         return MObject();
     }
 
-    MObject surfaceShaderObj = _GetOrCreateShaderObject(surfaceShader, true, context);
+    MObject surfaceShaderObj = _GetOrCreateShaderObject(
+            surfaceShader, context);
     if (surfaceShaderObj.isNull()) {
         return MObject();
     }
