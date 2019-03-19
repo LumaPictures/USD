@@ -36,7 +36,15 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
+enum class UsdMayaShadingNodeType {
+    None,
+    Light,
+    PostProcess,
+    Rendering,
+    Shader,
+    Texture,
+    Utility
+};
 
 /// \brief Provides helper functions for other readers to use.
 struct UsdMayaTranslatorUtil
@@ -114,11 +122,11 @@ struct UsdMayaTranslatorUtil
             MStatus* status,
             MObject* mayaNodeObj);
 
-    /// \brief Helper to create a shadingNode.  When \p asShader is \c true,
-    /// this is intended to mimic the mel command "shadingNode ... -asShader".
+    /// \brief Helper to create shadingNodes.  Wrapper around mel "shadingNode".
     ///
-    /// In particular, this hooks up the shader to "defaultShadingList1.shaders"
-    /// which makes sure the node shows up in the Hypershade UI.
+    /// if shaderType is ShadingNodeType::Unspecified, it will attempt to
+    /// determine the type of node automatically using it's classification
+    /// string
     ///
     /// If there are other side-effects of using "shadingNode" (as opposed to
     /// "createNode" directly), this should be udpated accordingly.
@@ -127,7 +135,7 @@ struct UsdMayaTranslatorUtil
     CreateShaderNode(
             const MString& nodeName,
             const MString& nodeTypeName,
-            const bool asShader,
+            UsdMayaShadingNodeType shadingNodeType,
             MStatus* status,
             MObject* shaderObj);
 

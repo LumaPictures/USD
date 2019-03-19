@@ -30,11 +30,13 @@
 #include "usdMaya/translatorUtil.h"
 
 #include "pxrUsdPreviewSurface/usdPreviewSurface.h"
+#include "pxrUsdPreviewSurface/debugCodes.h"
 
 #include "pxr/pxr.h"
 
 #include "pxr/base/gf/gamma.h"
 #include "pxr/base/gf/vec3f.h"
+#include "pxr/base/tf/debug.h"
 #include "pxr/base/tf/registryManager.h"
 #include "pxr/base/tf/staticTokens.h"
 #include "pxr/base/tf/stringUtils.h"
@@ -152,7 +154,6 @@ TfToken GetMayaPlugName(const UsdShadeShader& shaderSchema, TfToken attrBase, bo
 MObject
 _CreateAndPopulateShaderObject(
         const UsdShadeShader& shaderSchema,
-        const bool asShader,
         UsdMayaShadingModeImportContext* context,
         MayaTypeNameFunction mayaTypeNameFunction,
         MayaPlugNameFunction mayaPlugNameFunction);
@@ -160,7 +161,6 @@ _CreateAndPopulateShaderObject(
 MObject
 _GetOrCreateShaderObject(
         const UsdShadeShader& shaderSchema,
-        const bool asShader,
         UsdMayaShadingModeImportContext* context)
 {
     MObject shaderObj;
@@ -173,7 +173,7 @@ _GetOrCreateShaderObject(
     }
 
     shaderObj = _CreateAndPopulateShaderObject(
-            shaderSchema, asShader, context, GetMayaTypeName, GetMayaPlugName);
+            shaderSchema, context, GetMayaTypeName, GetMayaPlugName);
     return context->AddCreatedObject(shaderSchema.GetPrim(), shaderObj);
 }
 
@@ -206,30 +206,39 @@ _ImportAttr(const UsdAttribute& usdAttr, const MFnDependencyNode& fnDep,
 MObject
 _CreateAndPopulateShaderObject(
         const UsdShadeShader& shaderSchema,
-        const bool asShader,
         UsdMayaShadingModeImportContext* context,
         MayaTypeNameFunction mayaTypeNameFunction,
         MayaPlugNameFunction mayaPlugNameFunction)
 {
     TfToken mayaTypeName = mayaTypeNameFunction(shaderSchema);
 
-    // TODO: remove or convert to TF_DEBUG
-    TF_WARN("Making: %s (mayaType: %s)",
+    TF_DEBUG(PXRUSDMAYA_PREVIEWSURFACE_IMPORT).Msg(
+            "Making: %s (mayaType: %s)",
             shaderSchema.GetPrim().GetPath().GetText(),
             mayaTypeName.GetText());
 
     MStatus status;
     MObject shaderObj;
     MFnDependencyNode depFn;
+
+    UsdMayaShadingNodeType shadingNodeType = UsdMayaShadingNodeType::None;
+    if (mayaTypeName == _tokens->lambert
+            || mayaTypeName == PxrMayaUsdPreviewSurfaceTokens->MayaTypeName) {
+        shadingNodeType = UsdMayaShadingNodeType::Shader;
+    } else if (mayaTypeName == _tokens->file) {
+        shadingNodeType = UsdMayaShadingNodeType::Texture;
+    } else if (mayaTypeName == _tokens->place2dTexture) {
+        shadingNodeType = UsdMayaShadingNodeType::Utility;
+    }
     if (!(UsdMayaTranslatorUtil::CreateShaderNode(
                 MString(shaderSchema.GetPrim().GetName().GetText()),
                 mayaTypeName.GetText(),
-                asShader,
+                shadingNodeType,
                 &status,
                 &shaderObj)
             && depFn.setObject(shaderObj))) {
-        // TODO: remove or convert to TF_DEBUG
-        TF_WARN("Error making node of type %s for %s",
+        TF_DEBUG(PXRUSDMAYA_PREVIEWSURFACE_IMPORT).Msg(
+                "Error making node of type %s for %s",
                 mayaTypeName.GetText(),
                 shaderSchema.GetPrim().GetPath().GetText());
         return MObject();
@@ -246,8 +255,8 @@ _CreateAndPopulateShaderObject(
         auto stPos = std::find_if(inputs.begin(), inputs.end(), isST);
         if (stPos != inputs.begin() && stPos != inputs.end()) {
             std::iter_swap(inputs.begin(), stPos);
-            // TODO: remove or convert to TF_DEBUG
-            TF_WARN("Swapped st input from position %lu to start",
+            TF_DEBUG(PXRUSDMAYA_PREVIEWSURFACE_IMPORT).Msg(
+                    "Swapped st input from position %lu to start",
                     stPos - inputs.begin());
         }
     }
@@ -258,7 +267,8 @@ _CreateAndPopulateShaderObject(
         TfToken mayaAttrName = mayaPlugNameFunction(
                 shaderSchema, usdAttrBaseName, true);
 
-        TF_WARN("Attempting to import attr: %s.%s (%s.%s)",
+        TF_DEBUG(PXRUSDMAYA_PREVIEWSURFACE_IMPORT).Msg(
+                "Attempting to import attr: %s.%s (%s.%s)",
                 depFn.name().asChar(), mayaAttrName.GetText(),
                 shaderSchema.GetPath().GetText(),
                 input.GetAttr().GetName().GetText());
@@ -327,7 +337,8 @@ _CreateAndPopulateShaderObject(
             continue;
         }
 
-        TF_WARN("...successfully imported!");
+        TF_DEBUG(PXRUSDMAYA_PREVIEWSURFACE_IMPORT).Msg(
+                "...successfully imported!");
 
         UsdShadeConnectableAPI source;
         TfToken sourceOutputName;
@@ -341,7 +352,8 @@ _CreateAndPopulateShaderObject(
             continue;
         }
 
-        TF_WARN("...usd connected to: %s.outputs:%s",
+        TF_DEBUG(PXRUSDMAYA_PREVIEWSURFACE_IMPORT).Msg(
+                "...usd connected to: %s.outputs:%s",
                 source.GetPath().GetText(), sourceOutputName.GetText());
 
 
@@ -352,8 +364,6 @@ _CreateAndPopulateShaderObject(
 
         MObject sourceObj = _GetOrCreateShaderObject(
             sourceShaderSchema,
-            // any "nested" shader objects are not "shaders"
-            false,
             context);
 
         MFnDependencyNode sourceDepFn(sourceObj, &status);
@@ -364,7 +374,8 @@ _CreateAndPopulateShaderObject(
         TfToken mayaOutputName = mayaPlugNameFunction(
                 sourceShaderSchema, sourceOutputName, false);
 
-        TF_WARN("...trying to connect to: %s.%s",
+        TF_DEBUG(PXRUSDMAYA_PREVIEWSURFACE_IMPORT).Msg(
+                "...trying to connect to: %s.%s",
                 sourceDepFn.name().asChar(), mayaOutputName.GetText());
         MPlug srcAttr = sourceDepFn.findPlug(mayaOutputName.GetText(),
                                              &status);
@@ -377,7 +388,7 @@ _CreateAndPopulateShaderObject(
             const unsigned int numElements = srcAttr.evaluateNumElements();
             if (numElements > 0u) {
                 if (numElements > 1u) {
-                    TF_WARN(
+                    TF_DEBUG(PXRUSDMAYA_PREVIEWSURFACE_IMPORT).Msg(
                         "Array with multiple elements encountered at '%s'. "
                         "Currently, only arrays with a single element are "
                         "supported. Not connecting attribute.",
@@ -392,10 +403,9 @@ _CreateAndPopulateShaderObject(
         if (sourceObj.hasFn(MFn::kPlace2dTexture)
                 && mayaTypeName == _tokens->file) {
             MString cmd;
-            cmd.format("fileTexturePlacementConnect \"^1s\" \"^2s\"",
+            cmd.format("fileTexturePlacementConnectNoEcho \"^1s\" \"^2s\"",
                        depFn.name(), sourceDepFn.name());
-            // TODO: remove or convert to TF_DEBUG
-            TF_WARN(cmd.asChar());
+            TF_DEBUG(PXRUSDMAYA_PREVIEWSURFACE_IMPORT).Msg(cmd.asChar());
             status = MGlobal::executeCommand(cmd, false, false);
             if (!status) {
                 status.perror("Error connecting place2dTexture: ");
@@ -404,13 +414,14 @@ _CreateAndPopulateShaderObject(
             UsdMayaUtil::Connect(srcAttr, mayaAttr, false);
         }
 
-        TF_WARN("...successfully connected to: %s",
+        TF_DEBUG(PXRUSDMAYA_PREVIEWSURFACE_IMPORT).Msg(
+                "...successfully connected to: %s",
                 srcAttr.name().asChar());
 
     }
 
-    // TODO: remove or convert to TF_DEBUG
-    TF_WARN("Made: %s (mayaType: %s)",
+    TF_DEBUG(PXRUSDMAYA_PREVIEWSURFACE_IMPORT).Msg(
+            "Made: %s (mayaType: %s)",
             depFn.name().asChar(),
             mayaTypeName.GetText());
 
@@ -454,7 +465,8 @@ MObject MakeDisplayColorShader(UsdMayaShadingModeImportContext* context) {
             }
             gotDisplayColorAndOpacity = true;
         } else {
-            TF_WARN("Unable to retrieve displayColor on Material: %s "
+            TF_DEBUG(PXRUSDMAYA_PREVIEWSURFACE_IMPORT).Msg(
+                    "Unable to retrieve displayColor on Material: %s "
                     "or Gprim: %s",
                     shadeMaterial ?
                         shadeMaterial.GetPrim().GetPath().GetText() :
@@ -550,7 +562,8 @@ MObject MakePreviewSurfaceShader(UsdMayaShadingModeImportContext* context) {
         return MObject();
     }
 
-    MObject surfaceShaderObj = _GetOrCreateShaderObject(surfaceShader, true, context);
+    MObject surfaceShaderObj = _GetOrCreateShaderObject(
+            surfaceShader, context);
     if (surfaceShaderObj.isNull()) {
         return MObject();
     }
@@ -595,15 +608,15 @@ DEFINE_SHADING_MODE_IMPORTER(previewSurface, context)
 {
     MObject outputNode = MakePreviewSurfaceShader(context);
     if (!outputNode.isNull()) {
-        /// TODO: remove or convert to TF_DEBUG
-        TF_WARN("Successfully made preview shader for %s!",
+        TF_DEBUG(PXRUSDMAYA_PREVIEWSURFACE_IMPORT).Msg(
+                "Successfully made preview shader for %s!",
                 context->GetBoundPrim().GetPath().GetText());
         return outputNode;
     }
     // Fallback to displayColor
 
-    /// TODO: remove or convert to TF_DEBUG
-    TF_WARN("Unable to make preview shader for %s - falling back to display"
+    TF_DEBUG(PXRUSDMAYA_PREVIEWSURFACE_IMPORT).Msg(
+            "Unable to make preview shader for %s - falling back to display"
             " color", context->GetBoundPrim().GetPath().GetText());
 
     return MakeDisplayColorShader(context);

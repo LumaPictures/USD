@@ -36,7 +36,9 @@
 #include "pxr/usd/usdGeom/xformable.h"
 
 #include <maya/MDagModifier.h>
+#include <maya/MGlobal.h>
 #include <maya/MObject.h>
+#include <maya/MSelectionList.h>
 #include <maya/MString.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -223,27 +225,54 @@ bool
 UsdMayaTranslatorUtil::CreateShaderNode(
         const MString& nodeName,
         const MString& nodeTypeName,
-        const bool asShader,
+        UsdMayaShadingNodeType shadingNodeType,
         MStatus* status,
         MObject* shaderObj)
 {
-    MFnDependencyNode depFn;
-    depFn.create(nodeTypeName, nodeName, status);
-    CHECK_MSTATUS_AND_RETURN(*status, false);
-    *shaderObj = depFn.object(status);
-
-    if (asShader) {
-        MPlug shaderListPlug = UsdMayaUtil::GetMayaShaderListPlug();
-        if (shaderListPlug.isNull()) {
-            return false;
+    MString typeFlag;
+    switch (shadingNodeType) {
+    case UsdMayaShadingNodeType::Light:
+        typeFlag = "-al"; // -asLight
+        break;
+    case UsdMayaShadingNodeType::PostProcess:
+        typeFlag = "-app"; // -asPostProcess
+        break;
+    case UsdMayaShadingNodeType::Rendering:
+        typeFlag = "-ar"; // -asRendering
+        break;
+    case UsdMayaShadingNodeType::Shader:
+        typeFlag = "-as"; // -asShader
+        break;
+    case UsdMayaShadingNodeType::Texture:
+        typeFlag = "-icm -at"; // -isColorManaged -asTexture
+        break;
+    case UsdMayaShadingNodeType::Utility:
+        typeFlag = "-au"; // -asUtility
+        break;
+    default:
+        {
+            MFnDependencyNode depFn;
+            depFn.create(nodeTypeName, nodeName, status);
+            CHECK_MSTATUS_AND_RETURN(*status, false);
+            *shaderObj = depFn.object(status);
+            return true;
         }
-
-        MPlug msgPlug = depFn.findPlug("msg", true, status);
-        CHECK_MSTATUS_AND_RETURN(*status, false);
-
-        UsdMayaUtil::Connect(msgPlug, shaderListPlug, false);
     }
 
+    MString cmd;
+    // ss = skipSelect
+    *status = cmd.format("shadingNode ^1s -ss -n \"^2s\" \"^3s\"",
+               typeFlag, nodeName, nodeTypeName);
+    //MGlobal::displayInfo(cmd);
+    CHECK_MSTATUS_AND_RETURN(*status, false);
+
+    MString createdNode = MGlobal::executeCommandStringResult(cmd, false, false, status);
+    CHECK_MSTATUS_AND_RETURN(*status, false);
+    MSelectionList msel;
+    *status = msel.add(createdNode);
+    CHECK_MSTATUS_AND_RETURN(*status, false);
+    *status = msel.getDependNode(0, *shaderObj);
+    CHECK_MSTATUS_AND_RETURN(*status, false);
     return true;
 }
 
