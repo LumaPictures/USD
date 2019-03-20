@@ -1803,31 +1803,30 @@ class AppController(QtCore.QObject):
             return
         self._ui.frameSlider.retreatFrame()
 
-    def _findIndexOfFieldContents(self, field):
-        # don't convert string to float directly because of rounding error
-        frameString = str(field.text())
+    def _findClosestFrameIndex(self, timeSample):
+        """Find the closest frame index for the given `timeSample`.
 
-        if frameString.count(".") == 0:
-            frameString += ".0"
-        elif frameString[-1] == ".":
-            frameString += "0"
+        Args:
+            timeSample (float): A time sample value.
 
-        field.setText(frameString)
+        Returns:
+            int: The closest matching frame index or 0 if one cannot be
+            found.
+        """
+        closestIndex = int((timeSample - self._timeSamples[0]) / self.step)
 
-        # Find the index of the closest valid frame
-        dist = None
-        closestIndex = Usd.TimeCode.Default()
+        # Bounds checking
+        # 0 <= closestIndex <= number of time samples - 1
+        closestIndex = max(0, closestIndex)
+        closestIndex = min(len(self._timeSamples) - 1, closestIndex)
 
-        for i in range(len(self._timeSamples)):
-            newDist = abs(self._timeSamples[i] - float(frameString))
-            if dist is None or newDist < dist:
-                dist = newDist
-                closestIndex = i
         return closestIndex
 
     def _rangeBeginChanged(self):
-        self.realStartTimeCode = float(self._ui.rangeBegin.text())
-        self._UpdateTimeSamples(resetStageDataOnly=False)
+        value = float(self._ui.rangeBegin.text())
+        if value != self.realStartTimeCode:
+            self.realStartTimeCode = value
+            self._UpdateTimeSamples(resetStageDataOnly=False)
 
     def _stepSizeChanged(self):
         stepStr = self._ui.stepSize.text()
@@ -1835,11 +1834,14 @@ class AppController(QtCore.QObject):
         self._UpdateTimeSamples(resetStageDataOnly=False)
 
     def _rangeEndChanged(self):
-        self.realEndTimeCode = float(self._ui.rangeEnd.text())
-        self._UpdateTimeSamples(resetStageDataOnly=False)
+        value = float(self._ui.rangeEnd.text())
+        if value != self.realEndTimeCode:
+            self.realEndTimeCode = value
+            self._UpdateTimeSamples(resetStageDataOnly=False)
 
     def _frameStringChanged(self):
-        indexOfFrame = self._findIndexOfFieldContents(self._ui.frameField)
+        timeSample = float(self._ui.frameField.text())
+        indexOfFrame = self._findClosestFrameIndex(timeSample)
 
         if (indexOfFrame != Usd.TimeCode.Default()):
             self.setFrame(indexOfFrame, forceUpdate=True)
