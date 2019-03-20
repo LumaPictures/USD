@@ -130,6 +130,16 @@ HdStGLSLProgram::CompileShader(GLenum type,
     glShaderSource(shader, sizeof(shaderSources)/sizeof(const char *), shaderSources, NULL);
     glCompileShader(shader);
 
+    if (TfDebug::IsEnabled(HD_DUMP_SHADER_SOURCEFILE)) {
+        std::stringstream fname;
+        fname << "program" << program << "_shader" << shader << "_" << shaderType << ".glsl";
+        std::fstream output(fname.str().c_str(), std::ios::out);
+        output << shaderSource;
+        output.close();
+
+        std::cout << "Write " << fname.str() << " (size=" << shaderSource.size() << ")\n";
+    }
+
     std::string logString;
     if (!HdStGLUtils::GetShaderCompileStatus(shader, &logString)) {
         // XXX:validation
@@ -206,9 +216,9 @@ HdStGLSLProgram::Link()
         GLsizei len;
         GLenum format;
         glGetProgramBinary(program, size, &len, &format, &bin[0]);
-        static int id = 0;
+        GLuint id = _program.GetId();
         std::stringstream fname;
-        fname << "program" << id++ << ".bin";
+        fname << "program" << id << ".bin";
 
         std::fstream output(fname.str().c_str(), std::ios::out|std::ios::binary);
         output.write(&bin[0], size);
