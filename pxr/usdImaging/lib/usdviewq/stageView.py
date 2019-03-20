@@ -39,7 +39,8 @@ from pxr import UsdImagingGL
 from pxr import CameraUtil
 
 from common import (RenderModes, ColorCorrectionModes, ShadedRenderModes, Timer,
-    GetInstanceIndicesForIds, SelectionHighlightModes, DEBUG_CLIPPING)
+                    ReportMetricSize, GetInstanceIndicesForIds,
+                    SelectionHighlightModes, DEBUG_CLIPPING)
 from rootDataModel import RootDataModel
 from selectionDataModel import ALL_INSTANCES, SelectionDataModel
 from viewSettingsDataModel import ViewSettingsDataModel
@@ -1846,11 +1847,11 @@ class StageView(QtOpenGL.QGLWidget):
 
             toPrint["GL prims "] = self._glPrimitiveGeneratedQuery.GetResult()
             toPrint["GPU time "] = "%.2f ms " % (self._glTimeElapsedQuery.GetResult() / 1000000.0)
-            toPrint["GPU mem  "] = gpuMemTotal
-            toPrint[" primvar "] = allocInfo["primvar"] if "primvar" in allocInfo else "N/A"
-            toPrint[" topology"] = allocInfo["topology"] if "topology" in allocInfo else "N/A"
-            toPrint[" shader  "] = allocInfo["drawingShader"] if "drawingShader" in allocInfo else "N/A"
-            toPrint[" texture "] = texMem
+            toPrint["GPU mem  "] = ReportMetricSize(gpuMemTotal)
+            toPrint[" primvar "] = ReportMetricSize(allocInfo["primvar"]) if "primvar" in allocInfo else "N/A"
+            toPrint[" topology"] = ReportMetricSize(allocInfo["topology"]) if "topology" in allocInfo else "N/A"
+            toPrint[" shader  "] = ReportMetricSize(allocInfo["drawingShader"]) if "drawingShader" in allocInfo else "N/A"
+            toPrint[" texture "] = ReportMetricSize(texMem)
 
         # Playback Rate
         if self._dataModel.viewSettings.showHUD_Performance:
@@ -2150,11 +2151,22 @@ class StageView(QtOpenGL.QGLWidget):
     def glDraw(self):
         # override glDraw so we can time it.
         with Timer() as t:
-            # Make sure the renderer is created
-            if not self._getRenderer():
-                # error has already been issued
-                return
             QtOpenGL.QGLWidget.glDraw(self)
+
+        # Render creation is a deferred operation, so the render may not
+        # be initialized on entry to the function.
+        #
+        # This function itself can not create the render, as to create the
+        # renderer we need a valid GL context, which QT has not made current
+        # yet.
+        #
+        # So instead check that the render has been created after the fact.
+        # The point is to avoid reporting an invalid first image time.
+        
+        if not self._renderer:
+            # error has already been issued
+            return
+
 
         self._renderTime = t.interval
 
