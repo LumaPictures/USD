@@ -1,0 +1,6 @@
+From: Paul Molodowitch <paulm@lumapictures.com>
+Subject:     [imaging] make image extension case-insensitive
+
+so we can use, ie, .PNG, .TIF, etc
+oiio already can handle this, and Glf_StbImage::_GetFilenameExtension()
+already converts to lowercase as well
