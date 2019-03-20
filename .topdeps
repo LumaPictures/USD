@@ -21,3 +21,5 @@ tg/bugfixes/usd_houdini_update
 tg/simple_features/cxx14
 tg/simple_features/katana_texcoord_to_vector
 tg/bugfixes/fix_maya_skel_import_joint_remapping
+tg/simple_features/image_extension_case_insensitive
+tg/simple_features/HD_DUMP_SHADER_SOURCEFILE
