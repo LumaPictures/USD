@@ -23,6 +23,12 @@
 //
 #include "pxr/pxr.h"
 
+#include "pxr/imaging/glf/glew.h"
+
+#include "pxr/imaging/glf/contextCaps.h"
+#include "pxr/imaging/glf/glContext.h"
+#include "pxr/imaging/glf/testGLContext.h"
+
 #include "pxr/imaging/hd/changeTracker.h"
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/tokens.h"
@@ -64,13 +70,12 @@ public:
                       HdDirtyBits*) override
     {
         _renderPass->Sync();
-        _renderPassState->Sync(
-            _renderPass->GetRenderIndex()->GetResourceRegistry());
     }
 
     virtual void Prepare(HdTaskContext* ctx,
                          HdRenderIndex* renderIndex) override
     {
+        _renderPassState->Prepare(renderIndex->GetResourceRegistry());
     }
 
     virtual void Execute(HdTaskContext* ctx) override
@@ -161,6 +166,12 @@ static void CameraAndLightTest()
 int main()
 {
     TfErrorMark mark;
+
+    // Test uses ContextCaps, so need to create a GL instance.
+    GlfTestGLContext::RegisterGLContextCallbacks();
+    GlfGlewInit();
+    GlfSharedGLContextScopeHolder sharedContext;
+    GlfContextCaps::InitInstance();
 
     CameraAndLightTest();
 
