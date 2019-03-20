@@ -985,7 +985,7 @@ private:
 
     _WriterContext& _context;
     Parent _parent;
-    const SdfAbstractDataSpecId& _id;
+    SdfAbstractDataSpecId _id;
     std::string _suffix;
     UsdAbc_TimeSamples _sampleTimes;
     TfTokenVector _unextracted;
@@ -2930,9 +2930,10 @@ _WriteFaceSet(_PrimWriterContext* context)
     // The familyType is contained in the parent prim, so we 
     // contruct a new _PrimWriterContext to access it.
     SdfPath parentPath = context->GetPath().GetParentPath();
+    SdfAbstractDataSpecId parentSpecId(&parentPath);
     _PrimWriterContext parentPrimContext(context->GetWriterContext(),
                                          context->GetParent(),
-                                         SdfAbstractDataSpecId(&parentPath));
+                                         parentSpecId);
 
     UsdSamples familyType = parentPrimContext.ExtractSamples(
         UsdAbcPropertyNames->defaultFamilyTypeAttributeName,
