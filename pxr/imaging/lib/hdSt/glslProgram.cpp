@@ -44,6 +44,8 @@ TF_DEFINE_ENV_SETTING(HD_ENABLE_SHARED_CONTEXT_CHECK, 0,
 HdStGLSLProgram::HdStGLSLProgram(TfToken const &role)
     : _program(role), _uniformBuffer(role)
 {
+    static size_t globalDebugID = 0;
+    _debugID = globalDebugID++;
 }
 
 HdStGLSLProgram::~HdStGLSLProgram()
@@ -133,7 +135,9 @@ HdStGLSLProgram::CompileShader(GLenum type,
     std::string fname;
     if (TfDebug::IsEnabled(HD_DUMP_SHADER_SOURCEFILE)) {
         std::stringstream fnameStream;
-        fnameStream << "program" << program << "_shader" << shader << "_" << shaderType << ".glsl";
+        static size_t debugShaderID = 0;
+        fnameStream << "program" << _debugID << "_shader" << debugShaderID++
+                << "_" << shaderType << ".glsl";
         fname = fnameStream.str();
         std::fstream output(fname.c_str(), std::ios::out);
         output << shaderSource;
@@ -220,9 +224,8 @@ HdStGLSLProgram::Link()
         GLsizei len;
         GLenum format;
         glGetProgramBinary(program, size, &len, &format, &bin[0]);
-        GLuint id = _program.GetId();
         std::stringstream fname;
-        fname << "program" << id << ".bin";
+        fname << "program" << _debugID << ".bin";
 
         std::fstream output(fname.str().c_str(), std::ios::out|std::ios::binary);
         output.write(&bin[0], size);
