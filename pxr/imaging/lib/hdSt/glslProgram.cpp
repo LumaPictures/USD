@@ -130,21 +130,25 @@ HdStGLSLProgram::CompileShader(GLenum type,
     glShaderSource(shader, sizeof(shaderSources)/sizeof(const char *), shaderSources, NULL);
     glCompileShader(shader);
 
+    std::string fname;
     if (TfDebug::IsEnabled(HD_DUMP_SHADER_SOURCEFILE)) {
-        std::stringstream fname;
-        fname << "program" << program << "_shader" << shader << "_" << shaderType << ".glsl";
-        std::fstream output(fname.str().c_str(), std::ios::out);
+        std::stringstream fnameStream;
+        fnameStream << "program" << program << "_shader" << shader << "_" << shaderType << ".glsl";
+        fname = fnameStream.str();
+        std::fstream output(fname.c_str(), std::ios::out);
         output << shaderSource;
         output.close();
 
-        std::cout << "Write " << fname.str() << " (size=" << shaderSource.size() << ")\n";
+        std::cout << "Write " << fname << " (size=" << shaderSource.size() << ")\n";
     }
 
     std::string logString;
     if (!HdStGLUtils::GetShaderCompileStatus(shader, &logString)) {
         // XXX:validation
+        const char* programName = fname.empty() ? shaderType : fname.c_str();
+
         TF_WARN("Failed to compile shader (%s): %s",
-                shaderType, logString.c_str());
+                programName, logString.c_str());
 
         // shader is no longer needed.
         glDeleteShader(shader);
