@@ -76,7 +76,8 @@ HdStRenderPassState::~HdStRenderPassState()
 }
 
 void
-HdStRenderPassState::Sync(HdResourceRegistrySharedPtr const &resourceRegistry)
+HdStRenderPassState::Prepare(
+                            HdResourceRegistrySharedPtr const &resourceRegistry)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
@@ -311,7 +312,8 @@ HdStRenderPassState::Bind()
     }
 
     glDepthFunc(HdStGLConversions::GetGlDepthFunc(_depthFunc));
-    
+    glDepthMask(_depthMaskEnabled);
+
     // Stencil
     if (_stencilEnabled) {
         glEnable(GL_STENCIL_TEST);
@@ -406,6 +408,7 @@ HdStRenderPassState::Unbind()
     }
 
     glColorMask(true, true, true, true);
+    glDepthMask(true);
 }
 
 size_t
