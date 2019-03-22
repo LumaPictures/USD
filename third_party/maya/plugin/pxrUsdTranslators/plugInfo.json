@@ -22,7 +22,8 @@
                             "UsdRiPxrEnvDayLight",
                             "UsdShadeMaterial",
                             "UsdSkelRoot",
-                            "UsdSkelSkeleton"
+                            "UsdSkelSkeleton",
+                            "UsdGeomImagePlane"
                         ]
                     },
                     "PrimWriter": {
@@ -38,6 +39,7 @@
                             "nurbsCurve",
                             "nurbsSurface",
                             "particle",
+                            "imagePlane",
                             "PxrAovLight",
                             "PxrDiskLight",
                             "PxrDistantLight",

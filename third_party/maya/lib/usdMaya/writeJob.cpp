@@ -79,6 +79,23 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+namespace {
+    static
+    bool _HasParent(const MDagPath& curDagPath, const MDagPath& curLeafDagPath) {
+        MFnDagNode dagNode(curDagPath);
+        if (dagNode.inUnderWorld()) {
+            for (auto dagPathCopy = curDagPath; dagPathCopy.pathCount(); dagPathCopy.pop()) {
+                MFnDagNode dagNodeCopy(dagPathCopy);
+                if (!dagNodeCopy.inUnderWorld()) {
+                    return dagNodeCopy.hasParent(curLeafDagPath.node());
+                }
+            }
+            return false;
+        } else {
+            return dagNode.hasParent(curLeafDagPath.node());
+        }
+    }
+}
 
 UsdMaya_WriteJob::UsdMaya_WriteJob(const UsdMayaJobExportArgs& iArgs)
     : mJobCtx(iArgs),
@@ -353,7 +370,9 @@ UsdMaya_WriteJob::_BeginWriting(const std::string& fileName, bool append)
     // Now do a depth-first traversal of the Maya DAG from the world root.
     // We keep a reference to arg dagPaths as we encounter them.
     MDagPath curLeafDagPath;
-    for (MItDag itDag(MItDag::kDepthFirst, MFn::kInvalid); !itDag.isDone(); itDag.next()) {
+    MItDag itDag(MItDag::kDepthFirst, MFn::kInvalid);
+    itDag.traverseUnderWorld(true);
+    for (; !itDag.isDone(); itDag.next()) {
         MDagPath curDagPath;
         itDag.getPath(curDagPath);
         std::string curDagPathStr(curDagPath.partialPathName().asChar());
@@ -366,9 +385,8 @@ UsdMaya_WriteJob::_BeginWriting(const std::string& fileName, bool append)
             // This dagPath IS one of the arg dagPaths. It AND all of its
             // children should be included in the export.
             curLeafDagPath = curDagPath;
-        } else if (!MFnDagNode(curDagPath).hasParent(curLeafDagPath.node())) {
-            // This dagPath is not a child of one of the arg dagPaths, so prune
-            // it and everything below it from the traversal.
+        } else if (!_HasParent(curDagPath, curLeafDagPath)) {
+            // This dagPath is not a child (or in the underworld of a child) of one of the arg dagPaths, so prune
             itDag.prune();
             continue;
         }

@@ -1,0 +1,34 @@
+-- glslfx version 0.1
+
+-- configuration
+{
+    "techniques": {
+        "default": {
+            "displacementShader": {
+                "source": [ "ImagePlane.Displacement" ]
+            },
+            "surfaceShader": {
+                "source": [ "ImagePlane.Surface" ]
+            }
+        }
+    }
+}
+
+-- glsl ImagePlane.Displacement
+
+vec4 displacementShader(int index, vec4 Peye, vec3 Neye, vec4 patchCoord)
+{
+    return Peye;
+}
+
+
+-- glsl ImagePlane.Surface
+
+vec4 surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
+{
+#if defined(HD_HAS_colorOpacity)
+    return HdGet_colorOpacity();
+#else
+    return vec4(1.0, 0.0, 0.0, 1.0);
+#endif
+}

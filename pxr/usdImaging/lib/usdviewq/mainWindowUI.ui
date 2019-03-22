@@ -2562,6 +2562,17 @@
     <string>Adjust Default Material...</string>
    </property>
   </action>
+  <action name="actionDisplay_Image_Planes">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Display Image Planes</string>
+   </property>
+  </action>
   <action name="actionCameraReticles_Inside">
    <property name="checkable">
     <bool>true</bool>
