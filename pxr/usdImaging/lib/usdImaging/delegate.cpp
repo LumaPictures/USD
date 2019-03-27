@@ -120,6 +120,7 @@ UsdImagingDelegate::UsdImagingDelegate(
                                GetMaterialBindingPurpose())
     , _materialBindingCache(GetTime(), &_materialBindingImplData)
     , _visCache(GetTime())
+    , _purposeCache() // note that purpose is uniform, so no GetTime()
     , _drawModeCache(GetTime())
     , _displayGuides(true)
     , _enableUsdDrawModes(true)
@@ -885,6 +886,7 @@ UsdImagingDelegate::ApplyPendingUpdates()
     _materialBindingImplData.ClearCaches();
     _materialBindingCache.Clear();
     _visCache.Clear();
+    _purposeCache.Clear();
     _drawModeCache.Clear();
 
     UsdImagingDelegate::_Worker worker;
@@ -2513,8 +2515,7 @@ UsdImagingDelegate::GetInstanceIndices(SdfPath const &instancerId,
 
 /*virtual*/
 GfMatrix4d
-UsdImagingDelegate::GetInstancerTransform(SdfPath const &instancerId,
-                                          SdfPath const &prototypeId)
+UsdImagingDelegate::GetInstancerTransform(SdfPath const &instancerId)
 {
     HD_TRACE_FUNCTION();
 
@@ -2541,7 +2542,6 @@ UsdImagingDelegate::GetInstancerTransform(SdfPath const &instancerId,
 /*virtual*/
 size_t
 UsdImagingDelegate::SampleInstancerTransform(SdfPath const &instancerId,
-                                             SdfPath const &prototypeId,
                                              size_t maxSampleCount,
                                              float *times,
                                              GfMatrix4d *samples)

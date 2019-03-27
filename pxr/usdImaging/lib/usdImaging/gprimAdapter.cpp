@@ -141,12 +141,6 @@ UsdImagingGprimAdapter::TrackVariability(UsdPrim const& prim,
     // has been carefully pre-populated to avoid mutating the underlying
     // container during update.
     
-    // Why is this OK? 
-    // Either the value is unvarying, in which case the time ordinate doesn't
-    // matter; or the value is varying, in which case we will update it upon
-    // first call to Delegate::SetTime(). 
-    UsdTimeCode time(1.0);
-
     UsdImagingValueCache* valueCache = _GetValueCache();
 
     if (!_IsVarying(prim,
@@ -179,7 +173,6 @@ UsdImagingGprimAdapter::TrackVariability(UsdPrim const& prim,
                UsdImagingTokens->usdVaryingXform,
                timeVaryingBits);
 
-    valueCache->GetVisible(cachePath) = GetVisible(prim, time);
     // Discover time-varying visibility.
     _IsVarying(prim,
                UsdGeomTokens->visibility,
@@ -188,7 +181,7 @@ UsdImagingGprimAdapter::TrackVariability(UsdPrim const& prim,
                timeVaryingBits,
                true);
 
-    TfToken purpose = _GetPurpose(prim, time);
+    TfToken purpose = GetPurpose(prim);
     // Empty purpose means there is no opinion, fall back to geom.
     if (purpose.IsEmpty())
         purpose = UsdGeomTokens->default_;
@@ -621,14 +614,6 @@ UsdImagingGprimAdapter::GetOpacity(UsdPrim const& prim,
         *opacity = VtValue(result);
     }
     return true;
-}
-
-TfToken
-UsdImagingGprimAdapter::_GetPurpose(UsdPrim const& prim, UsdTimeCode time) const
-{
-    HD_TRACE_FUNCTION();
-    // PERFORMANCE: Make this more efficient, see http://bug/90497
-    return UsdGeomImageable(prim).ComputePurpose();
 }
 
 bool 
