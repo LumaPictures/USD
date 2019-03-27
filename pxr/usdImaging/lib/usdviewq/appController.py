@@ -769,8 +769,8 @@ class AppController(QtCore.QObject):
             self._ui.redrawOnScrub.toggled.connect(self._redrawOptionToggled)
 
             if self._stageView:
-                self._ui.actionRecompute_Clipping_Planes.triggered.connect(
-                    self._stageView.detachAndReClipFromCurrentCamera)
+                self._ui.actionAuto_Compute_Clipping_Planes.triggered.connect(
+                    self._toggleAutoComputeClippingPlanes)
 
             self._ui.actionAdjust_Clipping.triggered[bool].connect(
                 self._adjustClippingPlanes)
@@ -1839,9 +1839,10 @@ class AppController(QtCore.QObject):
             self._UpdateTimeSamples(resetStageDataOnly=False)
 
     def _stepSizeChanged(self):
-        stepStr = self._ui.stepSize.text()
-        self.step = float(stepStr)
-        self._UpdateTimeSamples(resetStageDataOnly=False)
+        value = float(self._ui.stepSize.text())
+        if value != self.step:
+            self.step = value
+            self._UpdateTimeSamples(resetStageDataOnly=False)
 
     def _rangeEndChanged(self):
         value = float(self._ui.rangeEnd.text())
@@ -2168,6 +2169,13 @@ class AppController(QtCore.QObject):
         during playback is activated or deactivated."""
         self._dataModel.viewSettings.showBBoxPlayback = (
             self._ui.showBBoxPlayback.isChecked())
+
+    def _toggleAutoComputeClippingPlanes(self):
+        autoClip = self._ui.actionAuto_Compute_Clipping_Planes.isChecked()
+        self._dataModel.viewSettings.autoComputeClippingPlanes = autoClip
+        if autoClip:
+            self._stageView.detachAndReClipFromCurrentCamera()
+        
 
     def _setUseExtentsHint(self):
         self._dataModel.useExtentsHint = self._ui.useExtentsHint.isChecked()
@@ -4637,6 +4645,8 @@ class AppController(QtCore.QObject):
             self._dataModel.viewSettings.displayPrimId)
         self._ui.actionCull_Backfaces.setChecked(
             self._dataModel.viewSettings.cullBackfaces)
+        self._ui.actionAuto_Compute_Clipping_Planes.setChecked(
+            self._dataModel.viewSettings.autoComputeClippingPlanes)
 
     def _refreshHUDMenu(self):
         self._ui.actionHUD.setChecked(self._dataModel.viewSettings.showHUD)
