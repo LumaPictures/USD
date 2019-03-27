@@ -54,6 +54,11 @@ public:
     /// Construct a null mapper.
     USDSKEL_API
     UsdSkelAnimMapper();
+
+    /// Construct an identity mapper for remapping a range of \p size elems.
+    /// An identity mapper is used to indicate that no remapping is required.
+    USDSKEL_API
+    UsdSkelAnimMapper(size_t size);
     
     /// Construct a mapper for mapping data from \p sourceOrder to
     /// \p targetOrder.
@@ -69,11 +74,11 @@ public:
                       const TfToken* targetOrder, size_t targetOrderSize);
 
     /// Typed remapping of data in an arbitrary, stl-like container.
-    /// The \p sourc earray provides a run of \p elementSize for each path in
+    /// The \p source array provides a run of \p elementSize for each path in
     /// the \\em sourceOrder. These elements are remapped and copied over the
     /// \p target array.
     /// Prior to remapping, the \p target array is resized to the size of the
-    /// \\ em targetOrdre (as given at mapper construction time) multiplied by
+    /// \\em targetOrder (as given at mapper construction time) multiplied by
     /// the \p elementSize. New element created in the array are initialized
     /// to \p defaultValue, if provided.
     template <typename Container>
