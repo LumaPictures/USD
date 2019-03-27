@@ -59,6 +59,11 @@ UsdSkelAnimMapper::UsdSkelAnimMapper()
 {}
 
 
+UsdSkelAnimMapper::UsdSkelAnimMapper(size_t size)
+    : _targetSize(size), _offset(0), _flags(_IdentityMap)
+{}
+
+
 UsdSkelAnimMapper::UsdSkelAnimMapper(const VtTokenArray& sourceOrder,
                                      const VtTokenArray& targetOrder)
     : UsdSkelAnimMapper(sourceOrder.cdata(), sourceOrder.size(),
@@ -87,18 +92,14 @@ UsdSkelAnimMapper::UsdSkelAnimMapper(const TfToken* sourceOrder,
                                   sourceOrder[0]);
         const size_t pos = it - targetOrder;
         if((pos + sourceOrderSize) <= targetOrderSize) {
-            const size_t compareCount =
-                std::min(sourceOrderSize, targetOrderSize-pos);
-            if(std::equal(sourceOrder, sourceOrder+compareCount, it)) {
+            if(std::equal(sourceOrder, sourceOrder+sourceOrderSize, it)) {
                 _offset = pos;
 
-                _flags = _OrderedMap;
+                _flags = _OrderedMap | _AllSourceValuesMapToTarget;
 
-                if(pos == 0 && compareCount == targetOrderSize) {
+                if(pos == 0 && sourceOrderSize == targetOrderSize) {
                     _flags |= _SourceOverridesAllTargetValues;
                 }
-                _flags |= compareCount == sourceOrderSize ?
-                    _AllSourceValuesMapToTarget : _SomeSourceValuesMapToTarget;
                 return;
             }
         }
