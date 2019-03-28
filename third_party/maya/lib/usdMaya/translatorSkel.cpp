@@ -1373,7 +1373,7 @@ UsdMayaTranslatorSkel::CreateSkinCluster(
             return false;
         }
         VtMatrix4dArray remappedBindXforms;
-        auto mapper = skinningQuery.GetMapper();
+        const auto& mapper = skinningQuery.GetMapper();
         if (mapper && !mapper->IsNull()) {
             if (mapper->IsSparse()) {
                 TF_WARN("Error - not all joints for the skinned object %s could "
@@ -1382,11 +1382,10 @@ UsdMayaTranslatorSkel::CreateSkinCluster(
                         skelQuery.GetPrim().GetPath().GetText());
                 return false;
             }
-            mapper->Remap(bindXforms, &remappedBindXforms);
+            mapper->RemapTransforms(bindXforms, &remappedBindXforms);
         }
 
-        if (joints.size() > bindXforms.size())
-        {
+        if (joints.size() > bindXforms.size()) {
             TF_WARN("Error - skinned object (%s) had more joints (%lu) "
                     "than the skeleton (%s) had bind xforms (%lu)",
                     primToSkin.GetPath().GetText(), joints.size(),
@@ -1430,8 +1429,8 @@ UsdMayaTranslatorSkel::CreateSkinCluster(
             MPlug bindPreMatrixI =
                 bindPreMatrix.elementByLogicalIndex(i, &status);
             CHECK_MSTATUS_AND_RETURN(status, false);
-            auto& bindXform = remappedBindXforms.size() > 0 ? remappedBindXforms[i] :
-                    bindXforms[i];
+            const auto& bindXform = remappedBindXforms.size() > 0 ? 
+                remappedBindXforms[i] : bindXforms[i];
             if (!UsdMayaUtil::setPlugMatrix(
                     bindXform.GetInverse(), bindPreMatrixI)) {
                 return false;
