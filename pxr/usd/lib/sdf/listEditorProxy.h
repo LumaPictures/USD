@@ -33,10 +33,9 @@
 
 #include "pxr/base/vt/value.h"  // for Vt_DefaultValueFactory
 
-#include <boost/mpl/logical.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/type_traits.hpp>
+#include <boost/function.hpp>
 #include <boost/optional.hpp>
+#include <boost/shared_ptr.hpp>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -119,7 +118,7 @@ public:
     void ApplyEditsToList(value_vector_type* vec) const
     {
         if (_Validate()) {
-            _listEditor->ApplyEdits(vec, ApplyCallback());
+            _listEditor->ApplyEditsToList(vec, ApplyCallback());
         }
     }
 
@@ -132,7 +131,7 @@ public:
     void ApplyEditsToList(value_vector_type* vec, CB callback) const
     {
         if (_Validate()) {
-            _listEditor->ApplyEdits(vec, ApplyCallback(callback));
+            _listEditor->ApplyEditsToList(vec, ApplyCallback(callback));
         }
     }
 
@@ -299,7 +298,7 @@ public:
     {
         value_vector_type result;
         if (_Validate()) {
-            _listEditor->ApplyEdits(&result);
+            _listEditor->ApplyEditsToList(&result);
         }
         return result;
     }
