@@ -25,7 +25,6 @@
 #include "context.h"
 
 #include "UT_Gf.h"
-#include "UT_Version.h"
 #include "GT_VtArray.h"
 #include "USD_XformCache.h"
 #include "GU_USD.h"
