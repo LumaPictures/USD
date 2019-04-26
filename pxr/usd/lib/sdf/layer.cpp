@@ -188,7 +188,7 @@ SdfLayer::~SdfLayer()
     _layerRegistry->Erase(SdfCreateHandle(this));
 }
 
-SdfFileFormatConstPtr
+const SdfFileFormatConstPtr&
 SdfLayer::GetFileFormat() const
 {
     return _fileFormat;
@@ -251,45 +251,64 @@ SdfLayer::_WaitForInitializationAndCheckIfSuccessful()
     return _initializationWasSuccessful.get();
 }
 
-SdfLayerRefPtr
-SdfLayer::CreateAnonymous(const string& tag)
+static SdfFileFormatConstPtr
+_GetFileFormatForExtension(
+    const std::string &ext, const SdfLayer::FileFormatArguments &args)
 {
-    // XXX: 
-    // It would be nice to use the _GetFileFormatForPath helper function 
-    // from below, but that function expects a layer identifier and the 
-    // tag is supposed to be just a helpful debugging aid; the fact that
-    // one can specify an underlying layer file format by specifying an
-    // extension was unintended.
-    SdfFileFormatConstPtr fileFormat;
-    const string suffix = TfStringGetSuffix(tag);
-    if (!suffix.empty()) {
-        fileFormat = SdfFileFormat::FindById(TfToken(suffix));
-    }
+    // Find a file format that can handle this extension and the
+    // specified target (if any).
+    const std::string* target = 
+        TfMapLookupPtr(args, SdfFileFormatTokens->TargetArg);
 
-    return CreateAnonymous(tag, fileFormat);
+    return SdfFileFormat::FindByExtension(
+        ext, (target ? *target : std::string()));
 }
 
 SdfLayerRefPtr
 SdfLayer::CreateAnonymous(
-    const string &tag, const SdfFileFormatConstPtr &format)
+    const string& tag, const FileFormatArguments& args)
 {
-    SdfFileFormatConstPtr fmt = format;
-    
-    if (!fmt) {
-        fmt = SdfFileFormat::FindById(SdfTextFileFormatTokens->Id);
+    // XXX: 
+    // It would be nice to use the _GetFileFormatForPath helper function 
+    // below but that function expects a layer identifier and the 
+    // tag is supposed to be just a helpful debugging aid; the fact that
+    // one can specify an underlying layer file format by specifying an
+    // extension was unintended.
+    SdfFileFormatConstPtr fileFormat;
+    string suffix = TfStringGetSuffix(tag);
+    if (!suffix.empty()) {
+        fileFormat = _GetFileFormatForExtension(suffix, args);
     }
 
-    if (!fmt) {
+    if (!fileFormat) {
+        fileFormat = SdfFileFormat::FindById(SdfTextFileFormatTokens->Id);
+    }
+
+    if (!fileFormat) {
         TF_CODING_ERROR("Cannot determine file format for anonymous SdfLayer");
         return SdfLayerRefPtr();
     }
 
-    return _CreateAnonymousWithFormat(fmt, tag);
+    return _CreateAnonymousWithFormat(fileFormat, tag, args);
+}
+
+SdfLayerRefPtr
+SdfLayer::CreateAnonymous(
+    const string &tag, const SdfFileFormatConstPtr &format,
+    const FileFormatArguments &args)
+{
+    if (!format) {
+        TF_CODING_ERROR("Invalid file format for anonymous SdfLayer");
+        return SdfLayerRefPtr();
+    }
+
+    return _CreateAnonymousWithFormat(format, tag, args);
 }
 
 SdfLayerRefPtr
 SdfLayer::_CreateAnonymousWithFormat(
-    const SdfFileFormatConstPtr &fileFormat, const std::string& tag)
+    const SdfFileFormatConstPtr &fileFormat, const std::string& tag,
+    const FileFormatArguments &args)
 {
     if (fileFormat->IsPackage()) {
         TF_CODING_ERROR("Cannot create anonymous layer: creating package %s "
@@ -302,7 +321,8 @@ SdfLayer::_CreateAnonymousWithFormat(
 
     SdfLayerRefPtr layer =
         _CreateNewWithFormat(
-            fileFormat, Sdf_GetAnonLayerIdentifierTemplate(tag), string());
+            fileFormat, Sdf_GetAnonLayerIdentifierTemplate(tag), 
+            string(), ArAssetInfo(), args);
 
     // No layer initialization required, so initialization is complete.
     layer->_FinishInitialization(/* success = */ true);
@@ -362,17 +382,7 @@ _GetFileFormatForPath(const std::string &filePath,
 {
     // Determine which file extension to use.
     const string ext = Sdf_GetExtension(filePath);
-    if (ext.empty()) {
-        return TfNullPtr;
-    }
-
-    // Find a file format that can handle this extension and the
-    // specified target (if any).
-    const std::string* target = 
-        TfMapLookupPtr(args, SdfFileFormatTokens->TargetArg);
-
-    return SdfFileFormat::FindByExtension(
-        ext, (target ? *target : std::string()));
+    return ext.empty() ? TfNullPtr : _GetFileFormatForExtension(ext, args);
 }
 
 SdfLayerRefPtr
@@ -2177,29 +2187,29 @@ SdfLayer::RemovePropertyIfHasOnlyRequiredFields(SdfPropertySpecHandle prop)
     if (!(prop && prop->HasOnlyRequiredFields()))
         return;
 
-    // XXX -- This doesn't deal with relational attributes;  bug 20145.
     if (SdfPrimSpecHandle owner = 
         TfDynamic_cast<SdfPrimSpecHandle>(prop->GetOwner())) {
 
         owner->RemoveProperty(prop);
         _RemoveInertToRootmost(owner);
 
-    } else if (SdfRelationshipSpecHandle owner = 
-               TfDynamic_cast<SdfRelationshipSpecHandle>(prop->GetOwner())) {
-
-        if (SdfAttributeSpecHandle attr = 
-            TfDynamic_cast<SdfAttributeSpecHandle>(prop)) {
-
-            owner->RemoveAttributeForTargetPath(
-                owner->GetTargetPathForAttribute(attr), attr);
-
-            //XXX: We may want to do something like 
-            //     _RemoveInertToRootmost here, but that would currently 
-            //     exacerbate bug 23878. Until we have  a solution for that bug,
-            //     we won't automatically clean up our parent (and his parent, 
-            //     etc) when deleting a relational attribute.
-        }
+    } 
+    else if (SdfAttributeSpecHandle attr = 
+             TfDynamic_cast<SdfAttributeSpecHandle>(prop)) {
+        Sdf_ChildrenUtils<Sdf_AttributeChildPolicy>::RemoveChild(
+            SdfCreateHandle(this), 
+            attr->GetPath().GetParentPath(), attr->GetNameToken());
     }
+    else if (SdfRelationshipSpecHandle rel = 
+             TfDynamic_cast<SdfRelationshipSpecHandle>(prop)) {
+        Sdf_ChildrenUtils<Sdf_RelationshipChildPolicy>::RemoveChild(
+            SdfCreateHandle(this), 
+            rel->GetPath().GetParentPath(), rel->GetNameToken());
+    }
+    //XXX: We may want to do something like 
+    //     _RemoveInertToRootmost here, but that would currently 
+    //     exacerbate bug 23878. Until we have  a solution for that bug,
+    //     we won't automatically clean up our parents in this case.
 }
 
 void
@@ -2530,7 +2540,7 @@ SdfLayer::AddToMutedLayers(const string &path)
                 SdfFileFormatConstPtr format = layer->GetFileFormat();
                 SdfAbstractDataRefPtr initializedData = 
                     format->InitData(layer->GetFileFormatArguments());
-                if (format->IsStreamingLayer(*layer.operator->())) {
+                if (layer->_data->StreamsData()) {
                     // See the discussion in TransferContent()
                     // about streaming layers; the same concerns
                     // apply here.  We must swap out the actual data
@@ -2596,9 +2606,10 @@ SdfLayer::RemoveFromMutedLayers(const string &path)
                     }
                 }
                 if (TF_VERIFY(mutedData)) {
-                    // If IsStreamingLayer() is true, this re-takes ownership
-                    // of the mutedData object.  Otherwise, this mutates
-                    // the existing data container to match its contents.
+                    // If SdfAbstractData::StreamsData() is true, this re-takes 
+                    // ownership of the mutedData object.  Otherwise, this 
+                    // mutates the existing data container to match its 
+                    // contents.
                     layer->_SetData(mutedData);
                 }
                 TF_VERIFY(layer->IsDirty());
@@ -2627,10 +2638,13 @@ SdfLayer::Clear()
         return;
     }
 
+    const bool isStreamingLayer = _data->StreamsData();
+
     _SetData(GetFileFormat()->InitData(GetFileFormatArguments()));
 
-    if (GetFileFormat()->IsStreamingLayer(*this))
+    if (isStreamingLayer) {
         _stateDelegate->_MarkCurrentStateAsDirty();
+    }
 }
 
 bool
@@ -2726,7 +2740,7 @@ SdfLayer::TransferContent(const SdfLayerHandle& layer)
     //
 
     bool notify = _ShouldNotify();
-    bool isStreamingLayer = GetFileFormat()->IsStreamingLayer(*this);
+    bool isStreamingLayer = _data->StreamsData();
     SdfAbstractDataRefPtr newData;
 
     if (!notify || isStreamingLayer) {
@@ -3316,7 +3330,7 @@ SdfLayer::_SetData(const SdfAbstractDataPtr &newData)
     // the data in the layer to be streamed in from disk.
     // So, all we can do is move the new data into place and
     // notify the world that this layer may have changed arbitrarily.
-    if (GetFileFormat()->IsStreamingLayer(*this)) {
+    if (_data->StreamsData()) {
         _data = newData;
         Sdf_ChangeManager::Get()
             .DidReplaceLayerContent(SdfCreateHandle(this));
