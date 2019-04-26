@@ -285,9 +285,6 @@ SDF_API const TfEnum &SdfDefaultUnit( const TfEnum &unit );
 /// Gets the unit category for a given /a unit.
 SDF_API const std::string &SdfUnitCategory( const TfEnum &unit );
 
-/// Gets the type/unit pair for a unit enum.
-std::pair<uint32_t, uint32_t> Sdf_GetUnitIndices( const TfEnum &unit );
-
 /// Converts from one unit of measure to another. The \a fromUnit and \a toUnit
 /// units must be of the same type (for example, both of type SdfLengthUnit).
 SDF_API double SdfConvertUnit( const TfEnum &fromUnit, const TfEnum &toUnit );
@@ -414,8 +411,6 @@ TF_DECLARE_PUBLIC_TOKENS(SdfValueRoleNames, SDF_API, SDF_VALUE_ROLE_NAME_TOKENS)
 SDF_DECLARE_HANDLES(SdfLayer);
 
 SDF_DECLARE_HANDLES(SdfAttributeSpec);
-SDF_DECLARE_HANDLES(SdfMapperArgSpec);
-SDF_DECLARE_HANDLES(SdfMapperSpec);
 SDF_DECLARE_HANDLES(SdfPrimSpec);
 SDF_DECLARE_HANDLES(SdfPropertySpec);
 SDF_DECLARE_HANDLES(SdfSpec);
@@ -538,7 +533,7 @@ public:
     TfToken GetSerializationName(const TfToken&) const;
 
 private:
-    friend class SdfSchema;
+    friend const Sdf_ValueTypeNamesType* Sdf_InitializeValueTypeNames();
     Sdf_ValueTypeNamesType();
 };
 
