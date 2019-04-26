@@ -18,7 +18,7 @@
 vec4 surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
 {
 #if defined(HD_HAS_baseColor)
-    return HdGet_baseColor();
+    return vec4(HdGet_baseColor(), 1.0);
 #else
     return vec4(1.0, 0.0, 0.0, 1.0);
 #endif

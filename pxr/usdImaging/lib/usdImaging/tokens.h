@@ -51,6 +51,7 @@ PXR_NAMESPACE_OPEN_SCOPE
     (bxdf)                  \
     (displacement)          \
     (uvPrimvar)             \
+    (UsdImagePlaneSurface)  \
     (UsdPreviewSurface)     \
     (UsdUVTexture)          \
     (UsdPrimvarReader_float)\

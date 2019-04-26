@@ -30,11 +30,15 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 HdxColorizeTask::HdxColorizeTask(HdSceneDelegate* delegate, SdfPath const& id)
-    : HdSceneTask(delegate, id)
-    , _renderBuffer(nullptr)
-    , _outputBuffer(nullptr)
-    , _outputBufferSize(0)
-    , _converged(false)
+ : HdxProgressiveTask(id)
+ , _aovName()
+ , _renderBufferId()
+ , _renderBuffer(nullptr)
+ , _outputBuffer(nullptr)
+ , _outputBufferSize(0)
+ , _converged(false)
+ , _compositor()
+ , _needsValidation(false)
 {
 }
 
@@ -69,7 +73,7 @@ static void _colorizeNdcDepth(uint8_t* dest, uint8_t* src, size_t nPixels)
             std::min(std::max((depthBuffer[i] * 0.5f) + 0.5f, 0.0f), 1.0f);
         uint8_t value = (uint8_t)(255.0f * valuef);
         // special case 1.0 (far plane) as all black.
-        if (depthBuffer[i] == 1.0f) {
+        if (depthBuffer[i] >= 1.0f) {
             value = 0;
         }
         dest[i*4+0] = value;
@@ -154,15 +158,81 @@ static _Colorizer _colorizerTable[] = {
     { HdAovTokens->Neye, HdFormatFloat32Vec3, _colorizeNormal },
     { HdAovTokens->normal, HdFormatFloat32Vec3, _colorizeNormal },
     { HdAovTokens->primId, HdFormatInt32, _colorizeId },
+    { HdAovTokens->elementId, HdFormatInt32, _colorizeId },
+    { HdAovTokens->instanceId, HdFormatInt32, _colorizeId },
 };
 
 void
-HdxColorizeTask::_Execute(HdTaskContext* ctx)
+HdxColorizeTask::Sync(HdSceneDelegate* delegate,
+                      HdTaskContext* ctx,
+                      HdDirtyBits* dirtyBits)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
+    if ((*dirtyBits) & HdChangeTracker::DirtyParams) {
+        HdxColorizeTaskParams params;
+
+        if (_GetTaskParams(delegate, &params)) {
+            _aovName = params.aovName;
+            _renderBufferId = params.renderBuffer;
+            _needsValidation = true;
+        }
+    }
+    *dirtyBits = HdChangeTracker::Clean;
+}
+
+void
+HdxColorizeTask::Prepare(HdTaskContext* ctx, HdRenderIndex *renderIndex)
+{
+    // An empty _renderBufferId disables the task
+    if (_renderBufferId.IsEmpty()) {
+        _renderBuffer = nullptr;
+        return;
+    }
+
+    _renderBuffer = static_cast<HdRenderBuffer*>(
+        renderIndex->GetBprim(HdPrimTypeTokens->renderBuffer, _renderBufferId));
+
     if (!TF_VERIFY(_renderBuffer)) {
+        return;
+    }
+
+
+    if (_needsValidation) {
+        bool match = false;
+        for (auto& colorizer : _colorizerTable) {
+            if (_aovName == colorizer.aovName &&
+                _renderBuffer->GetFormat() == colorizer.aovFormat) {
+                match = true;
+                break;
+            }
+        }
+        if (HdParsedAovToken(_aovName).isPrimvar &&
+            _renderBuffer->GetFormat() == HdFormatFloat32Vec3) {
+            match = true;
+        }
+        if (!match) {
+            TF_WARN("Unsupported AOV input %s with format %s",
+                _aovName.GetText(),
+                TfEnum::GetName(_renderBuffer->GetFormat()).c_str());
+        }
+        _needsValidation = false;
+    }
+
+}
+
+void
+HdxColorizeTask::Execute(HdTaskContext* ctx)
+{
+    HD_TRACE_FUNCTION();
+    HF_MALLOC_TAG_FUNCTION();
+
+    // _renderBuffer is null if the task is disabled
+    // because _renderBufferId is empty or
+    // we failed to look up the renderBuffer in the render index,
+    // in which case the error was previously reported
+    if (!_renderBuffer) {
         return;
     }
 
@@ -195,7 +265,7 @@ HdxColorizeTask::_Execute(HdTaskContext* ctx)
         }
     }
     // (special handling for primvar tokens).
-    if (HdAovIdentifier(_aovName).isPrimvar &&
+    if (HdParsedAovToken(_aovName).isPrimvar &&
         _renderBuffer->GetFormat() == HdFormatFloat32Vec3) {
         _colorizePrimvar(_outputBuffer, _renderBuffer->Map(),
                          _outputBufferSize);
@@ -209,49 +279,6 @@ HdxColorizeTask::_Execute(HdTaskContext* ctx)
     _compositor.Draw();
 }
 
-void
-HdxColorizeTask::_Sync(HdTaskContext* ctx)
-{
-    HD_TRACE_FUNCTION();
-    HF_MALLOC_TAG_FUNCTION();
-
-    HdDirtyBits bits = _GetTaskDirtyBits();
-
-    bool validate = false;
-    if (bits & HdChangeTracker::DirtyParams) {
-        HdxColorizeTaskParams params;
-
-        if (_GetSceneDelegateValue(HdTokens->params, &params)) {
-            _aovName = params.aovName;
-            _renderBufferId = params.renderBuffer;
-            validate = true;
-        }
-    }
-
-    HdRenderIndex &renderIndex = GetDelegate()->GetRenderIndex();
-    _renderBuffer = static_cast<HdRenderBuffer*>(
-        renderIndex.GetBprim(HdPrimTypeTokens->renderBuffer, _renderBufferId));
-
-    if (validate) {
-        bool match = false;
-        for (auto& colorizer : _colorizerTable) {
-            if (_aovName == colorizer.aovName &&
-                _renderBuffer->GetFormat() == colorizer.aovFormat) {
-                match = true;
-                break;
-            }
-        }
-        if (HdAovIdentifier(_aovName).isPrimvar &&
-            _renderBuffer->GetFormat() == HdFormatFloat32Vec3) {
-            match = true;
-        }
-        if (!match) {
-            TF_WARN("Unsupported AOV input %s with format %s",
-                _aovName.GetText(),
-                TfEnum::GetName(_renderBuffer->GetFormat()).c_str());
-        }
-    }
-}
 
 // --------------------------------------------------------------------------- //
 // VtValue Requirements

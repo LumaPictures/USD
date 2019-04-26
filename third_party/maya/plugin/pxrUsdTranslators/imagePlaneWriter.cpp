@@ -12,17 +12,17 @@
 #include "usdMaya/writeJobContext.h"
 #include "usdMaya/writeUtil.h"
 
-#ifdef GENERATE_SHADERS
-#include <pxr/imaging/glf/glslfx.h>
 #include <pxr/usd/usdShade/material.h>
 #include <pxr/usd/usdShade/materialBindingAPI.h>
 #include <pxr/usd/usdShade/shader.h>
 #include <pxr/usd/usdShade/connectableAPI.h>
+#include <pxr/usd/usdShade/tokens.h>
 #include <pxr/usd/usdHydra/tokens.h>
 #include <pxr/usd/usdGeom/camera.h>
+#include <pxr/imaging/hio/glslfx.h>
+#include <pxr/usdImaging/usdImaging/tokens.h>
 
 #include <maya/MRenderUtil.h>
-#endif
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -32,22 +32,22 @@ PXRUSDMAYA_REGISTER_ADAPTOR_SCHEMA(imagePlane, UsdGeomImagePlane);
 TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
     ((defaultOutputName, "out"))
-#ifdef GENERATE_SHADERS
     ((materialName, "HdMaterial"))
     ((shaderName, "HdShader"))
     ((primvarName, "HdPrimvar"))
     ((textureName, "HdTexture"))
     (st)
-    (uv)
     (result)
-    (baseColor)
+    (colorOpacity)
     (color)
-#endif
+    (rgba)
+    (file)
+    (varname)
 );
 
 MayaImagePlaneWriter::MayaImagePlaneWriter(
-    const MDagPath & iDag, const SdfPath& uPath, UsdMayaWriteJobContext& jobCtx)
-    : UsdMayaPrimWriter(iDag, uPath, jobCtx)
+    const MFnDependencyNode& depNodeFn, const SdfPath& uPath, UsdMayaWriteJobContext& jobCtx)
+    : UsdMayaPrimWriter(depNodeFn, uPath, jobCtx)
 {
     auto primSchema =
         UsdGeomImagePlane::Define(GetUsdStage(), GetUsdPath());
@@ -55,7 +55,6 @@ MayaImagePlaneWriter::MayaImagePlaneWriter(
     _usdPrim = primSchema.GetPrim();
     TF_AXIOM(_usdPrim);
 
-#ifdef GENERATE_SHADERS
     const auto materialPath = GetUsdPath().AppendChild(_tokens->materialName);
     auto material = UsdShadeMaterial::Define(GetUsdStage(), materialPath);
     auto shader = UsdShadeShader::Define(GetUsdStage(),
@@ -71,23 +70,14 @@ MayaImagePlaneWriter::MayaImagePlaneWriter(
         .Bind(material);
 
     UsdShadeConnectableAPI::ConnectToSource(
-        UsdShadeMaterial(material).CreateSurfaceOutput(GlfGLSLFXTokens->glslfx),
-        UsdShadeMaterial(shader).CreateOutput(
-            _tokens->defaultOutputName,
-            SdfValueTypeNames->Token));
+        UsdShadeMaterial(material).CreateSurfaceOutput(HioGlslfxTokens->glslfx),
+        UsdShadeMaterial(shader).CreateSurfaceOutput());
 
-    shader.GetPrim()
-        .CreateAttribute(UsdHydraTokens->infoFilename, SdfValueTypeNames->Asset,
-            SdfVariabilityUniform)
-        .Set(SdfAssetPath("shaders/simpleTexturedSurface.glslfx"));
+    shader.CreateIdAttr().Set(UsdImagingTokens->UsdImagePlaneSurface);
 
-    primvar.CreateIdAttr().Set(UsdHydraTokens->HwPrimvar_1);
-    primvar.GetPrim()
-        .CreateAttribute(UsdHydraTokens->infoVarname, SdfValueTypeNames->Token,
-            SdfVariabilityUniform)
-        .Set(_tokens->st);
+    primvar.CreateIdAttr().Set(UsdImagingTokens->UsdPrimvarReader_float2);
 
-    texture.CreateIdAttr().Set(UsdHydraTokens->HwUvTexture_1);
+    texture.CreateIdAttr().Set(UsdImagingTokens->UsdUVTexture);
     texture.GetPrim()
         .CreateAttribute(UsdHydraTokens->textureMemory,
             SdfValueTypeNames->Float, SdfVariabilityUniform)
@@ -97,13 +87,16 @@ MayaImagePlaneWriter::MayaImagePlaneWriter(
     UsdShadeConnectableAPI primvarApi(primvar);
     UsdShadeConnectableAPI textureApi(texture);
 
+    primvarApi.CreateInput(_tokens->varname, SdfValueTypeNames->Token)
+        .Set(_tokens->st);
+
     UsdShadeConnectableAPI::ConnectToSource(
-        textureApi.CreateInput(_tokens->uv, SdfValueTypeNames->Float2),
+        textureApi.CreateInput(_tokens->st, SdfValueTypeNames->Float2),
         primvarApi.CreateOutput(_tokens->result, SdfValueTypeNames->Float2));
 
     UsdShadeConnectableAPI::ConnectToSource(
-        shaderApi.CreateInput(_tokens->baseColor, SdfValueTypeNames->Color4f),
-        textureApi.CreateOutput(_tokens->color, SdfValueTypeNames->Color4f));
+        shaderApi.CreateInput(_tokens->colorOpacity, SdfValueTypeNames->Float4),
+        textureApi.CreateOutput(_tokens->rgba, SdfValueTypeNames->Float4));
 
     for (auto pt = GetUsdPath(); !pt.IsEmpty(); pt = pt.GetParentPath()) {
         auto pr = GetUsdStage()->GetPrimAtPath(pt);
@@ -112,7 +105,6 @@ MayaImagePlaneWriter::MayaImagePlaneWriter(
             break;
         }
     }
-#endif
 }
 
 MayaImagePlaneWriter::~MayaImagePlaneWriter() {
@@ -143,14 +135,11 @@ bool MayaImagePlaneWriter::_WriteImagePlaneAttrs(
         std::string(dnode.findPlug("imageName").asString().asChar()));
     primSchema.GetFilenameAttr().Set(imageName);
     primSchema.GetFilenameAttr().Set(imageNameExtractedPath, usdTime);
-#ifdef GENERATE_SHADERS
     UsdShadeShader textureShader(mTexture);
-    auto filenameAttr = textureShader.GetPrim()
-        .CreateAttribute(UsdHydraTokens->infoFilename,
-            SdfValueTypeNames->Asset, SdfVariabilityVarying);
+    auto filenameAttr = UsdShadeConnectableAPI(textureShader)
+        .CreateInput(_tokens->file, SdfValueTypeNames->Asset);
     filenameAttr.Set(imageNameExtractedPath, usdTime);
     filenameAttr.Set(imageName);
-#endif
     const auto fit = dnode.findPlug("fit").asShort();
     if (fit == UsdGeomImagePlane::FIT_BEST) {
         primSchema.GetFitAttr().Set(UsdGeomTokens->best);

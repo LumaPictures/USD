@@ -31,6 +31,7 @@
 #include "pxr/imaging/hdx/selectionTracker.h"
 #include "pxr/imaging/hdx/renderSetupTask.h"
 #include "pxr/imaging/hdx/shadowTask.h"
+#include "pxr/imaging/hdx/colorCorrectionTask.h"
 
 #include "pxr/imaging/hd/aov.h"
 #include "pxr/imaging/hd/renderIndex.h"
@@ -49,25 +50,23 @@ PXR_NAMESPACE_OPEN_SCOPE
 // XXX: This API is transitional. At the least, render/picking/selection
 // APIs should be decoupled.
 
-/// Task set tokens:
-/// - "colorRender" is the set of tasks needed to render to a color buffer.
-/// - "idRender" is the set of tasks needed to render an id buffer, indicating
-///              what object is at each pixel.
-#define HDX_TASK_SET_TOKENS                    \
-    (colorRender)                              \
-    (idRender)
-
-TF_DECLARE_PUBLIC_TOKENS(HdxTaskSetTokens, HDX_API, HDX_TASK_SET_TOKENS);
-
 /// Intersection mode tokens, mapped to HdxIntersector API.
-/// Note: "nearest" hitmode may be considerably more efficient.
-/// - "nearest" returns the nearest single hit point.
+/// Note: The "nearest*" hitmodes may be considerably more efficient.
+/// - "nearestToCamera" returns the single hit point closest (by depth) to the
+///                     camera
+/// - "nearestToCenter" returns the single hit point nearest to the center of
+///                     the selection region; note that this should be faster
+///                     than nearestToCamera, as it will sample outward from the
+///                     center, and stop as soon as it finds any hit, while
+///                     nearestToCamera will check ALL pixels in the selection
+///                     region, and return the hit that has the lowest z
 /// - "unique"  returns the set of unique hit prims, keeping only the nearest
 ///             depth per prim.
 /// - "all"     returns all hit points, possibly including multiple hits per
 ///             prim.
 #define HDX_INTERSECTION_MODE_TOKENS           \
-    (nearest)                                  \
+    (nearestToCamera)                          \
+    (nearestToCenter)                          \
     (unique)                                   \
     (all)
 
@@ -95,14 +94,13 @@ public:
     /// -------------------------------------------------------
     /// Execution API
 
-    /// Obtain the set of tasks managed by the task controller
-    /// suitable for execution. Currently supported tasksets:
-    /// HdxTaskSet->render
-    /// HdxTaskSet->idRender
+    /// Obtain the set of tasks managed by the task controller,
+    /// for execution. The tasks returned will be different based on
+    /// current renderer state.
     ///
-    /// A vector of zero length indicates the specified taskSet is unsupported.
+    /// A vector of zero length indicates error.
     HDX_API
-    HdTaskSharedPtrVector const &GetTasks(TfToken const& taskSet);
+    HdTaskSharedPtrVector const GetTasks();
 
     /// -------------------------------------------------------
     /// Rendering API
@@ -220,6 +218,13 @@ public:
     HDX_API
     bool IsConverged() const;
 
+    /// -------------------------------------------------------
+    /// Color Correction API
+
+    /// Configure color correction by settings params.
+    HDX_API
+    void SetColorCorrectionParams(HdxColorCorrectionTaskParams const& params);
+
 private:
     ///
     /// This class is not intended to be copied.
@@ -230,17 +235,17 @@ private:
     HdRenderIndex *_index;
     SdfPath const _controllerId;
 
-    HdTaskSharedPtrVector _tasks;
     std::unique_ptr<HdxIntersector> _intersector;
 
     // Create taskController objects. Since the camera is a parameter
     // to the tasks, _CreateCamera() should be called first.
     void _CreateCamera();
-    void _CreateRenderTasks();
+    void _CreateRenderTask();
     void _CreateSelectionTask();
     void _CreateLightingTask();
     void _CreateShadowTask();
     void _CreateColorizeTask();
+    void _CreateColorCorrectionTask();
 
     SdfPath _GetAovPath(TfToken const& aov);
 
@@ -296,17 +301,12 @@ private:
     _Delegate _delegate;
 
     // Generated tasks.
-    //
-    // _renderTaskId and _idRenderTaskId are both of type HdxRenderTask.
-    // The reason we have two around is so that they can have parallel sets of
-    // HdxRenderTaskParams; if there were only one render task, we'd thrash the
-    // params switching between id and color render.
-    SdfPath _renderTaskId;
-    SdfPath _idRenderTaskId;
+    SdfPathVector _renderTaskIds;
     SdfPath _selectionTaskId;
     SdfPath _simpleLightTaskId;
     SdfPath _shadowTaskId;
     SdfPath _colorizeTaskId;
+    SdfPath _colorCorrectionTaskId;
 
     // Generated cameras
     SdfPath _cameraId;

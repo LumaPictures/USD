@@ -143,7 +143,6 @@ if __name__ == '__main__':
     render_params.enableSampleAlphaToCoverage = False
     render_params.highlight = False
     render_params.enableHardwareShading = True
-    render_params.displayImagePlanes = False
 
     target_aspect = float(args.width) / max(1.0, args.height)
 

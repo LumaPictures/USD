@@ -183,13 +183,6 @@ void HydraKatana::draw(ViewportWrapperPtr viewport)
     glGetDoublev(GL_VIEWPORT, &glviewport[0]);
     m_taskController->SetCameraViewport(glviewport);
 
-    // Near/Far planes
-    double nearPlane = 0.0;
-    double farPlane = 0.0;
-    camera->getNearFar(nearPlane, farPlane);
-    assert(nearPlane >= 0.01 && farPlane > nearPlane);
-    m_renderTaskParams.drawingRange = GfVec2f((float)nearPlane, (float)farPlane);
-
     // Set Task Params
     m_taskController->SetRenderParams(m_renderTaskParams);
 
@@ -198,7 +191,7 @@ void HydraKatana::draw(ViewportWrapperPtr viewport)
     m_engine.SetTaskContextData(HdxTokens->selectionState, selectionValue);
 
     // Render
-    auto tasks = m_taskController->GetTasks(HdxTaskSetTokens->colorRender);
+    auto tasks = m_taskController->GetTasks();
     m_engine.Execute(*m_renderIndex, tasks);
 }
 
@@ -214,7 +207,7 @@ bool HydraKatana::pick(ViewportWrapperPtr viewport,
 
     // Define the hit mode
     HdxIntersector::HitMode hitMode = HdxIntersector::HitMode::HitFirst;
-    TfToken intersectionMode = HdxIntersectionModeTokens->nearest;
+    TfToken intersectionMode = HdxIntersectionModeTokens->nearestToCenter;
     if (deepPicking)
     {
         hitMode = HdxIntersector::HitMode::HitAll;

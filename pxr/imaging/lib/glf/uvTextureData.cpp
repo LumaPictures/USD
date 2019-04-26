@@ -190,7 +190,7 @@ GlfUVTextureData::_ReadDegradedImageInput(bool generateMipmap,
     // If no targetMemory set, use degradeLevel to determine mipLevel
     if (targetMemory == 0) {
         GlfImageSharedPtr image =
-		GlfImage::OpenForReading(_filePath, 0, degradeLevel);
+        GlfImage::OpenForReading(_filePath, 0, degradeLevel);
         if (!image) {
             return _DegradedImageInput(1.0, 1.0);
         }

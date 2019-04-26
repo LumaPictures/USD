@@ -65,10 +65,8 @@ public:
     GlfTextureHandleRefPtr GetTextureHandle(const TfTokenVector &textures,
                                   GlfImage::ImageOriginLocation originLocation = 
                                                      GlfImage::OriginUpperLeft);
-
     GLF_API
     GlfTextureHandleRefPtr GetTextureHandle(GlfTextureRefPtr texture);
-
     GLF_API
     GlfTextureHandleRefPtr GetTextureHandle(
         const TfToken& texture,
@@ -105,6 +103,10 @@ private:
     GlfTextureHandleRefPtr _CreateTexture(const TfTokenVector &textures,
                                           const size_t numTextures,
                                   GlfImage::ImageOriginLocation originLocation);
+    GlfTextureHandleRefPtr _CreateTexture(const TfToken &texture,
+                                  GlfImage::ImageOriginLocation originLocation,
+                                  const GlfTextureFactoryBase *textureFactory);
+
     GlfTextureFactoryBase* _GetTextureFactory(const TfToken &filename);
 
     // Metadata for texture files to aid in cache invalidation.

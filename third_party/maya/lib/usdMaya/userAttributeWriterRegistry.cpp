@@ -1,5 +1,5 @@
 //
-// Copyright 2017 Pixar
+// Copyright 2019 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -36,24 +36,27 @@ namespace {
     _WriterRegistry _writerReg;
 }
 
-TfTokenVector UsdMayaUserAttributeWriterRegistry::_ListWriters() {
+TfTokenVector UsdMayaUserAttributeWriterRegistry::_ListWriters()
+{
     UsdMaya_RegistryHelper::LoadUserAttributeWriterPlugins();
     TfRegistryManager::GetInstance().SubscribeTo<UsdMayaUserAttributeWriterRegistry>();
     TfTokenVector ret;
     ret.reserve(_writerReg.size());
-    for (const auto& e : _writerReg) {
-        ret.push_back(e.first);
+    for (const auto& nameAndWriter : _writerReg) {
+        ret.push_back(nameAndWriter.first);
     }
     return ret;
 }
 
 void UsdMayaUserAttributeWriterRegistry::RegisterWriter(
     const std::string& name,
-    const UserAttributeWriter& fn) {
+    const UserAttributeWriter& fn)
+{
     _writerReg.insert(std::make_pair(TfToken(name), fn));
 }
 
-UsdMayaUserAttributeWriterRegistry::UserAttributeWriter UsdMayaUserAttributeWriterRegistry::_GetWriter(const TfToken& name) {
+UsdMayaUserAttributeWriterRegistry::UserAttributeWriter UsdMayaUserAttributeWriterRegistry::_GetWriter(const TfToken& name)
+{
     UsdMaya_RegistryHelper::LoadUserAttributeWriterPlugins();
     TfRegistryManager::GetInstance().SubscribeTo<UsdMayaUserAttributeWriterRegistry>();
     const auto it = _writerReg.find(name);
@@ -63,16 +66,19 @@ UsdMayaUserAttributeWriterRegistry::UserAttributeWriter UsdMayaUserAttributeWrit
 TF_INSTANTIATE_SINGLETON(UsdMayaUserAttributeWriterRegistry);
 
 UsdMayaUserAttributeWriterRegistry&
-UsdMayaUserAttributeWriterRegistry::GetInstance() {
+UsdMayaUserAttributeWriterRegistry::GetInstance()
+{
     return TfSingleton<UsdMayaUserAttributeWriterRegistry>::GetInstance();
 }
 
-UsdMayaUserAttributeWriterRegistry::UsdMayaUserAttributeWriterRegistry() {
-    
+UsdMayaUserAttributeWriterRegistry::UsdMayaUserAttributeWriterRegistry()
+{
+
 }
 
-UsdMayaUserAttributeWriterRegistry::~UsdMayaUserAttributeWriterRegistry() {
-    
+UsdMayaUserAttributeWriterRegistry::~UsdMayaUserAttributeWriterRegistry()
+{
+
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -39,7 +39,7 @@
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
 
-#include "pxr/imaging/glf/glslfx.h"
+#include "pxr/imaging/hio/glslfx.h"
 
 #include "pxr/base/tf/iterator.h"
 #include "pxr/base/tf/staticTokens.h"
@@ -126,7 +126,7 @@ std::string
 _GetPtexTextureShaderSource()
 {
     static std::string source =
-        GlfGLSLFX(HdStPackagePtexTextureShader()).GetSource(
+        HioGlslfx(HdStPackagePtexTextureShader()).GetSource(
             _tokens->ptexTextureSampler);
     return source;
 }
@@ -683,7 +683,7 @@ HdSt_CodeGen::Compile()
     // prep interstage plumbing function
     _procVS  << "void ProcessPrimvars() {\n";
     _procTCS << "void ProcessPrimvars() {\n";
-    _procTES << "void ProcessPrimvars(float u, float v, int i0, int i1, int i2, int i3) {\n";
+    _procTES << "void ProcessPrimvars(vec4 basis, int i0, int i1, int i2, int i3) {\n";
     // geometry shader plumbing
     switch(_geometricShader->GetPrimitiveType())
     {
@@ -695,23 +695,25 @@ HdSt_CodeGen::Compile()
             _procGS << "vec4 GetPatchCoord(int index);\n"
                     << "void ProcessPrimvars(int index) {\n"
                     << "   vec2 localST = GetPatchCoord(index).xy;\n";
-            break;            
+            break;
         }
 
         case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_QUADS:
         {
             // quad interpolation
             _procGS  << "void ProcessPrimvars(int index) {\n"
-                     << "   vec2 localST = vec2[](vec2(0,0), vec2(1,0), vec2(1,1), vec2(0,1))[index];\n";
-            break;            
+                     << "   vec2 lut[4] = vec2[4](vec2(0,0), vec2(1,0), vec2(1,1), vec2(0,1));\n"
+                     << "   vec2 localST = lut[index];\n";
+            break;
         }
 
         case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_TRIANGLES:
         {
             // barycentric interpolation
              _procGS  << "void ProcessPrimvars(int index) {\n"
-                      << "   vec2 localST = vec2[](vec2(0,0), vec2(1,0), vec2(0,1))[index];\n";
-            break;            
+                      << "   vec2 lut[3] = vec2[3](vec2(0,0), vec2(1,0), vec2(0,1));\n"
+                      << "   vec2 localST = lut[index];\n";
+            break;
         }
 
         default: // points, basis curves
@@ -1643,7 +1645,7 @@ HdSt_CodeGen::_GenerateDrawingCoord()
     if (_metaData.drawingCoordIBinding.binding.IsValid()) {
         _genVS << "  for (int i = 0; i < HD_INSTANCER_NUM_LEVELS; ++i) {\n"
                << "    dc.instanceCoords[i] = drawingCoordI[i] \n"
-               << "      + GetInstanceIndex().indices[i+1]; \n"
+               << "      + dc.instanceIndex[i+1]; \n"
                << "  }\n";
     }
 
@@ -1712,7 +1714,7 @@ HdSt_CodeGen::_GenerateConstantPrimvar()
           mat4 transform;
           mat4 transformInverse;
           mat4 instancerTransform[2];
-          vec4 color;
+          vec3 displayColor;
           vec4 primID;
       };
       // bindless
@@ -1726,8 +1728,8 @@ HdSt_CodeGen::_GenerateConstantPrimvar()
       mat4 HdGet_transform(int localIndex) {
           return constantData0[GetConstantCoord()].transform;
       }
-      vec4 HdGet_color(int localIndex) {
-          return constantData0[GetConstantCoord()].color;
+      vec3 HdGet_displayColor(int localIndex) {
+          return constantData0[GetConstantCoord()].displayColor;
       }
 
     */
@@ -1903,15 +1905,15 @@ HdSt_CodeGen::_GenerateElementPrimvar()
 
       // --------- uniform primvar declaration ---------
       struct ElementData0 {
-          vec4 color;
+          vec3 displayColor;
       };
       layout (std430, binding=?) buffer buffer0 {
           ElementData0 elementData0[];
       };
 
       // ---------uniform primvar data accessor ---------
-      vec4 HdGet_color(int localIndex) {
-          return elementData0[GetAggregatedElementID()].color;
+      vec3 HdGet_displayColor(int localIndex) {
+          return elementData0[GetAggregatedElementID()].displayColor;
       }
 
     */
@@ -2195,7 +2197,11 @@ HdSt_CodeGen::_GenerateElementPrimvar()
             << "  if (primitiveEdgeID == -1) {\n"
             << "    return -1;\n"
             << "  }\n"
-            << "  return HdGet_edgeIndices()[abs(primitiveEdgeID)];\n;"
+            << "  "
+            << _GetUnpackedType(_metaData.edgeIndexBinding.dataType, false)
+            << " edgeIndices = HdGet_edgeIndices();\n"
+            << "  int coord = abs(primitiveEdgeID);\n"
+            << "  return edgeIndices[coord];\n"
             << "}\n";
 
         // Primitive EdgeID getter
@@ -2359,13 +2365,12 @@ HdSt_CodeGen::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
                 << " = " << name << ";\n";
         _procTCS << "  outPrimvars[gl_InvocationID]." << name
                  << " = inPrimvars[gl_InvocationID]." << name << ";\n";
-        // procTES linearly interpolate vertex/varying primvars here.
-        // XXX: needs smooth interpolation for vertex primvars?
-        _procTES << "  outPrimvars." << name
-                 << " = mix(mix(inPrimvars[i3]." << name
-                 << "         , inPrimvars[i2]." << name << ", u),"
-                 << "       mix(inPrimvars[i1]." << name
-                 << "         , inPrimvars[i0]." << name << ", u), v);\n";
+       _procTES << "  outPrimvars." << name
+                 << " = basis[0] * inPrimvars[i0]." << name
+                 << " + basis[1] * inPrimvars[i1]." << name
+                 << " + basis[2] * inPrimvars[i2]." << name
+                 << " + basis[3] * inPrimvars[i3]." << name << ";\n";
+
         _procGS  << "  outPrimvars." << name
                  << " = inPrimvars[index]." << name << ";\n";
     }
@@ -2757,7 +2762,7 @@ HdSt_CodeGen::_GenerateShaderParameters()
             // vec4 HdGet_name(vec2 coord) { vec3 c = hd_sample_udim(coord);
             // c.z = texelFetch(sampler1d_name_layout, int(c.z), 0).x - 1;
             // if (c.z < -0.5) { return vec4(0, 0, 0, 0).xyz; } else {
-            // return texture(sampler2dArray_name, hd_sample_udim(coord)).xyz;}}
+            // return texture(sampler2dArray_name, c).xyz;}}
             accessors
                 << it->second.dataType
                 << " HdGet_" << it->second.name

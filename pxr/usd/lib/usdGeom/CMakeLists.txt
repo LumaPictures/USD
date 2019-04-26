@@ -35,8 +35,6 @@ pxr_library(usdGeom
         cube
         curves
         cylinder
-        collectionAPI
-        faceSetAPI
         imageable
         imagePlane
         gprim
@@ -73,12 +71,10 @@ pxr_library(usdGeom
         wrapCamera.cpp
         wrapConstraintTarget.cpp
         wrapCapsule.cpp
-        wrapCollectionAPI.cpp
         wrapCone.cpp
         wrapCube.cpp
         wrapCurves.cpp
         wrapCylinder.cpp
-        wrapFaceSetAPI.cpp
         wrapGprim.cpp
         wrapImageable.cpp
         wrapImagePlane.cpp
@@ -116,12 +112,13 @@ pxr_test_scripts(
     testenv/testUsdGeomBasisCurves.py
     testenv/testUsdGeomBBoxCache.py
     testenv/testUsdGeomCamera.py
-    testenv/testUsdGeomCollectionAPI.py
+    testenv/testUsdGeomComputeAtTime.py
     testenv/testUsdGeomConstraintTarget.py
     testenv/testUsdGeomConsts.py
     testenv/testUsdGeomCurves.py
-    testenv/testUsdGeomFaceSetAPI.py
+    testenv/testUsdGeomExtentTransform.py
     testenv/testUsdGeomMesh.py
+    testenv/testUsdGeomMetrics.py
     testenv/testUsdGeomMotionAPI.py
     testenv/testUsdGeomNoPlugLoad.py
     testenv/testUsdGeomPointInstancer.py
@@ -131,8 +128,6 @@ pxr_test_scripts(
     testenv/testUsdGeomSubset.py
     testenv/testUsdGeomXformable.py
     testenv/testUsdGeomXformCommonAPI.py
-    testenv/testUsdGeomExtentTransform.py
-    testenv/testUsdGeomComputeAtTime.py
 )
 
 pxr_build_test(testUsdGeomXformCache
@@ -187,18 +182,8 @@ pxr_install_test_dir(
 )
 
 pxr_install_test_dir(
-    SRC testenv/testUsdGeomCollectionAPI
-    DEST testUsdGeomCollectionAPI
-)
-
-pxr_install_test_dir(
     SRC testenv/testUsdGeomConsts
     DEST testUsdGeomConsts
-)
-
-pxr_install_test_dir(
-    SRC testenv/testUsdGeomFaceSetAPI
-    DEST testUsdGeomFaceSetAPI
 )
 
 pxr_install_test_dir(
@@ -246,12 +231,6 @@ pxr_register_test(testUsdGeomCamera
     EXPECTED_RETURN_CODE 0
 )
 
-pxr_register_test(testUsdGeomCollectionAPI
-    PYTHON
-    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdGeomCollectionAPI"
-    EXPECTED_RETURN_CODE 0
-)
-
 pxr_register_test(testUsdGeomConstraintTarget
     PYTHON
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdGeomConstraintTarget"
@@ -272,12 +251,6 @@ pxr_register_test(testUsdGeomCreateAttribute
 pxr_register_test(testUsdGeomCurves
     PYTHON
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdGeomCurves"
-    EXPECTED_RETURN_CODE 0
-)
-
-pxr_register_test(testUsdGeomFaceSetAPI
-    PYTHON
-    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdGeomFaceSetAPI"
     EXPECTED_RETURN_CODE 0
 )
 

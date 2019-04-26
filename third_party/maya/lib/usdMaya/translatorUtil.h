@@ -36,7 +36,15 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
+enum class UsdMayaShadingNodeType {
+    None,
+    Light,
+    PostProcess,
+    Rendering,
+    Shader,
+    Texture,
+    Utility
+};
 
 /// \brief Provides helper functions for other readers to use.
 struct UsdMayaTranslatorUtil
@@ -113,6 +121,37 @@ struct UsdMayaTranslatorUtil
             MObject& parentNode,
             MStatus* status,
             MObject* mayaNodeObj);
+
+    /// \brief Helper to create shadingNodes.  Wrapper around mel "shadingNode".
+    ///
+    /// if shaderType is ShadingNodeType::Unspecified, it will attempt to
+    /// determine the type of node automatically using it's classification
+    /// string
+    ///
+    /// If there are other side-effects of using "shadingNode" (as opposed to
+    /// "createNode" directly), this should be udpated accordingly.
+    PXRUSDMAYA_API
+    static bool
+    CreateShaderNode(
+            const MString& nodeName,
+            const MString& nodeTypeName,
+            UsdMayaShadingNodeType shadingNodeType,
+            MStatus* status,
+            MObject* shaderObj);
+
+    /// \brief Helper to set up a light node as a default light.  
+    /// This is intended to mimic the mel command "shadingNode ... -asLight".
+    ///
+    /// In particular, this makes sure the light nodes are members of the
+    /// "defaultLightSet" which allows lights to be recognized on the stage
+    ///
+    /// If there are other side-effects of using "shadingNode" (as opposed to
+    /// "createNode" directly), this should be updated accordingly.
+    PXRUSDMAYA_API
+    static bool
+    ConnectDefaultLightNode(
+            MObject& lightNode,
+            MStatus* status);
 
     /// Gets an API schema of the requested type for the given \p usdPrim.
     ///

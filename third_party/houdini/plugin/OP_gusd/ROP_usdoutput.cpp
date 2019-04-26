@@ -204,6 +204,7 @@ getTemplates()
     static PRM_Name pxhPreRenderName("pxhprerenderscript", "Pxh Pre-Render Script");
 
     static PRM_Name geometryHeadingName("geometryheading", "Geometry");
+    static PRM_Name useObjTransformName("useobjtransform","Use Object Transform");
     static PRM_Name instanceRefsName("usdinstancing","Enable USD Instancing");
     static PRM_Name authorVariantSelName("authorvariantselection", "Author Variant Selections");
 
@@ -356,6 +357,20 @@ getTemplates()
             0, // thespareptr (leave default)
             0, // paramgroup (leave default)
             0, // help string
+            0), // disable rules
+
+        PRM_Template(
+            PRM_TOGGLE,
+            1,
+            &useObjTransformName,
+            PRMoneDefaults, // default
+            0, // menu choices
+            0, // range
+            0, // callback
+            0, // thespareptr (leave default)
+            0, // paramgroup (leave default)
+            "When not selected, Write out the USD data in local space, ignoring"
+            " any object level transforms.",
             0), // disable rules
 
         PRM_Template(
@@ -1546,9 +1561,13 @@ renderFrame(fpreal time,
         fpreal sampleTime = CHgetTimeFromFrame(sampleFrame);
         OP_Context houdiniContext(sampleTime);
 
+        bool useObj = static_cast<bool>(evalInt( "useobjtransform", 0, 0 ));
         // Get the OBJ node transform
         UT_Matrix4D localToWorldMatrix;
-        objNode->getLocalToWorldTransform( houdiniContext, localToWorldMatrix);
+        if (useObj)
+            objNode->getLocalToWorldTransform( houdiniContext, localToWorldMatrix);
+        else
+            localToWorldMatrix.identity();
 
         // Cook our input
         GU_DetailHandle cookedGeoHdl = m_renderNode->getCookedGeoHandle(houdiniContext);
@@ -1718,15 +1737,16 @@ renderFrame(fpreal time,
 
         GusdSimpleXformCache xformCache;
 
-        // If we are not writing an overlay, assume we are writing an asset rooted 
-        // at the prim named m_pathPrefix. Write the obj space transform at this 
-        // prim on all frames. This is needed to make sure that transform motion 
-        // blur is right when the object space is animated.
-        if( !overlayGeo && !m_pathPrefix.empty() ) {
+        // If we are not writing an overlay (and we are not ignoring objject
+        // level transforms, assume we are writing an asset rooted at the prim
+        // named m_pathPrefix. Write the obj space transform at this prim on all
+        // frames. This is needed to make sure that transform motion blur is
+        // right when the object space is animated.
+        if( useObj && !overlayGeo && !m_pathPrefix.empty() ) {
 
             SdfPath assetPrimPath( m_pathPrefix );
 
-            // Chec to make sure the asset prim isn't going to be written anyway.
+            // Check to make sure the asset prim isn't going to be written anyway.
             bool assetPrimFound = false;
             for( auto& gtPrim : gPrims ) {
 

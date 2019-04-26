@@ -1,5 +1,5 @@
 //
-// Copyright 2017 Pixar
+// Copyright 2019 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -36,16 +36,19 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-usdListUserAttributeWriters::usdListUserAttributeWriters() {
+usdListUserAttributeWriters::usdListUserAttributeWriters()
+{
 
 }
 
-usdListUserAttributeWriters::~usdListUserAttributeWriters() {
+usdListUserAttributeWriters::~usdListUserAttributeWriters()
+{
 
 }
 
 MStatus
-usdListUserAttributeWriters::doIt(const MArgList& args) {    
+usdListUserAttributeWriters::doIt(const MArgList& args)
+{
     for (const auto& e : UsdMayaUserAttributeWriterRegistry::ListWriters()) {
         appendToResult(e.GetString().c_str());
     }
@@ -53,7 +56,8 @@ usdListUserAttributeWriters::doIt(const MArgList& args) {
     return MS::kSuccess;
 }
 
-void* usdListUserAttributeWriters::creator() {
+void* usdListUserAttributeWriters::creator()
+{
     return new usdListUserAttributeWriters();
 }
 

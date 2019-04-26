@@ -100,6 +100,7 @@ private:
     std::string _filename;
     int _width;
     int _height;
+    float _gamma;
     
     //GL_UNSIGNED_BYTE, GL_FLOAT
     GLenum _outputType; 
@@ -185,6 +186,11 @@ Glf_StbImage::_GetInfoFromStorageSpec(GlfImage::StorageSpec const & storage)
 }
 
 Glf_StbImage::Glf_StbImage()
+    : _width(0)
+    , _height(0)
+    , _gamma(0.0f)
+    , _nchannels(0)
+
 {
 }
 
@@ -331,6 +337,24 @@ Glf_StbImage::GetBytesPerPixel() const
 bool
 Glf_StbImage::IsColorSpaceSRGB() const
 {
+    const float gamma_epsilon = 0.1f;
+
+    // If we found gamma in the texture, use it to decide if we are sRGB
+    bool isSRGB = ( fabs(_gamma-0.45455f) < gamma_epsilon);
+    if (isSRGB) {
+        return true;
+    }
+
+    bool isLinear = ( fabs(_gamma-1) < gamma_epsilon);
+    if (isLinear) {
+        return false;
+    }
+
+    if (_gamma > 0) {
+        TF_WARN("Unsupported gamma encoding in: %s", _filename.c_str());
+    }
+
+    // Texture had no (recognized) gamma hint, make a reasonable guess
     return ((_nchannels == 3  || _nchannels == 4) && 
             GetType() == GL_UNSIGNED_BYTE);
 }
@@ -384,7 +408,7 @@ Glf_StbImage::_OpenForReading(std::string const & filename, int subimage,
 
     return stbi_info_from_memory(
         reinterpret_cast<stbi_uc const*>(buffer.get()), asset->GetSize(), 
-        &_width, &_height, &_nchannels) &&
+        &_width, &_height, &_nchannels, &_gamma) &&
             subimage == 0 && mip == 0;
 }
 
@@ -473,10 +497,11 @@ Glf_StbImage::ReadCropped(int const cropTop,
         int bpp = GetBytesPerPixel();
         int inputStrideInBytes = _width * bpp; 
         bool resizeNeeded = _width != storage.width || _height != storage.height;
-        
+
         if (resizeNeeded) {
-            if (IsColorSpaceSRGB()) {
-                int alphaIndex = (_nchannels == 3)?
+            // XXX STB only has a sRGB resize for 8bit
+            if (IsColorSpaceSRGB() && _outputType == GL_UNSIGNED_BYTE) {
+                int alphaIndex = (_nchannels != 4)?
                                  STBIR_ALPHA_CHANNEL_NONE : 3;
                 stbir_resize_uint8_srgb((unsigned char*)imageData, 
                                         _width, 

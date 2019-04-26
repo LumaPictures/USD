@@ -2099,7 +2099,6 @@ private:
     friend class UsdObject;
     friend class UsdPrim;
     friend class UsdProperty;
-    friend class UsdReferences;
     friend class UsdRelationship;
     friend class UsdSpecializes;
     friend class UsdVariantSet;
@@ -2108,6 +2107,8 @@ private:
     friend class Usd_PcpCacheAccess;
     friend class Usd_PrimData;
     friend class Usd_StageOpenRequest;
+    template <class RefsOrPayloadsEditorType, class RefsOrPayloadsProxyType> 
+        friend class Usd_RefOrPayloadListEditImpl;
 };
 
 template<typename T>

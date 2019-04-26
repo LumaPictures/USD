@@ -16,6 +16,7 @@ endif()
 
 pxr_library(hdSt
     LIBRARIES
+        hio
         garch
         glf
         hd
@@ -35,6 +36,7 @@ pxr_library(hdSt
         commandBuffer
         computeShader
         copyComputation
+        debugCodes
         dispatchBuffer
         drawItem
         drawItemInstance

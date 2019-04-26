@@ -38,17 +38,13 @@
 
 #include <boost/foreach.hpp>
 
+#include <iostream>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 // drand48 and srand48 defined in SYS_Math.h as of 13.5.153. and conflicts with imath.
 #undef drand48
 #undef srand48
-
-using std::cout;
-using std::cerr;
-using std::endl;
-using std::vector;
-using std::string;
 
 #ifdef DEBUG
 #define DBG(x) x

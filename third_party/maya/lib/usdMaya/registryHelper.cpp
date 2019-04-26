@@ -155,8 +155,9 @@ _HasPlugin(
 }
 
 static void
-_LoadAllPlugins(std::once_flag& once_flag, const std::vector<TfToken>& scope) {
-    std::call_once(once_flag, [&scope](){        
+_LoadAllPlugins(std::once_flag& once_flag, const std::vector<TfToken>& scope)
+{
+    std::call_once(once_flag, [&scope](){
         PlugPluginPtrVector plugins = PlugRegistry::GetInstance().GetAllPlugins();
         std::string mayaPlugin;
         TF_FOR_ALL(plugIter, plugins) {
@@ -246,7 +247,8 @@ UsdMaya_RegistryHelper::LoadShadingModePlugins() {
 }
 
 void
-UsdMaya_RegistryHelper::LoadUserAttributeWriterPlugins() {
+UsdMaya_RegistryHelper::LoadUserAttributeWriterPlugins()
+{
     static std::once_flag _userAttributeWritersLoaded;
     static std::vector<TfToken> scope = {_tokens->UsdMaya, _tokens->UserAttributeWriterPlugin};
     _LoadAllPlugins(_userAttributeWritersLoaded, scope);
@@ -297,6 +299,24 @@ UsdMaya_RegistryHelper::GetComposedInfoDictionary(
     }
 
     return result;
+}
+
+/* static */
+void
+UsdMaya_RegistryHelper::AddUnloader(const std::function<void()>& func)
+{
+    if (TfRegistryManager::GetInstance().AddFunctionForUnload(func)) {
+        // It is likely that the registering plugin library is opened/closed
+        // by Maya and not via TfDlopen/TfDlclose. This means that the
+        // unloaders won't be invoked unless we use RunUnloadersAtExit(),
+        // which allows unloaders to be called from normal dlclose().
+        TfRegistryManager::GetInstance().RunUnloadersAtExit();
+    }
+    else {
+        TF_CODING_ERROR(
+                "Couldn't add unload function (was this function called from "
+                "outside a TF_REGISTRY_FUNCTION block?)");
+    }
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

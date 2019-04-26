@@ -36,6 +36,7 @@
 #include "usdMaya/importCommand.h"
 #include "usdMaya/importTranslator.h"
 #include "usdMaya/listShadingModesCommand.h"
+#include "usdMaya/notice.h"
 #include "usdMaya/pointBasedDeformerNode.h"
 #include "usdMaya/proxyShape.h"
 #include "usdMaya/referenceAssembly.h"
@@ -153,13 +154,8 @@ initializePlugin(MObject obj)
     CHECK_MSTATUS(status);
 
     // Attribute Editor Templates
-    // XXX: The try/except here is temporary until we change the Pixar-internal
-    // package name to match the external package name.
     MString attribEditorCmd(
-        "try:\n"
-        "    from pxr.UsdMaya import AEpxrUsdReferenceAssemblyTemplate\n"
-        "except ImportError:\n"
-        "    from pixar.UsdMaya import AEpxrUsdReferenceAssemblyTemplate\n"
+        "from pxr.UsdMaya import AEpxrUsdReferenceAssemblyTemplate\n"
         "AEpxrUsdReferenceAssemblyTemplate.addMelFunctionStubs()");
     status = MGlobal::executePythonCommand(attribEditorCmd);
     CHECK_MSTATUS(status);
@@ -226,6 +222,7 @@ initializePlugin(MObject obj)
         status.perror("pxrUsd: unable to register USD Export translator.");
     }
 
+    UsdMayaSceneResetNotice::InstallListener();
     UsdMayaDiagnosticDelegate::InstallDelegate();
 
     return status;
@@ -308,6 +305,7 @@ uninitializePlugin(MObject obj)
     status = plugin.deregisterData(UsdMayaStageData::mayaTypeId);
     CHECK_MSTATUS(status);
 
+    UsdMayaSceneResetNotice::RemoveListener();
     UsdMayaDiagnosticDelegate::RemoveDelegate();
 
     return status;

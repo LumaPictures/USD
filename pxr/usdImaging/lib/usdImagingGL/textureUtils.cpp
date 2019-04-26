@@ -28,7 +28,7 @@
 #include "pxr/usdImaging/usdImaging/textureUtils.h"
 #include "pxr/usdImaging/usdImaging/tokens.h"
 
-#include "pxr/imaging/glf/glslfx.h"
+#include "pxr/imaging/hio/glslfx.h"
 #include "pxr/imaging/glf/ptexTexture.h"
 #include "pxr/imaging/glf/udimTexture.h"
 #include "pxr/imaging/glf/textureHandle.h"
@@ -52,12 +52,16 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 namespace {
 
-HdWrap _GetWrap(
-    UsdPrim const &usdPrim, HdTextureType textureType, const TfToken &wrapAttr)
+HdWrap 
+_GetWrap(UsdPrim const &usdPrim, 
+    HdTextureType textureType, 
+    const TfToken &wrapAttr)
 {
+    // A Udim always uses black wrap
     if (textureType == HdTextureType::Udim) {
         return HdWrapBlack;
     }
+
     // The fallback, when the prim has no opinion is to use the metadata on
     // the texture.
     TfToken usdWrap = UsdHydraTokens->useMetadata;
@@ -75,7 +79,7 @@ HdWrap _GetWrap(
                 auto &shaderReg = SdrRegistry::GetInstance();
                 if (SdrShaderNodeConstPtr sdrNode = 
                     shaderReg.GetShaderNodeByIdentifierAndType(shaderId, 
-                                GlfGLSLFXTokens->glslfx)) {
+                                HioGlslfxTokens->glslfx)) {
                     if (const auto &sdrInput = 
                             sdrNode->GetShaderInput(wrapAttr)) {
                         VtValue wrapVal = sdrInput->GetDefaultValue();
@@ -122,7 +126,8 @@ HdWrap _GetWrap(
     return hdWrap;
 }
 
-HdWrap _GetWrapS(UsdPrim const &usdPrim, HdTextureType textureType)
+HdWrap
+_GetWrapS(UsdPrim const &usdPrim, HdTextureType textureType)
 {
     return _GetWrap(usdPrim, textureType, UsdHydraTokens->wrapS);
 }
@@ -234,8 +239,8 @@ private:
 
 // We need to find the first layer that changes the value
 // of the parameter and anchor relative paths to that.
-SdfLayerHandle _FindLayerHandle(
-    const UsdAttribute& attr, const UsdTimeCode& time) {
+SdfLayerHandle 
+_FindLayerHandle(const UsdAttribute& attr, const UsdTimeCode& time) {
     for (const auto& spec: attr.GetPropertyStack(time)) {
         if (spec->HasDefaultValue() ||
             spec->GetLayer()->GetNumTimeSamplesForPath(
@@ -246,6 +251,36 @@ SdfLayerHandle _FindLayerHandle(
     return {};
 }
 
+UsdAttribute 
+_GetTextureResourceAttr(UsdPrim const &shaderPrim, 
+                        SdfPath const &fileInputPath)
+{
+    UsdAttribute attr = shaderPrim.GetAttribute(fileInputPath.GetNameToken());
+    if (!attr) {
+        return attr;
+    }
+
+    UsdShadeInput attrInput(attr);
+    if (!attrInput) {
+        return attr;
+    }
+
+    // If the texture 'file' input is connected to an interface input on a 
+    // node-graph, then read from the connection source instead.
+    UsdShadeConnectableAPI source;
+    TfToken sourceName;
+    UsdShadeAttributeType sourceType;
+    if (attrInput.GetConnectedSource(&source, &sourceName, &sourceType) && 
+        sourceType == UsdShadeAttributeType::Input && 
+        source.IsNodeGraph()) {
+        if (UsdShadeInput sourceInput = source.GetInput(sourceName)) {
+            return sourceInput.GetAttr();
+        }
+    }
+
+    return attr;
+}
+
 }
 
 HdTextureResource::ID
@@ -254,14 +289,17 @@ UsdImagingGL_GetTextureResourceID(UsdPrim const& usdPrim,
                                   UsdTimeCode time,
                                   size_t salt)
 {
-    if (!TF_VERIFY(usdPrim))
+    if (!TF_VERIFY(usdPrim)) {
         return HdTextureResource::ID(-1);
-    if (!TF_VERIFY(usdPath != SdfPath()))
+    }
+    if (!TF_VERIFY(usdPath != SdfPath())) {
         return HdTextureResource::ID(-1);
+    }
 
     // If the texture name attribute doesn't exist, it might be badly specified
     // in scene data.
-    UsdAttribute attr = usdPrim.GetAttribute(usdPath.GetNameToken());
+    UsdAttribute attr = _GetTextureResourceAttr(usdPrim, usdPath);
+
     SdfAssetPath asset;
     if (!attr || !attr.Get(&asset, time)) {
         TF_WARN("Unable to find texture attribute <%s> in scene data",
@@ -271,13 +309,24 @@ UsdImagingGL_GetTextureResourceID(UsdPrim const& usdPrim,
 
     HdTextureType textureType = HdTextureType::Uv;
     TfToken filePath = TfToken(asset.GetResolvedPath());
-    // Fallback to the literal path if it couldn't be resolved.
-    if (filePath.IsEmpty()) {
+
+    if (!filePath.IsEmpty()) {
+        // If the resolved path contains a correct path, then we are 
+        // dealing with a ptex or uv textures.
+        if (GlfIsSupportedPtexTexture(filePath)) {
+            textureType = HdTextureType::Ptex;
+        } else {
+            textureType = HdTextureType::Uv;
+        }
+    } else {
+        // If the path couldn't be resolved, then it might be a Udim as they 
+        // contain special characters in the path to identify them <Udim>.
+        // Another option is that the path is just wrong and it can not be
+        // resolved.
         filePath = TfToken(asset.GetAssetPath());
         if (GlfIsSupportedUdimTexture(filePath)) {
             const GlfContextCaps& caps = GlfContextCaps::GetInstance();
-            if (!UsdImaging_UdimTilesExist(
-                filePath, caps.maxArrayTextureLayers,
+            if (!UsdImaging_UdimTilesExist(filePath, caps.maxArrayTextureLayers,
                 _FindLayerHandle(attr, time))) {
                 TF_WARN("Unable to find Texture '%s' with path '%s'. Fallback "
                         "textures are not supported for udim",
@@ -301,10 +350,6 @@ UsdImagingGL_GetTextureResourceID(UsdPrim const& usdPrim,
                     "texture will be substituted in its place.",
                     filePath.GetText(), usdPath.GetText());
             return HdTextureResource::ID(-1);
-        }
-    } else {
-        if (GlfIsSupportedPtexTexture(filePath)) {
-            textureType = HdTextureType::Ptex;
         }
     }
 
@@ -345,7 +390,7 @@ UsdImagingGL_GetTextureResource(UsdPrim const& usdPrim,
     if (!TF_VERIFY(usdPath != SdfPath()))
         return HdTextureResourceSharedPtr();
 
-    UsdAttribute attr = usdPrim.GetAttribute(usdPath.GetNameToken());
+    UsdAttribute attr = _GetTextureResourceAttr(usdPrim, usdPath);
     SdfAssetPath asset;
     if (!TF_VERIFY(attr) || !TF_VERIFY(attr.Get(&asset, time))) {
         return HdTextureResourceSharedPtr();
