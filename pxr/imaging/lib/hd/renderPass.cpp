@@ -50,10 +50,16 @@ HdRenderPass::~HdRenderPass()
 void 
 HdRenderPass::SetRprimCollection(HdRprimCollection const& col)
 {
-    if (col == _collection){
+    if (col == _collection) {
         return;
     }
-         
+
+    if (col.GetRenderTags() != _collection.GetRenderTags()) {
+        HdChangeTracker &changeTracker = _renderIndex->GetChangeTracker();
+
+        changeTracker.MarkRenderTagsDirty();
+    }
+
     _collection = col; 
 
     // update dirty list subscription for the new collection.
@@ -122,7 +128,7 @@ HdRenderPass::Sync()
     HF_MALLOC_TAG_FUNCTION();
 
     // Sync the dirty list of prims
-    _renderIndex->Sync(_dirtyList);
+    _renderIndex->Sync(_dirtyList, _collection);
 
     // Give derived classes a chance to sync.
     _Sync();
