@@ -501,6 +501,11 @@ pxr_install_test_dir(
 )
 
 pxr_install_test_dir(
+    SRC testenv/testPcpMuseum_SubrootReferenceNonCycle.testenv
+    DEST testPcpMuseum_SubrootReferenceNonCycle
+)
+
+pxr_install_test_dir(
     SRC testenv/testPcpMuseum_TrickyVariantAncestralSelection.testenv
     DEST testPcpMuseum_TrickyVariantAncestralSelection
 )
@@ -613,11 +618,6 @@ pxr_install_test_dir(
 pxr_install_test_dir(
     SRC testenv/testPcpMuseum_TrickySpookyVariantSelectionInClass.testenv
     DEST testPcpMuseum_TrickySpookyVariantSelectionInClass
-)
-
-pxr_install_test_dir(
-    SRC testenv/testPcpMuseum_TrickyRelationalAttributeOnRelocatedTarget.testenv
-    DEST testPcpMuseum_TrickyRelationalAttributeOnRelocatedTarget
 )
 
 pxr_install_test_dir(
@@ -1075,6 +1075,13 @@ pxr_register_test(testPcpMuseum_TrickyInheritsInVariants2
     DIFF_COMPARE compositionResults_TrickyInheritsInVariants2.txt 
 )
 
+pxr_register_test(testPcpMuseum_SubrootReferenceNonCycle
+    PYTHON
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testPcpCompositionResults --errorFile compositionErrors_SubrootReferenceNonCycle.txt SubrootReferenceNonCycle/root.sdf" 
+    STDOUT_REDIRECT compositionResults_SubrootReferenceNonCycle.txt
+    DIFF_COMPARE compositionResults_SubrootReferenceNonCycle.txt compositionErrors_SubrootReferenceNonCycle.txt 
+)
+
 pxr_register_test(testPcpMuseum_TrickyVariantAncestralSelection
     PYTHON
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testPcpCompositionResults TrickyVariantAncestralSelection/root.sdf" 
@@ -1227,13 +1234,6 @@ pxr_register_test(testPcpMuseum_TrickySpookyVariantSelection
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testPcpCompositionResults TrickySpookyVariantSelection/root.sdf" 
     STDOUT_REDIRECT compositionResults_TrickySpookyVariantSelection_pcp.txt
     DIFF_COMPARE compositionResults_TrickySpookyVariantSelection_pcp.txt 
-)
-
-pxr_register_test(testPcpMuseum_TrickyRelationalAttributeOnRelocatedTarget
-    PYTHON
-    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testPcpCompositionResults TrickyRelationalAttributeOnRelocatedTarget/root.sdf" 
-    STDOUT_REDIRECT compositionResults_TrickyRelationalAttributeOnRelocatedTarget.txt
-    DIFF_COMPARE compositionResults_TrickyRelationalAttributeOnRelocatedTarget.txt 
 )
 
 pxr_register_test(testPcpMuseum_TrickyConnectionToRelocatedAttribute
