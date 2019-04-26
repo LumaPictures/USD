@@ -158,7 +158,8 @@ public:
     /// call chain ties it to SyncAll, i.e.
     /// HdRenderIndex::SyncAll > .... > HdRenderPass::Sync > HdRenderIndex::Sync
     HD_API
-    void Sync(HdDirtyListSharedPtr const &dirtyList);
+    void Sync(HdDirtyListSharedPtr const &dirtyList,
+              HdRprimCollection const &collection);
 
     /// Syncs input tasks, B & S prims, (external) computations and processes 
     /// all pending dirty lists (which syncs the R prims). At the end of this
@@ -166,7 +167,7 @@ public:
     /// data sources.
     /// This is the first phase in Hydra's execution. See HdEngine::Execute
     HD_API
-    void SyncAll(HdTaskSharedPtrVector const &tasks, HdTaskContext *taskContext);
+    void SyncAll(HdTaskSharedPtrVector *tasks, HdTaskContext *taskContext);
 
     // ---------------------------------------------------------------------- //
     /// \name Execution
@@ -444,9 +445,13 @@ private:
     typedef TfHashMap<SdfPath, HdInstancer*, SdfPath::Hash> _InstancerMap;
     _InstancerMap _instancerMap;
 
-    // XXX: TO FIX Move
-    typedef std::vector<HdDirtyListSharedPtr> _DirtyListVector;
-    _DirtyListVector _syncQueue;
+    struct _SyncQueueEntry {
+        HdDirtyListSharedPtr dirtyList;
+        HdRprimCollection    collection;
+
+    };
+    typedef std::vector<_SyncQueueEntry> _SyncQueue;
+    _SyncQueue _syncQueue;
 
     HdRenderDelegate *_renderDelegate;
 
