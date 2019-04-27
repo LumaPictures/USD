@@ -375,20 +375,38 @@ PxrUsdKatanaReadPointInstancer(
 
             const std::string buildPath = protoPath.GetString();
 
-            // Walk up from the prototype prim looking for a material binding,
-            // and if one is found, assign it directly to the generated instance
-            // source location.
-            //
-            UsdPrim prim = protoPrim;
             FnKat::Attribute materialAssignAttr;
-            while (prim and prim != instancer.GetPrim() and
-                   prim != data.GetUsdInArgs()->GetRootPrim())
+
+            // If the prototype prim is a (sub)component, it should have
+            // materials defined below it.
+            //
+            TfToken kind;
+            std::string assetName;
+            auto assetAPI = UsdModelAPI(protoPrim);
+
+            const bool hasMaterialChildren = (
+                    assetAPI.GetAssetName(&assetName) and
+                    assetAPI.GetKind(&kind) and (
+                        KindRegistry::IsA(kind, KindTokens->component) or
+                        KindRegistry::IsA(kind, KindTokens->subcomponent)));
+
+            // Otherwise, walk up from the prototype prim looking for a material
+            // binding, and if one is found, assign it directly to the generated
+            // instance source location.
+            //
+            if (!hasMaterialChildren)
             {
-                materialAssignAttr = PxrUsdKatanaUtils::GetMaterialAssignAttr(prim, data);
-                if (materialAssignAttr.isValid()) {
-                    break;
+                UsdPrim prim = protoPrim;
+                while (prim and prim != instancer.GetPrim() and
+                       prim != data.GetUsdInArgs()->GetRootPrim())
+                {
+                    materialAssignAttr = 
+                        PxrUsdKatanaUtils::GetMaterialAssignAttr(prim, data);
+                    if (materialAssignAttr.isValid()) {
+                        break;
+                    }
+                    prim = prim.GetParent();
                 }
-                prim = prim.GetParent();
             }
 
             // See if the path is a child of the point instancer. If so, we'll
