@@ -24,6 +24,7 @@ pxr_library(usdShaders
         plugInfo.json
         shaders/shaderDefs.usda
         shaders/previewSurface.glslfx
+        shaders/previewSurfaceTranslucent.glslfx
         shaders/uvTexture.glslfx
         shaders/primvarReader.glslfx
 )
