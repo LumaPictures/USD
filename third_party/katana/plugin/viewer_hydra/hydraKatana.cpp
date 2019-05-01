@@ -192,7 +192,7 @@ void HydraKatana::draw(ViewportWrapperPtr viewport)
 
     // Render
     auto tasks = m_taskController->GetTasks();
-    m_engine.Execute(*m_renderIndex, tasks);
+    m_engine.Execute(m_renderIndex, &tasks);
 }
 
 
