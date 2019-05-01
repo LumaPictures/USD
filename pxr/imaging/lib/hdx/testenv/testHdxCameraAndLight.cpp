@@ -23,6 +23,12 @@
 //
 #include "pxr/pxr.h"
 
+#include "pxr/imaging/glf/glew.h"
+
+#include "pxr/imaging/glf/contextCaps.h"
+#include "pxr/imaging/glf/glContext.h"
+#include "pxr/imaging/glf/testGLContext.h"
+
 #include "pxr/imaging/hd/changeTracker.h"
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/tokens.h"
@@ -64,13 +70,12 @@ public:
                       HdDirtyBits*) override
     {
         _renderPass->Sync();
-        _renderPassState->Sync(
-            _renderPass->GetRenderIndex()->GetResourceRegistry());
     }
 
     virtual void Prepare(HdTaskContext* ctx,
                          HdRenderIndex* renderIndex) override
     {
+        _renderPassState->Prepare(renderIndex->GetResourceRegistry());
     }
 
     virtual void Execute(HdTaskContext* ctx) override
@@ -121,7 +126,7 @@ static void CameraAndLightTest()
                       VtValue(HdRprimCollection(HdTokens->geometry,
                                         HdReprSelector(HdReprTokens->hull))));
 
-    engine.Execute(*index, tasks);
+    engine.Execute(index.get(), &tasks);
 
     VERIFY_PERF_COUNT(HdPerfTokens->rebuildBatches, 1);
 
@@ -130,7 +135,7 @@ static void CameraAndLightTest()
     tracker.MarkSprimDirty(camera, HdCamera::DirtyViewMatrix);
     tracker.MarkSprimDirty(camera, HdCamera::DirtyProjMatrix);
 
-    engine.Execute(*index, tasks);
+    engine.Execute(index.get(), &tasks);
 
     // batch should not be rebuilt
     VERIFY_PERF_COUNT(HdPerfTokens->rebuildBatches, 1);
@@ -141,7 +146,7 @@ static void CameraAndLightTest()
                         HdReprSelector(HdReprTokens->refined))));
     tracker.MarkSprimDirty(light, HdLight::DirtyCollection);
 
-    engine.Execute(*index, tasks);
+    engine.Execute(index.get(), &tasks);
 
     // batch rebuilt
     VERIFY_PERF_COUNT(HdPerfTokens->rebuildBatches, 2);
@@ -152,7 +157,7 @@ static void CameraAndLightTest()
                                 HdReprSelector(HdReprTokens->refined))));
     tracker.MarkSprimDirty(light, HdLight::DirtyCollection);
 
-    engine.Execute(*index, tasks);
+    engine.Execute(index.get(), &tasks);
 
     // batch should not be rebuilt
     VERIFY_PERF_COUNT(HdPerfTokens->rebuildBatches, 2);
@@ -161,6 +166,12 @@ static void CameraAndLightTest()
 int main()
 {
     TfErrorMark mark;
+
+    // Test uses ContextCaps, so need to create a GL instance.
+    GlfTestGLContext::RegisterGLContextCallbacks();
+    GlfGlewInit();
+    GlfSharedGLContextScopeHolder sharedContext;
+    GlfContextCaps::InitInstance();
 
     CameraAndLightTest();
 
