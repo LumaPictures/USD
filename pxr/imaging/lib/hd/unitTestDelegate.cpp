@@ -360,14 +360,14 @@ void
 HdUnitTestDelegate::HideRprim(SdfPath const& id) 
 {
     _hiddenRprims.insert(id);
-    GetRenderIndex().GetChangeTracker().MarkAllCollectionsDirty();
+    MarkRprimDirty(id, HdChangeTracker::DirtyRenderTag);
 }
 
 void
 HdUnitTestDelegate::UnhideRprim(SdfPath const& id) 
 {
     _hiddenRprims.erase(id);
-    GetRenderIndex().GetChangeTracker().MarkAllCollectionsDirty();
+    MarkRprimDirty(id, HdChangeTracker::DirtyRenderTag);
 }
 
 void
@@ -696,8 +696,7 @@ HdUnitTestDelegate::GetInstanceIndices(SdfPath const& instancerId,
 
 /*virtual*/
 GfMatrix4d
-HdUnitTestDelegate::GetInstancerTransform(SdfPath const& instancerId,
-                                           SdfPath const& prototypeId)
+HdUnitTestDelegate::GetInstancerTransform(SdfPath const& instancerId)
 {
     HD_TRACE_FUNCTION();
     if (_Instancer *instancer = TfMapLookupPtr(_instancers, instancerId)) {
