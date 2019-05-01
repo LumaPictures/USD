@@ -2127,7 +2127,7 @@ UsdStage::_LoadAndUnload(const SdfPathSet &loadSet,
 
     // Now get the current load set and find everything that's prefixed by
     // something in unloadPruneSet.  That's the finalUnloadSet.
-    SdfPathSet curLoadSet = _cache->GetIncludedPayloads(); //GetLoadSet();
+    PcpCache::PayloadSet const &curLoadSet = _cache->GetIncludedPayloads(); //GetLoadSet();
     SdfPathVector curLoadVec(curLoadSet.begin(), curLoadSet.end());
     curLoadVec.erase(
         std::remove_if(
@@ -4066,7 +4066,8 @@ UsdStage::_RecomposePrims(const PcpChanges &changes,
         // Walk the old and new, and if the old has payloads included strictly
         // descendent to the old path, find the equivalent relative path on the
         // new and include that payload.
-        SdfPathSet curLoadSet = _cache->GetIncludedPayloads();
+        PcpCache::PayloadSet const &curLoadHashSet = _cache->GetIncludedPayloads();
+        SdfPathSet curLoadSet(curLoadHashSet.begin(), curLoadHashSet.end());
         SdfPathSet newPayloads;
 
         for (size_t i = 0;
@@ -7787,17 +7788,17 @@ std::string UsdDescribe(const UsdStageRefPtr &stage) {
 #define _INSTANTIATE_GET(r, unused, elem)                               \
     template bool UsdStage::_GetValue(                                  \
         UsdTimeCode, const UsdAttribute&,                               \
-        SDF_VALUE_TRAITS_TYPE(elem)::Type*) const;                      \
+        SDF_VALUE_CPP_TYPE(elem)*) const;                               \
     template bool UsdStage::_GetValue(                                  \
         UsdTimeCode, const UsdAttribute&,                               \
-        SDF_VALUE_TRAITS_TYPE(elem)::ShapedType*) const;                \
+        SDF_VALUE_CPP_ARRAY_TYPE(elem)*) const;                         \
                                                                         \
     template bool UsdStage::_GetValueFromResolveInfo(                   \
         const UsdResolveInfo&, UsdTimeCode, const UsdAttribute&,        \
-        SDF_VALUE_TRAITS_TYPE(elem)::Type*) const;                      \
+        SDF_VALUE_CPP_TYPE(elem)*) const;                               \
     template bool UsdStage::_GetValueFromResolveInfo(                   \
         const UsdResolveInfo&, UsdTimeCode, const UsdAttribute&,        \
-        SDF_VALUE_TRAITS_TYPE(elem)::ShapedType*) const;                      
+        SDF_VALUE_CPP_ARRAY_TYPE(elem)*) const;                      
 
 BOOST_PP_SEQ_FOR_EACH(_INSTANTIATE_GET, ~, SDF_VALUE_TYPES)
 #undef _INSTANTIATE_GET

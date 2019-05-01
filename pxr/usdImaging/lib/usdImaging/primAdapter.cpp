@@ -68,6 +68,14 @@ static bool _IsEnabledVisCache() {
     return _v;
 }
 
+TF_DEFINE_ENV_SETTING(USDIMAGING_ENABLE_PURPOSE_CACHE, 1, 
+                      "Enable a cache for purpose.");
+static bool _IsEnabledPurposeCache() {
+    static bool _v = TfGetEnvSetting(USDIMAGING_ENABLE_PURPOSE_CACHE) == 1;
+    return _v;
+}
+
+
 UsdImagingPrimAdapter::~UsdImagingPrimAdapter() 
 {
 }
@@ -170,6 +178,14 @@ UsdImagingPrimAdapter::MarkReprDirty(UsdPrim const& prim,
 /*virtual*/
 void
 UsdImagingPrimAdapter::MarkCullStyleDirty(UsdPrim const& prim,
+                                          SdfPath const& usdPath,
+                                          UsdImagingIndexProxy* index)
+{
+}
+
+/*virtual*/
+void
+UsdImagingPrimAdapter::MarkRenderTagDirty(UsdPrim const& prim,
                                           SdfPath const& usdPath,
                                           UsdImagingIndexProxy* index)
 {
@@ -709,6 +725,19 @@ UsdImagingPrimAdapter::GetVisible(UsdPrim const& prim, UsdTimeCode time) const
     } else {
         return UsdImaging_VisStrategy::ComputeVisibility(prim, time)
                     == UsdGeomTokens->inherited;
+    }
+}
+
+TfToken 
+UsdImagingPrimAdapter::GetPurpose(UsdPrim const& prim) const
+{
+    HD_TRACE_FUNCTION();
+
+    if (_IsEnabledPurposeCache()) {
+        return _delegate->_purposeCache.GetValue(prim);
+
+    } else {
+        return UsdImaging_PurposeStrategy::ComputePurpose(prim);
     }
 }
 
