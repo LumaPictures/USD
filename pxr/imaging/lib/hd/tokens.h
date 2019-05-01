@@ -42,6 +42,7 @@ PXR_NAMESPACE_OPEN_SCOPE
     (catmullRom)                                \
     (collection)                                \
     (computeShader)                             \
+    (coordSysBindings)                          \
     (cubic)                                     \
     (culledInstanceIndices)                     \
     (cullStyle)                                 \
@@ -184,6 +185,7 @@ PXR_NAMESPACE_OPEN_SCOPE
     (pointColor)                                \
     (pointSize)                                 \
     (pointSelectedSize)                         \
+    (materialTag)                               \
     (tessControlShader)                         \
     (tessEvalShader)                            \
     (tessLevel)                                 \
@@ -192,6 +194,9 @@ PXR_NAMESPACE_OPEN_SCOPE
     (wireframeColor)                            \
     (worldToViewMatrix)                         \
     (worldToViewInverseMatrix)
+
+#define HD_MATERIALTAG_TOKENS                   \
+    (defaultMaterialTag)
 
 #define HD_OPTION_TOKENS                        \
     (parallelRprimSync)                        
@@ -207,6 +212,7 @@ PXR_NAMESPACE_OPEN_SCOPE
     (camera)                                    \
     (drawTarget)                                \
     (material)                                  \
+    (coordSys)                                  \
     /* Sprims Lights */                         \
     (simpleLight)                               \
     (cylinderLight)                             \
@@ -238,7 +244,8 @@ PXR_NAMESPACE_OPEN_SCOPE
     /* Standard rendering outputs */            \
                                                 \
     /* HdAovTokens->color represents the final
-     * fragment RGBA color.
+     * fragment RGBA color. For correct compositing
+     * using Hydra, it should have pre-multiplied alpha.
      */                                         \
     (color)                                     \
     /* HdAovTokens->depth represents the clip-space
@@ -319,6 +326,7 @@ TF_DECLARE_PUBLIC_TOKENS(HdTokens, HD_API, HD_TOKENS);
 TF_DECLARE_PUBLIC_TOKENS(HdReprTokens, HD_API, HD_REPR_TOKENS);
 TF_DECLARE_PUBLIC_TOKENS(HdPerfTokens, HD_API, HD_PERF_TOKENS);
 TF_DECLARE_PUBLIC_TOKENS(HdShaderTokens, HD_API, HD_SHADER_TOKENS);
+TF_DECLARE_PUBLIC_TOKENS(HdMaterialTagTokens, HD_API, HD_MATERIALTAG_TOKENS);
 TF_DECLARE_PUBLIC_TOKENS(HdOptionTokens, HD_API, HD_OPTION_TOKENS);
 TF_DECLARE_PUBLIC_TOKENS(HdPrimTypeTokens, HD_API, HD_PRIMTYPE_TOKENS);
 TF_DECLARE_PUBLIC_TOKENS(HdPrimvarRoleTokens, HD_API, HD_PRIMVAR_ROLE_TOKENS);
