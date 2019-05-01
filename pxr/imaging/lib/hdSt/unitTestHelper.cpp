@@ -68,14 +68,13 @@ public:
                       HdDirtyBits*) override
     {
         _renderPass->Sync();
-        _renderPassState->Sync(
-            _renderPass->GetRenderIndex()->GetResourceRegistry());
     }
 
     virtual void Prepare(HdTaskContext* ctx,
                          HdRenderIndex* renderIndex) override
     {
-
+        _renderPassState->Prepare(
+            renderIndex->GetResourceRegistry());
     }
 
     virtual void Execute(HdTaskContext* ctx) override
@@ -196,7 +195,7 @@ HdSt_TestDriver::Draw(HdRenderPassSharedPtr const &renderPass)
     HdTaskSharedPtrVector tasks = {
         boost::make_shared<HdSt_DrawTask>(renderPass, _renderPassState)
     };
-    _engine.Execute(_sceneDelegate->GetRenderIndex(), tasks);
+    _engine.Execute(&_sceneDelegate->GetRenderIndex(), &tasks);
 
     GLF_POST_PENDING_GL_ERRORS();
 }
