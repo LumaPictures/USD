@@ -40,6 +40,7 @@
 #include "gusd/error.h"
 #include "gusd/USD_DataCache.h"
 
+#include "pxr/base/arch/hints.h"
 #include "pxr/base/tf/envSetting.h"
 #include "pxr/base/tf/notice.h"
 #include "pxr/usd/ar/resolver.h"
@@ -410,6 +411,11 @@ public:
 
     void            FindStages(const UT_StringSet& paths,
                                UT_Set<UsdStageRefPtr>& stages) const;
+
+    void	    InsertStage(UsdStageRefPtr &stage,
+                                const UT_StringRef& path,
+                                const GusdStageOpts& opts,
+                                const GusdStageEditPtr& edit);
 
     /// Load a range of [start,end) prims from the cache. The range corresponds
     /// to a *subset* of the prims in \p primPaths.
@@ -906,7 +912,7 @@ GusdStageCache::_Impl::_GetPrimsInRange(const PrimRangeFn& rangeFn,
     char bcnt = 0;
 
     for(exint i = start; i < end; ++i) {
-        if(BOOST_UNLIKELY(!++bcnt && task.wasInterrupted()))
+        if(ARCH_UNLIKELY(!++bcnt && task.wasInterrupted()))
             return false;
 
         exint primIndex = rangeFn(i);
@@ -1145,7 +1151,7 @@ GusdStageCache::_Impl::LoadPrims(
             auto* boss = UTgetInterrupt();
             
             for(size_t i = r.begin(); i < r.end(); ++i) {
-                if(BOOST_UNLIKELY(boss->opInterrupt() || workerInterrupt)) {
+                if(ARCH_UNLIKELY(boss->opInterrupt() || workerInterrupt)) {
                     return;
                 }
 
@@ -1320,6 +1326,23 @@ GusdStageCache::_Impl::FindStages(const UT_StringSet& paths,
             UT_ASSERT_P(pair.second);
             pair.second->GetStages(stages);
         }
+    }
+}
+
+
+void
+GusdStageCache::_Impl::InsertStage(UsdStageRefPtr &stage,
+                                   const UT_StringRef& path,
+                                   const GusdStageOpts& opts,
+                                   const GusdStageEditPtr& edit)
+{
+    TF_DEBUG(GUSD_STAGECACHE).Msg(
+        "[GusdStageCache::InsertStage] Inserting stage @%s@\n",
+        path.c_str());
+
+    _StageMap::accessor a;
+    if(stage && _stageMap.insert(a, _StageKey(path, opts, edit))) {
+        a->second = stage;
     }
 }
 
@@ -1742,6 +1765,15 @@ GusdStageCacheWriter::FindStages(const UT_StringSet& paths,
     _cache._impl->FindStages(paths, stages);
 }
 
+
+void
+GusdStageCacheWriter::InsertStage(UsdStageRefPtr &stage,
+                                  const UT_StringRef& path,
+                                  const GusdStageOpts& opts,
+                                  const GusdStageEditPtr& edit)
+{
+    _cache._impl->InsertStage(stage, path, opts, edit);
+}
 
 void
 GusdStageCacheWriter::ReloadStages(const UT_StringSet& paths)
