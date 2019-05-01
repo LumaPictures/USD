@@ -31,6 +31,7 @@
 #include "pxr/imaging/hd/meshTopology.h"
 
 #include "pxr/usd/usdSkel/binding.h"
+#include "pxr/usd/usdSkel/blendShapeQuery.h"
 #include "pxr/usd/usdSkel/cache.h"
 #include "pxr/usd/usdSkel/skeleton.h"
 #include "pxr/usd/usdSkel/skeletonQuery.h"
@@ -89,7 +90,7 @@ public:
                            instancerContext=nullptr) const override;
 
     // ---------------------------------------------------------------------- //
-    /// \name Change Processing
+    /// \name Change Processing API (public)
     // ---------------------------------------------------------------------- //
 
     USDSKELIMAGING_API
@@ -98,25 +99,38 @@ public:
                                       const TfToken& propertyName) override;
 
     USDSKELIMAGING_API
+    void ProcessPrimResync(SdfPath const& primPath,
+                           UsdImagingIndexProxy* index) override;
+
+    USDSKELIMAGING_API
+    void ProcessPrimRemoval(SdfPath const& primPath,
+                            UsdImagingIndexProxy* index) override;
+
+    USDSKELIMAGING_API
     void MarkDirty(const UsdPrim& prim,
                    const SdfPath& cachePath,
                    HdDirtyBits dirty,
                    UsdImagingIndexProxy* index) override;
 
     USDSKELIMAGING_API
-    virtual void MarkRefineLevelDirty(UsdPrim const& prim,
+    void MarkRefineLevelDirty(UsdPrim const& prim,
                                       SdfPath const& cachePath,
                                       UsdImagingIndexProxy* index) override;
 
     USDSKELIMAGING_API
-    virtual void MarkReprDirty(UsdPrim const& prim,
-                               SdfPath const& cachePath,
-                               UsdImagingIndexProxy* index) override;
+    void MarkReprDirty(UsdPrim const& prim,
+                       SdfPath const& cachePath,
+                       UsdImagingIndexProxy* index) override;
 
     USDSKELIMAGING_API
-    virtual void MarkCullStyleDirty(UsdPrim const& prim,
-                                    SdfPath const& cachePath,
-                                    UsdImagingIndexProxy* index) override;
+    void MarkCullStyleDirty(UsdPrim const& prim,
+                            SdfPath const& cachePath,
+                            UsdImagingIndexProxy* index) override;
+
+    USDSKELIMAGING_API
+    void MarkRenderTagDirty(UsdPrim const& prim,
+                            SdfPath const& cachePath,
+                            UsdImagingIndexProxy* index) override;
 
     USDSKELIMAGING_API
     void MarkTransformDirty(const UsdPrim& prim,
@@ -149,7 +163,7 @@ public:
 
 protected:
     // ---------------------------------------------------------------------- //
-    /// \name Utility methods
+    /// \name Change Processing API (protected)
     // ---------------------------------------------------------------------- //
     void _RemovePrim(const SdfPath& cachePath,
                      UsdImagingIndexProxy* index) override;
@@ -192,8 +206,11 @@ private:
     // ---------------------------------------------------------------------- //
     /// Common utitily methods for skinning computations & skinned prims
     // ---------------------------------------------------------------------- //
-    bool _IsAffectedByTimeVaryingJointXforms(const SdfPath& skinnedPrimPath)
+    bool _IsAffectedByTimeVaryingSkelAnim(const SdfPath& skinnedPrimPath)
         const;
+    
+    void _RemoveSkinnedPrimAndComputations(const SdfPath& cachePath,
+                                           UsdImagingIndexProxy* index);
 
     // ---------------------------------------------------------------------- //
     /// Handlers for the skinning computations
@@ -273,7 +290,9 @@ private:
         HdMeshTopology ComputeTopologyAndRestState();
 
         /// Compute animated  bone mesh points.
-        VtVec3fArray ComputePoints(UsdTimeCode time) const; 
+        VtVec3fArray ComputePoints(UsdTimeCode time) const;
+
+        TfToken ComputePurpose() const;
 
     private:
         // Cache of a mesh for a skeleton (at rest)
@@ -287,8 +306,27 @@ private:
     
     UsdSkelCache _skelCache;
     using _SkelDataMap =
-        boost::unordered_map<SdfPath,std::shared_ptr<_SkelData> >;
+        std::unordered_map<SdfPath, std::shared_ptr<_SkelData>, SdfPath::Hash>;
     _SkelDataMap _skelDataCache;
+
+    // Data for each skinned prim.
+    struct _SkinnedPrimData {
+        _SkinnedPrimData() = default;
+        _SkinnedPrimData(const UsdSkelSkeletonQuery& skelQuery,
+                         const UsdSkelSkinningQuery& skinningQuery);
+
+        std::shared_ptr<UsdSkelBlendShapeQuery> blendShapeQuery;
+        UsdSkelAnimMapper jointMapper;
+        UsdSkelAnimMapper blendShapeMapper;
+        SdfPath skelPath;
+        bool hasJointInfluences = false;
+    };
+
+    const _SkinnedPrimData* _GetSkinnedPrimData(const SdfPath& cachePath) const;
+
+    using _SkinnedPrimDataMap =
+        std::unordered_map<SdfPath, _SkinnedPrimData, SdfPath::Hash>;
+    _SkinnedPrimDataMap _skinnedPrimDataCache;
 
     // ---------------------------------------------------------------------- //
     /// Skeleton -> Skinned Prim(s) state
@@ -297,14 +335,6 @@ private:
     using _SkelBindingMap =
         std::unordered_map<SdfPath, UsdSkelBinding, SdfPath::Hash>;
     _SkelBindingMap _skelBindingMap;
-
-    // ---------------------------------------------------------------------- //
-    /// Skinned Prim -> Skeleton
-    /// (Updated locally)
-    // ---------------------------------------------------------------------- //
-    using _SkinnedPrimToSkelMap =
-        std::unordered_map<SdfPath, SdfPath, SdfPath::Hash>;
-    _SkinnedPrimToSkelMap _skinnedPrimToSkelMap;
 };
 
 

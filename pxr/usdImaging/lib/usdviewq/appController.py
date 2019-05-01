@@ -96,6 +96,7 @@ class PropertyIndex(ConstantGroup):
 
 class DebugTypes(ConstantGroup):
     # Tf Debug entries to include in debug menu
+    HDST = "HDST"
     HD = "HD"
     HDX = "HDX"
     USD = "USD"
@@ -544,7 +545,7 @@ class AppController(QtCore.QObject):
             self._ui.propertyView.setHorizontalScrollMode(
                 QtWidgets.QAbstractItemView.ScrollPerPixel)
 
-            self._ui.frameSlider.setUpdateOnFrameScrub(
+            self._ui.frameSlider.setTracking(
                     self._dataModel.viewSettings.redrawOnScrub)
 
             self._ui.colorGroup = QtWidgets.QActionGroup(self)
@@ -731,8 +732,9 @@ class AppController(QtCore.QObject):
 
             self._ui.primView.expanded.connect(self._primViewExpanded)
 
-            self._ui.frameSlider.signalFrameChanged.connect(self.setFrame)
-            self._ui.frameSlider.signalPositionChanged.connect(self._sliderMoved)
+            self._ui.frameSlider.valueChanged.connect(self.setFrame)
+            self._ui.frameSlider.sliderMoved.connect(self._sliderMoved)
+            self._ui.frameSlider.sliderReleased.connect(self._updateGUIForFrameChange)
 
             self._ui.frameField.editingFinished.connect(self._frameStringChanged)
 
@@ -769,8 +771,8 @@ class AppController(QtCore.QObject):
             self._ui.redrawOnScrub.toggled.connect(self._redrawOptionToggled)
 
             if self._stageView:
-                self._ui.actionRecompute_Clipping_Planes.triggered.connect(
-                    self._stageView.detachAndReClipFromCurrentCamera)
+                self._ui.actionAuto_Compute_Clipping_Planes.triggered.connect(
+                    self._toggleAutoComputeClippingPlanes)
 
             self._ui.actionAdjust_Clipping.triggered[bool].connect(
                 self._adjustClippingPlanes)
@@ -1243,10 +1245,12 @@ class AppController(QtCore.QObject):
 
         if self._playbackAvailable:
             if not resetStageDataOnly:
-                self._ui.frameSlider.resetSlider(len(self._timeSamples))
+                self._ui.frameSlider.setRange(0, len(self._timeSamples) - 1)
+                self._ui.frameSlider.setValue(0)
             self._setPlayShortcut()
             self._ui.playButton.setCheckable(True)
-            self._ui.playButton.setChecked(False)
+            # Ensure the play button state respects the current playback state
+            self._ui.playButton.setChecked(self._dataModel.playing)
 
     def _clearCaches(self, preserveCamera=False):
         """Clears value and computation caches maintained by the controller.
@@ -1528,8 +1532,6 @@ class AppController(QtCore.QObject):
         else:
             self._resetPrimView(restoreSelection=False)
 
-        self._ui.frameSlider.resetToMinimum()
-
         if not self._stageView:
 
             # The second child is self._ui.glFrame, which disappears if
@@ -1558,8 +1560,6 @@ class AppController(QtCore.QObject):
                 layout.setContentsMargins(0, 0, 0, 0)
                 self._ui.glFrame.setLayout(layout)
                 layout.addWidget(self._stageView)
-
-        self._playbackFrameIndex = 0
 
         self._primSearchResults = deque([])
         self._attrSearchResults = deque([])
@@ -1727,7 +1727,7 @@ class AppController(QtCore.QObject):
 
     def _redrawOptionToggled(self, checked):
         self._dataModel.viewSettings.redrawOnScrub = checked
-        self._ui.frameSlider.setUpdateOnFrameScrub(
+        self._ui.frameSlider.setTracking(
             self._dataModel.viewSettings.redrawOnScrub)
 
     # Frame-by-frame/Playback functionality ===================================
@@ -1751,10 +1751,14 @@ class AppController(QtCore.QObject):
         self._ui.stageBegin.setEnabled(isEnabled)
         self._ui.stageEnd.setEnabled(isEnabled)
         self._ui.redrawOnScrub.setEnabled(isEnabled)
+        self._ui.stepSizeLabel.setEnabled(isEnabled)
+        self._ui.stepSize.setEnabled(isEnabled)
 
 
     def _playClicked(self):
         if self._ui.playButton.isChecked():
+            # Enable tracking whilst playing
+            self._ui.frameSlider.setTracking(True)
             # Start playback.
             self._dataModel.playing = True
             self._ui.playButton.setText("Stop")
@@ -1767,6 +1771,7 @@ class AppController(QtCore.QObject):
             self._primViewUpdateTimer.stop()
             self._playbackIndex = 0
         else:
+            self._ui.frameSlider.setTracking(self._ui.redrawOnScrub.isChecked())
             # Stop playback.
             self._dataModel.playing = False
             self._ui.playButton.setText("Play")
@@ -1776,7 +1781,7 @@ class AppController(QtCore.QObject):
             self._fpsHUDInfo[HUDEntries.PLAYBACK]  = "N/A"
             self._timer.stop()
             self._primViewUpdateTimer.start()
-            self._updateOnFrameChange(refreshUI=True)
+            self._updateOnFrameChange()
 
     def _advanceFrameForPlayback(self):
         sleep(max(0, 1. / self.framesPerSecond - (time() - self._lastFrameTime)))
@@ -1794,62 +1799,86 @@ class AppController(QtCore.QObject):
         self._advanceFrame()
 
     def _advanceFrame(self):
-        if not self._playbackAvailable:
-            return
-        self._ui.frameSlider.advanceFrame()
+        if self._playbackAvailable:
+            value = self._ui.frameSlider.value() + 1
+            if value > self._ui.frameSlider.maximum():
+                value = self._ui.frameSlider.minimum()
+            self._ui.frameSlider.setValue(value)
 
     def _retreatFrame(self):
-        if not self._playbackAvailable:
-            return
-        self._ui.frameSlider.retreatFrame()
+        if self._playbackAvailable:
+            value = self._ui.frameSlider.value() - 1
+            if value < self._ui.frameSlider.minimum():
+                value = self._ui.frameSlider.maximum()
+            self._ui.frameSlider.setValue(value)
 
-    def _findIndexOfFieldContents(self, field):
-        # don't convert string to float directly because of rounding error
-        frameString = str(field.text())
+    def _findClosestFrameIndex(self, timeSample):
+        """Find the closest frame index for the given `timeSample`.
 
-        if frameString.count(".") == 0:
-            frameString += ".0"
-        elif frameString[-1] == ".":
-            frameString += "0"
+        Args:
+            timeSample (float): A time sample value.
 
-        field.setText(frameString)
+        Returns:
+            int: The closest matching frame index or 0 if one cannot be
+            found.
+        """
+        closestIndex = int((timeSample - self._timeSamples[0]) / self.step)
 
-        # Find the index of the closest valid frame
-        dist = None
-        closestIndex = Usd.TimeCode.Default()
+        # Bounds checking
+        # 0 <= closestIndex <= number of time samples - 1
+        closestIndex = max(0, closestIndex)
+        closestIndex = min(len(self._timeSamples) - 1, closestIndex)
 
-        for i in range(len(self._timeSamples)):
-            newDist = abs(self._timeSamples[i] - float(frameString))
-            if dist is None or newDist < dist:
-                dist = newDist
-                closestIndex = i
         return closestIndex
 
     def _rangeBeginChanged(self):
-        self.realStartTimeCode = float(self._ui.rangeBegin.text())
-        self._UpdateTimeSamples(resetStageDataOnly=False)
+        value = float(self._ui.rangeBegin.text())
+        if value != self.realStartTimeCode:
+            self.realStartTimeCode = value
+            self._UpdateTimeSamples(resetStageDataOnly=False)
 
     def _stepSizeChanged(self):
-        stepStr = self._ui.stepSize.text()
-        self.step = float(stepStr)
-        self._UpdateTimeSamples(resetStageDataOnly=False)
+        value = float(self._ui.stepSize.text())
+        if value != self.step:
+            self.step = value
+            self._UpdateTimeSamples(resetStageDataOnly=False)
 
     def _rangeEndChanged(self):
-        self.realEndTimeCode = float(self._ui.rangeEnd.text())
-        self._UpdateTimeSamples(resetStageDataOnly=False)
+        value = float(self._ui.rangeEnd.text())
+        if value != self.realEndTimeCode:
+            self.realEndTimeCode = value
+            self._UpdateTimeSamples(resetStageDataOnly=False)
 
     def _frameStringChanged(self):
-        indexOfFrame = self._findIndexOfFieldContents(self._ui.frameField)
+        timeSample = float(self._ui.frameField.text())
+        indexOfFrame = self._findClosestFrameIndex(timeSample)
 
         if (indexOfFrame != Usd.TimeCode.Default()):
             self.setFrame(indexOfFrame, forceUpdate=True)
-            self._ui.frameSlider.setValueImmediate(indexOfFrame)
+            self._ui.frameSlider.setValue(indexOfFrame)
 
         self._ui.frameField.setText(
             str(self._dataModel.currentFrame.GetValue()))
 
-    def _sliderMoved(self, value):
-        self._ui.frameField.setText(str(self._timeSamples[value]))
+    def _sliderMoved(self, frameIndex):
+        """Slot called when the frame slider is moved by a user.
+        
+        Args:
+            frameIndex (int): The new frame index value.
+        """
+        # If redraw on scrub is disabled, ensure we still update the
+        # frame field.
+        if not self._ui.redrawOnScrub.isChecked():
+            self.setFrameField(self._timeSamples[frameIndex])
+
+    def setFrameField(self, frame):
+        """Set the frame field to the given `frame`.
+
+        Args:
+            frame (str|int|float): The new frame value.
+        """
+        frame = round(float(frame), ndigits=2)
+        self._ui.frameField.setText(str(frame))
 
     # Prim/Attribute search functionality =====================================
 
@@ -2156,6 +2185,13 @@ class AppController(QtCore.QObject):
         during playback is activated or deactivated."""
         self._dataModel.viewSettings.showBBoxPlayback = (
             self._ui.showBBoxPlayback.isChecked())
+
+    def _toggleAutoComputeClippingPlanes(self):
+        autoClip = self._ui.actionAuto_Compute_Clipping_Planes.isChecked()
+        self._dataModel.viewSettings.autoComputeClippingPlanes = autoClip
+        if autoClip:
+            self._stageView.detachAndReClipFromCurrentCamera()
+        
 
     def _setUseExtentsHint(self):
         self._dataModel.useExtentsHint = self._ui.useExtentsHint.isChecked()
@@ -3152,7 +3188,6 @@ class AppController(QtCore.QObject):
 
     def setFrame(self, frameIndex, forceUpdate=False):
         frameAtStart = self._dataModel.currentFrame
-        self._playbackFrameIndex = frameIndex
 
         frame = self._timeSamples[int(frameIndex)]
         if self._dataModel.currentFrame.GetValue() != frame:
@@ -3173,31 +3208,33 @@ class AppController(QtCore.QObject):
         # conditionally update?  All this function should do, after
         # computing a new frame number, is emit a signal that the
         # time has changed.  Future work.
-        self._ui.frameField.setText(
-            str(round(self._dataModel.currentFrame.GetValue(), ndigits=2)))
+        self.setFrameField(self._dataModel.currentFrame.GetValue())
 
         if (self._dataModel.currentFrame != frameAtStart) or forceUpdate:
-            # do not update HUD/BBOX if scrubbing or playing
-            updateUI = forceUpdate or not (self._dataModel.playing or
-                                          self._ui.frameSlider.isSliderDown())
-            self._updateOnFrameChange(updateUI)
+            self._updateOnFrameChange()
 
-    def _updateOnFrameChange(self, refreshUI = True):
-        """Called when the frame changed, updates the renderer and such"""
+    def _updateGUIForFrameChange(self):
+        """Called when the frame changes have finished.
+        e.g When the playback/scrubbing has stopped.
+        """
+        # slow stuff that we do only when not playing
+        # topology might have changed, recalculate
+        self._updateHUDGeomCounts()
+        self._updatePropertyView()
+        self._refreshAttributeValue()
 
-        if refreshUI: # slow stuff that we do only when not playing
-            # topology might have changed, recalculate
-            self._updateHUDGeomCounts()
-            self._updatePropertyView()
-            self._refreshAttributeValue()
+        # value sources of an attribute can change upon frame change
+        # due to value clips, so we must update the layer stack.
+        self._updateLayerStackView()
 
-            # value sources of an attribute can change upon frame change
-            # due to value clips, so we must update the layer stack.
-            self._updateLayerStackView()
+        # refresh the visibility column
+        self._resetPrimViewVis(selItemsOnly=False, authoredVisHasChanged=False)
 
-            # refresh the visibility column
-            self._resetPrimViewVis(selItemsOnly=False, authoredVisHasChanged=False)
-
+    def _updateOnFrameChange(self):
+        """Called when the frame changes, updates the renderer and such"""
+        # do not update HUD/BBOX if scrubbing or playing
+        if not (self._dataModel.playing or self._ui.frameSlider.isSliderDown()):
+            self._updateGUIForFrameChange()
         if self._stageView:
             # this is the part that renders
             if self._dataModel.playing:
@@ -3336,7 +3373,7 @@ class AppController(QtCore.QObject):
                     (key, type(primProperty)))
                 continue
 
-            attrText = GetShortString(primProperty, frame) or ""
+            attrText = GetShortString(primProperty, frame)
             treeWidget.addTopLevelItem(
                 QtWidgets.QTreeWidgetItem(["", str(key), attrText]))
 
@@ -4625,6 +4662,8 @@ class AppController(QtCore.QObject):
             self._dataModel.viewSettings.displayPrimId)
         self._ui.actionCull_Backfaces.setChecked(
             self._dataModel.viewSettings.cullBackfaces)
+        self._ui.actionAuto_Compute_Clipping_Planes.setChecked(
+            self._dataModel.viewSettings.autoComputeClippingPlanes)
 
     def _refreshHUDMenu(self):
         self._ui.actionHUD.setChecked(self._dataModel.viewSettings.showHUD)

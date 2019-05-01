@@ -313,10 +313,6 @@ HdRenderIndex::Clear()
         _tracker.TaskRemoved(it->first);
     }
     _taskMap.clear();
-
-    // After clearing the index, all collections must be invalidated to force
-    // any dependent state to be updated.
-    _tracker.MarkAllCollectionsDirty();
 }
 
 // -------------------------------------------------------------------------- //
@@ -621,9 +617,18 @@ _DrawItemFilterPredicate(const SdfPath &rprimID, const void *predicateParam)
     const HdRprimCollection &collection = filterParam->collection;
     const HdRenderIndex *renderIndex    = filterParam->renderIndex;
 
-   if (collection.HasRenderTag(renderIndex->GetRenderTag(rprimID))) {
-       return true;
-   }
+    if (collection.HasRenderTag(renderIndex->GetRenderTag(rprimID))) {
+        // Filter out rprims that do not match the collection's materialTag.
+        // E.g. We may want to gather only opaque or translucent prims.
+        // An empty materialTag on collection means: ignore material-tags.
+        // This is important for tasks such as the selection-task which wants
+        // to ignore materialTags and receive all prims in its collection.
+        TfToken const& collectionMatTag = collection.GetMaterialTag();
+        if (collectionMatTag.IsEmpty() ||
+            renderIndex->GetMaterialTag(rprimID) == collectionMatTag) {
+            return true;
+        }
+    }
 
    return false;
 }
@@ -694,6 +699,17 @@ HdRenderIndex::GetRenderTag(SdfPath const& id) const
     }
 
     return info->rprim->GetRenderTag(info->sceneDelegate);
+}
+
+TfToken
+HdRenderIndex::GetMaterialTag(SdfPath const& id) const
+{
+    _RprimInfo const* info = TfMapLookupPtr(_rprimMap, id);
+    if (info == nullptr) {
+        return HdMaterialTagTokens->defaultMaterialTag;
+    }
+
+    return info->rprim->GetMaterialTag();
 }
 
 SdfPathVector
@@ -1000,13 +1016,14 @@ namespace {
 };
 
 void
-HdRenderIndex::Sync(HdDirtyListSharedPtr const &dirtyList)
+HdRenderIndex::Sync(HdDirtyListSharedPtr const &dirtyList,
+                    HdRprimCollection const &collection)
 {
-    _syncQueue.push_back(dirtyList);
+    _syncQueue.emplace_back(_SyncQueueEntry{dirtyList, collection});
 }
 
 void
-HdRenderIndex::SyncAll(HdTaskSharedPtrVector const &tasks,
+HdRenderIndex::SyncAll(HdTaskSharedPtrVector *tasks,
                        HdTaskContext *taskContext)
 {
     HD_TRACE_FUNCTION();
@@ -1036,17 +1053,25 @@ HdRenderIndex::SyncAll(HdTaskSharedPtrVector const &tasks,
 
     _sprimIndex.SyncPrims(_tracker, _renderDelegate->GetRenderParam());
 
-    // could be in parallel... but how?
-    // may be just gathering dirtyLists at first, and then index->sync()?
-
+    ////////////////////////////////////////////////////////////////////////////
+    //
+    // Task Sync
+    //
+    // could be in parallel...
+    //
     // These tasks will call Sync() adding dirty lists to _syncQueue for
     // processing below.
-    TF_FOR_ALL(it, tasks) {
-        if (!TF_VERIFY(*it)) {
+    //
+    size_t numTasks = tasks->size();
+    for (size_t taskNum = 0; taskNum < numTasks; ++taskNum) {
+        HdTaskSharedPtr &task = (*tasks)[taskNum];
+
+        if (!TF_VERIFY(task)) {
+            TF_CODING_ERROR("Null Task in task list.  Entry Num: %zu", taskNum);
             continue;
         }
 
-        SdfPath taskId = (*it)->GetId();
+        SdfPath taskId = task->GetId();
 
         // Is this a tracked task?
         _TaskMap::iterator taskMapIt = _taskMap.find(taskId);
@@ -1064,7 +1089,7 @@ HdRenderIndex::SyncAll(HdTaskSharedPtrVector const &tasks,
             //
             // However, this is still a weird situation, so report the
             // issue as a verify so it can be addressed.
-            TF_VERIFY(taskInfo.task == (*it));
+            TF_VERIFY(taskInfo.task == task);
 
             HdDirtyBits taskDirtyBits = _tracker.GetTaskDirtyBits(taskId);
 
@@ -1079,9 +1104,9 @@ HdRenderIndex::SyncAll(HdTaskSharedPtrVector const &tasks,
             HdDirtyBits taskDirtyBits = 0;
 
             // This is an untracked task, never added to the render index.
-            (*it)->Sync(nullptr,
-                        taskContext,
-                        &taskDirtyBits);
+            task->Sync(nullptr,
+                       taskContext,
+                       &taskDirtyBits);
         }
     }
 
@@ -1095,8 +1120,11 @@ HdRenderIndex::SyncAll(HdTaskSharedPtrVector const &tasks,
         HF_TRACE_FUNCTION_SCOPE("Merge Dirty Lists");
         // If dirty list prims are all sorted, we could do something more
         // efficient here.
-        for (auto const& hdDirtyList : _syncQueue) {
-            HdRprimCollection const& collection = hdDirtyList->GetCollection();
+        size_t numSyncQueueEntries = _syncQueue.size();
+        for (size_t entryNum = 0; entryNum < numSyncQueueEntries; ++entryNum) {
+            _SyncQueueEntry &entry = _syncQueue[entryNum];
+            HdDirtyListSharedPtr &hdDirtyList = entry.dirtyList;
+            HdRprimCollection const& collection = entry.collection;
 
             _ReprSpec reprSpec(collection.GetReprSelector(),
                                collection.IsForcedRepr());
@@ -1125,8 +1153,14 @@ HdRenderIndex::SyncAll(HdTaskSharedPtrVector const &tasks,
             }
 
             // PERFORMANCE: this loop can be expensive.
-            for (auto const& sdfPath : hdDirtyList->GetDirtyRprims()) {
-                dirtyIds[sdfPath] |= (1ULL << reprIndex);
+            TfTokenVector const &renderTags = collection.GetRenderTags();
+            SdfPathVector const &dirtyPrims
+                               = hdDirtyList->GetDirtyRprims(renderTags);
+
+            size_t numDirtyPrims = dirtyPrims.size();
+            for (size_t primNum = 0; primNum < numDirtyPrims; ++primNum) {
+                SdfPath const &primPath = dirtyPrims[primNum];
+                dirtyIds[primPath] |= (1ULL << reprIndex);
             }
         }
     }
@@ -1292,10 +1326,10 @@ HdRenderIndex::SyncAll(HdTaskSharedPtrVector const &tasks,
             HdSceneDelegate *delegate = dlgIt->first;
             delegate->PostSyncCleanup();
         }
-
-        // Clear out the dirty list for future consumers.
-        for (auto const& hdDirtyList : _syncQueue) {
-            hdDirtyList->Clear();
+        const HdSceneDelegatePtrVector& sprimDelegates =
+            _sprimIndex.GetSceneDelegatesForDirtyPrims();
+        for (HdSceneDelegate* delegate : sprimDelegates) {
+            delegate->PostSyncCleanup();
         }
 
         if (resetVaryingState) {
@@ -1562,11 +1596,11 @@ HdRenderIndex::_AppendDrawItems(
                     const HdRprim::HdDrawItemPtrVector* drawItems =
                         rprim->GetDrawItems(reprToken);
 
-                    TF_VERIFY(drawItems);
-
-                    resultDrawItems.insert( resultDrawItems.end(),
-                                            drawItems->begin(),
-                                            drawItems->end() );
+                    if (TF_VERIFY(drawItems)) {
+                        resultDrawItems.insert( resultDrawItems.end(),
+                                                drawItems->begin(),
+                                                drawItems->end() );
+                    }
                 }
             }
         }
