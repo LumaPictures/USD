@@ -66,6 +66,10 @@ struct UsdGeomTokensType {
     /// 
     /// Possible value for UsdGeomMesh::GetFaceVaryingLinearInterpolationAttr()
     const TfToken all;
+    /// \brief "alphaGain"
+    /// 
+    /// UsdGeomImagePlane
+    const TfToken alphaGain;
     /// \brief "angularVelocities"
     /// 
     /// UsdGeomPointInstancer
@@ -78,6 +82,10 @@ struct UsdGeomTokensType {
     /// 
     /// UsdGeomBasisCurves
     const TfToken basis;
+    /// \brief "best"
+    /// 
+    /// Possible value for UsdGeomImagePlane::GetFitAttr(), Default value for UsdGeomImagePlane::GetFitAttr()
+    const TfToken best;
     /// \brief "bezier"
     /// 
     /// Possible value for UsdGeomBasisCurves::GetBasisAttr(), Default value for UsdGeomBasisCurves::GetBasisAttr()
@@ -102,6 +110,10 @@ struct UsdGeomTokensType {
     /// 
     /// Possible value for UsdGeomBasisCurves::GetBasisAttr()
     const TfToken bspline;
+    /// \brief "camera"
+    /// 
+    /// UsdGeomImagePlane
+    const TfToken camera;
     /// \brief "cards"
     /// 
     /// Possible value for UsdGeomModelAPI::GetModelDrawModeAttr()
@@ -150,6 +162,14 @@ struct UsdGeomTokensType {
     /// 
     /// Possible value for UsdGeomMesh::GetFaceVaryingLinearInterpolationAttr()
     const TfToken cornersPlus2;
+    /// \brief "coverage"
+    /// 
+    /// UsdGeomImagePlane
+    const TfToken coverage;
+    /// \brief "coverageOrigin"
+    /// 
+    /// UsdGeomImagePlane
+    const TfToken coverageOrigin;
     /// \brief "creaseIndices"
     /// 
     /// UsdGeomMesh
@@ -178,6 +198,10 @@ struct UsdGeomTokensType {
     /// 
     /// Possible value for UsdGeomModelAPI::GetModelDrawModeAttr(), Possible value for UsdGeomImageable::GetPurposeAttr(), Default value for UsdGeomImageable::GetPurposeAttr()
     const TfToken default_;
+    /// \brief "depth"
+    /// 
+    /// UsdGeomImagePlane
+    const TfToken depth;
     /// \brief "doubleSided"
     /// 
     /// UsdGeomGprim
@@ -230,6 +254,14 @@ struct UsdGeomTokensType {
     /// 
     /// UsdGeomSubset
     const TfToken familyName;
+    /// \brief "fill"
+    /// 
+    /// Possible value for UsdGeomImagePlane::GetFitAttr()
+    const TfToken fill;
+    /// \brief "fit"
+    /// 
+    /// UsdGeomImagePlane
+    const TfToken fit;
     /// \brief "focalLength"
     /// 
     /// UsdGeomCamera
@@ -238,6 +270,18 @@ struct UsdGeomTokensType {
     /// 
     /// UsdGeomCamera
     const TfToken focusDistance;
+    /// \brief "frame"
+    /// 
+    /// UsdGeomImagePlane
+    const TfToken frame;
+    /// \brief "frameCache"
+    /// 
+    /// UsdGeomImagePlane
+    const TfToken frameCache;
+    /// \brief "frameOffset"
+    /// 
+    /// UsdGeomImagePlane
+    const TfToken frameOffset;
     /// \brief "fromTexture"
     /// 
     /// Possible value for UsdGeomModelAPI::GetModelCardGeometryAttr()
@@ -252,7 +296,7 @@ struct UsdGeomTokensType {
     const TfToken guide;
     /// \brief "height"
     /// 
-    /// UsdGeomCone, UsdGeomCapsule, UsdGeomCylinder
+    /// UsdGeomCone, UsdGeomCapsule, UsdGeomCylinder, UsdGeomImagePlane
     const TfToken height;
     /// \brief "hermite"
     /// 
@@ -262,6 +306,10 @@ struct UsdGeomTokensType {
     /// 
     /// UsdGeomMesh
     const TfToken holeIndices;
+    /// \brief "horizontal"
+    /// 
+    /// Possible value for UsdGeomImagePlane::GetFitAttr()
+    const TfToken horizontal;
     /// \brief "horizontalAperture"
     /// 
     /// UsdGeomCamera
@@ -274,6 +322,10 @@ struct UsdGeomTokensType {
     /// 
     /// UsdGeomPointInstancer, UsdGeomPoints
     const TfToken ids;
+    /// \brief "imageCenter"
+    /// 
+    /// UsdGeomImagePlane
+    const TfToken imageCenter;
     /// \brief "inactiveIds"
     /// 
     /// int64listop prim metadata that specifies the PointInstancer ids that should be masked (unrenderable) over all time.
@@ -282,6 +334,10 @@ struct UsdGeomTokensType {
     /// 
     /// UsdGeomSubset
     const TfToken indices;
+    /// \brief "info:filename"
+    /// 
+    /// UsdGeomImagePlane
+    const TfToken infoFilename;
     /// \brief "inherited"
     /// 
     /// Possible value for UsdGeomImageable::GetVisibilityAttr(), Default value for UsdGeomImageable::GetVisibilityAttr()
@@ -390,6 +446,10 @@ struct UsdGeomTokensType {
     /// 
     /// UsdGeomPointBased
     const TfToken normals;
+    /// \brief "offset"
+    /// 
+    /// UsdGeomImagePlane
+    const TfToken offset;
     /// \brief "open"
     /// 
     /// Possible value for UsdGeomNurbsPatch::GetVFormAttr(), Default value for UsdGeomNurbsPatch::GetVFormAttr(), Possible value for UsdGeomNurbsPatch::GetUFormAttr(), Default value for UsdGeomNurbsPatch::GetUFormAttr()
@@ -498,6 +558,10 @@ struct UsdGeomTokensType {
     /// 
     /// Possible value for UsdGeomGprim::GetOrientationAttr(), Default value for UsdGeomGprim::GetOrientationAttr()
     const TfToken rightHanded;
+    /// \brief "rotate"
+    /// 
+    /// UsdGeomImagePlane
+    const TfToken rotate;
     /// \brief "scales"
     /// 
     /// UsdGeomPointInstancer
@@ -512,12 +576,16 @@ struct UsdGeomTokensType {
     const TfToken shutterOpen;
     /// \brief "size"
     /// 
-    /// UsdGeomCube
+    /// UsdGeomCube, UsdGeomImagePlane
     const TfToken size;
     /// \brief "smooth"
     /// 
     /// Possible value for UsdGeomMesh::GetTriangleSubdivisionRuleAttr()
     const TfToken smooth;
+    /// \brief "squeezeCorrection"
+    /// 
+    /// UsdGeomImagePlane
+    const TfToken squeezeCorrection;
     /// \brief "stereoRole"
     /// 
     /// UsdGeomCamera
@@ -526,6 +594,10 @@ struct UsdGeomTokensType {
     /// 
     /// UsdGeomMesh
     const TfToken subdivisionScheme;
+    /// \brief "to size"
+    /// 
+    /// Possible value for UsdGeomImagePlane::GetFitAttr()
+    const TfToken toSize;
     /// \brief "triangleSubdivisionRule"
     /// 
     /// UsdGeomMesh
@@ -590,6 +662,10 @@ struct UsdGeomTokensType {
     /// 
     /// UsdGeomNurbsPatch
     const TfToken uRange;
+    /// \brief "useFrameExtension"
+    /// 
+    /// UsdGeomImagePlane
+    const TfToken useFrameExtension;
     /// \brief "uVertexCount"
     /// 
     /// UsdGeomNurbsPatch
@@ -606,6 +682,10 @@ struct UsdGeomTokensType {
     /// 
     /// Possible value for UsdGeomPrimvar::SetInterpolation. Values are interpolated between each vertex in the surface primitive. The basis function of the surface is used for  interpolation between vertices.
     const TfToken vertex;
+    /// \brief "vertical"
+    /// 
+    /// Possible value for UsdGeomImagePlane::GetFitAttr()
+    const TfToken vertical;
     /// \brief "verticalAperture"
     /// 
     /// UsdGeomCamera
@@ -638,6 +718,10 @@ struct UsdGeomTokensType {
     /// 
     /// UsdGeomNurbsPatch
     const TfToken vVertexCount;
+    /// \brief "width"
+    /// 
+    /// UsdGeomImagePlane
+    const TfToken width;
     /// \brief "widths"
     /// 
     /// UsdGeomPoints, UsdGeomCurves

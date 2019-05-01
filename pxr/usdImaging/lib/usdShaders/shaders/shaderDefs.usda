@@ -370,3 +370,21 @@ def Shader "UsdPrimvarReader_matrix" (
 
     matrix4d outputs:result
 }
+
+def Shader "UsdImagePlaneSurface" (
+    sdrMetadata = {
+       token role = "surface"
+    }
+)
+{
+    uniform token info:id = "UsdImagePlaneSurface"
+    uniform token info:implementationSource = "sourceAsset"
+    uniform asset info:glslfx:sourceAsset = @./imagePlane.glslfx@
+
+    float4 inputs:colorOpacity = (1.0, 0.0, 0.0, 1.0) (
+        doc = """Color and opacity of the image plane."""
+    )
+
+    token outputs:surface
+    token outputs:displacement
+}
