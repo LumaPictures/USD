@@ -143,6 +143,11 @@ private:
             const TfToken& interpolation,
             const VtArray<int>& assignmentIndices);
 
+    void _writeMotionVectors(UsdGeomMesh& primSchema,
+                             const UsdTimeCode& usdTime,
+                             MFnMesh& mesh,
+                             const std::string& colorSetName);
+
     /// Adds displayColor and displayOpacity primvars using the given color,
     /// alpha, and assignment data if the \p primSchema does not already have
     /// authored opinions for them.
@@ -200,6 +205,9 @@ private:
     static const GfVec3f _ColorSetDefaultRGB;
     static const float _ColorSetDefaultAlpha;
     static const GfVec4f _ColorSetDefaultRGBA;
+
+    /// Names for color sets that are interpreted as motion vectors.
+    static const std::vector<std::string> _MotionVectorNames;
 
     /// Input mesh before any skeletal deformations, cached between iterations.
     MObject _skelInputMesh;
