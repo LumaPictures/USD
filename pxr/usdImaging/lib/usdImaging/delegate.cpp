@@ -120,6 +120,7 @@ UsdImagingDelegate::UsdImagingDelegate(
                                GetMaterialBindingPurpose())
     , _materialBindingCache(GetTime(), &_materialBindingImplData)
     , _visCache(GetTime())
+    , _purposeCache() // note that purpose is uniform, so no GetTime()
     , _drawModeCache(GetTime())
     , _displayGuides(true)
     , _enableUsdDrawModes(true)
@@ -885,6 +886,7 @@ UsdImagingDelegate::ApplyPendingUpdates()
     _materialBindingImplData.ClearCaches();
     _materialBindingCache.Clear();
     _visCache.Clear();
+    _purposeCache.Clear();
     _drawModeCache.Clear();
 
     UsdImagingDelegate::_Worker worker;
@@ -1435,9 +1437,25 @@ UsdImagingDelegate::SetDisplayGuides(bool displayGuides)
 {
     _displayGuides = displayGuides;
     
-    // Geometry that was assigned to a command buffer to be rendered might
-    // now be hidden or the contrary, so we need to rebuild the collections.
-    GetRenderIndex().GetChangeTracker().MarkAllCollectionsDirty();
+    UsdImagingIndexProxy indexProxy(this, nullptr);
+
+    // _displayGuides changes a prims render tag.
+    // So we need to make sure all prims render tags get re-evaluated.
+    // XXX: Should be smarted and only invalidate prims whose
+    // purpose == UsdGeomTokens->guide.
+    // Look at GetRenderTag for complixity with this.
+    for (_PrimInfoMap::iterator it  = _primInfoMap.begin();
+                                it != _primInfoMap.end();
+                              ++it) {
+        const SdfPath &usdPath = it->first;
+        _PrimInfo &primInfo = it->second;
+
+        if (TF_VERIFY(primInfo.adapter, "%s", usdPath.GetText())) {
+            primInfo.adapter->MarkRenderTagDirty(primInfo.usdPrim,
+                                                 usdPath,
+                                                 &indexProxy);
+        }
+    }
 }
 
 void
@@ -1748,10 +1766,6 @@ UsdImagingDelegate::SetReprFallback(HdReprSelector const &repr)
                                             &indexProxy);
         }
     }
-
-    // XXX: currently we need to make collection dirty so that
-    // HdRenderPass::_PrepareCommandBuffer gathers new drawitem from scratch.
-    GetRenderIndex().GetChangeTracker().MarkAllCollectionsDirty();
 }
 
 void
@@ -1776,10 +1790,6 @@ UsdImagingDelegate::SetCullStyleFallback(HdCullStyle cullStyle)
                                                  &indexProxy);
         }
     }
-
-    // XXX: currently we need to make collection dirty so that
-    // HdRenderPass::_PrepareCommandBuffer gathers new drawitem from scratch.
-    GetRenderIndex().GetChangeTracker().MarkAllCollectionsDirty();
 }
 
 void
@@ -2445,9 +2455,10 @@ UsdImagingDelegate::GetPrimvarDescriptors(SdfPath const& id,
 {
     HD_TRACE_FUNCTION();
     SdfPath usdPath = GetPathForUsd(id);
-    // Filter the stored primvars to just ones of the requested type.
     HdPrimvarDescriptorVector primvars;
     HdPrimvarDescriptorVector allPrimvars;
+    // We expect to populate an entry always (i.e., we don't use a slow path
+    // fetch)
     if (!TF_VERIFY(_valueCache.FindPrimvars(usdPath, &allPrimvars), 
                    "<%s> interpolation: %s", usdPath.GetText(),
                    TfEnum::GetName(interpolation).c_str())) {
@@ -2455,6 +2466,7 @@ UsdImagingDelegate::GetPrimvarDescriptors(SdfPath const& id,
     }
     // It's valid to have no authored primvars (they could be computed)
     for (HdPrimvarDescriptor const& pv: allPrimvars) {
+        // Filter the stored primvars to just ones of the requested type.
         if (pv.interpolation == interpolation) {
             primvars.push_back(pv);
         }
@@ -2511,8 +2523,7 @@ UsdImagingDelegate::GetInstanceIndices(SdfPath const &instancerId,
 
 /*virtual*/
 GfMatrix4d
-UsdImagingDelegate::GetInstancerTransform(SdfPath const &instancerId,
-                                          SdfPath const &prototypeId)
+UsdImagingDelegate::GetInstancerTransform(SdfPath const &instancerId)
 {
     HD_TRACE_FUNCTION();
 
@@ -2539,7 +2550,6 @@ UsdImagingDelegate::GetInstancerTransform(SdfPath const &instancerId,
 /*virtual*/
 size_t
 UsdImagingDelegate::SampleInstancerTransform(SdfPath const &instancerId,
-                                             SdfPath const &prototypeId,
                                              size_t maxSampleCount,
                                              float *times,
                                              GfMatrix4d *samples)
@@ -2951,28 +2961,19 @@ UsdImagingDelegate::GetExtComputationPrimvarDescriptors(
     HD_TRACE_FUNCTION();
     SdfPath usdPath = GetPathForUsd(computationId);
 
-    // Filter the stored primvars to just ones of the requested type.
-    HdExtComputationPrimvarDescriptorVector primvars;
     HdExtComputationPrimvarDescriptorVector allPrimvars;
-    if (!_valueCache.ExtractExtComputationPrimvars(usdPath, &allPrimvars)) {
-        TF_DEBUG(HD_SAFE_MODE).Msg("WARNING: Slow extComputation primvar "
-                                   "descriptor fetch for %s\n", 
-                                   computationId.GetText());
-        
-        // XXX: May be we ought to have an additional dirty bit for this, like
-        // DirtyComputedPrimvar, rather than using DirtyPrimvar?
-        _UpdateSingleValue(usdPath, HdChangeTracker::DirtyPrimvar);
-        
-        // Don't use a verify below because it is often the case that there are
-        // no computated primvars on an rprim.
-        _valueCache.ExtractExtComputationPrimvars(usdPath, &allPrimvars);
-    }
-
+    // We don't require an entry to be populated.
+    _valueCache.FindExtComputationPrimvars(usdPath, &allPrimvars);
+    
+    // Don't use a verify below because it is often the case that there are
+    // no computed primvars on an rprim.
     if (allPrimvars.empty()) {
-        return primvars;
+        return allPrimvars;
     }
 
+    HdExtComputationPrimvarDescriptorVector primvars;
     for (const auto& pv : allPrimvars) {
+        // Filter the stored primvars to just ones of the requested type.
         if (pv.interpolation == interpolation) {
             primvars.push_back(pv);
         }

@@ -211,6 +211,11 @@ public:
                                     UsdImagingIndexProxy* index);
 
     USDIMAGING_API
+    virtual void MarkRenderTagDirty(UsdPrim const& prim,
+                                    SdfPath const& cachePath,
+                                    UsdImagingIndexProxy* index);
+
+    USDIMAGING_API
     virtual void MarkTransformDirty(UsdPrim const& prim,
                                     SdfPath const& cachePath,
                                     UsdImagingIndexProxy* index);
@@ -365,6 +370,11 @@ public:
     /// "super vis/invis".
     USDIMAGING_API
     bool GetVisible(UsdPrim const& prim, UsdTimeCode time) const;
+
+    /// Returns the purpose token for \p prim.
+    ///
+    USDIMAGING_API
+    TfToken GetPurpose(UsdPrim const& prim) const;
 
     /// Fetches the transform for the given prim at the given time from a
     /// pre-computed cache of prim transforms. Requesting transforms at
