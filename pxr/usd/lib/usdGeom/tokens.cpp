@@ -26,6 +26,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 UsdGeomTokensType::UsdGeomTokensType() :
+    accelerations("accelerations", TfToken::Immortal),
     all("all", TfToken::Immortal),
     alphaGain("alphaGain", TfToken::Immortal),
     angularVelocities("angularVelocities", TfToken::Immortal),
@@ -133,6 +134,7 @@ UsdGeomTokensType::UsdGeomTokensType() :
     partition("partition", TfToken::Immortal),
     periodic("periodic", TfToken::Immortal),
     perspective("perspective", TfToken::Immortal),
+    pinned("pinned", TfToken::Immortal),
     points("points", TfToken::Immortal),
     pointWeights("pointWeights", TfToken::Immortal),
     positions("positions", TfToken::Immortal),
@@ -198,6 +200,7 @@ UsdGeomTokensType::UsdGeomTokensType() :
     y("Y", TfToken::Immortal),
     z("Z", TfToken::Immortal),
     allTokens({
+        accelerations,
         all,
         alphaGain,
         angularVelocities,
@@ -305,6 +308,7 @@ UsdGeomTokensType::UsdGeomTokensType() :
         partition,
         periodic,
         perspective,
+        pinned,
         points,
         pointWeights,
         positions,

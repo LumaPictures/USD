@@ -21,3 +21,4 @@ tg/simple_features/dirty_all_sprims_bprims
 tg/customization/fix_GetTransform_GetExtent
 tg/customization/katana_hydra_viewer_proxies
 tg/simple_features/usdMaya_UsdPreviewSurface_importer
+tg/customization/translucent_preview_surface
