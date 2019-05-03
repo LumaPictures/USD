@@ -190,7 +190,8 @@ _GetMaterialTag(const TfToken& inputName, const UsdAttribute& attr,
         }
 
         if (isTranslucent) {
-            *materialTag = HdxMaterialTagTokens->translucent;
+            // Default to our cheapest blending: unsorted additive
+            *materialTag = HdxMaterialTagTokens->additive;
         }
     }
 }
@@ -526,7 +527,8 @@ UsdImagingGLHydraMaterialAdapter::_GetShaderSource(
                 // XXX: Process other shaderIds here using a shader 
                 // registry.
                 if (shaderId == UsdImagingTokens->UsdPreviewSurface ||
-                    shaderId == UsdImagingTokens->UsdImagePlaneSurface) {
+                    shaderId == UsdImagingTokens->UsdImagePlaneSurface ||
+                    shaderId == UsdImagingTokens->UsdPreviewSurfaceTranslucent) {
                     auto &shaderReg = SdrRegistry::GetInstance();
                     if (SdrShaderNodeConstPtr sdrNode = 
                             shaderReg.GetShaderNodeByIdentifierAndType(shaderId, 
