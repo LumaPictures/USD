@@ -35,6 +35,7 @@
 
 #include "pxr/base/tf/getenv.h"
 #include "pxr/base/tf/envSetting.h"
+#include "pxr/base/tf/stringUtils.h"
 
 #include "pxr/usd/usdUtils/pipeline.h"
 
@@ -61,113 +62,15 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-TF_DEFINE_ENV_SETTING(USD_KATANA_ALLOW_CUSTOM_MATERIAL_SCOPES, false,
-        "Set to true to enable custom names for the parent scope "
-        "of materials. Otherwise only scopes named Looks are allowed.");
+TF_DEFINE_ENV_SETTING(USD_KATANA_API_SCHEMAS_AS_GROUP_ATTR, false,
+        "If true, API schemas will be imported as group attributes instead "
+        "of an array of strings. This provides easier support for CEL "
+        "matching based on API schemas and an easier way to access the. "
+        "instance name of Multiple Apply Schemas.");
+
 
 FnLogSetup("PxrUsdKatanaReadPrim");
 
-static FnKat::Attribute
-_GetMaterialAssignAttr(
-        const UsdPrim& prim,
-        const PxrUsdKatanaUsdInPrivateData& data)
-{
-    if (!prim || prim.GetPath() == SdfPath::AbsoluteRootPath()) {
-        // Special-case to pre-empt coding errors.
-        return FnKat::Attribute();
-    }
-
-    UsdRelationship usdRel = UsdShadeMaterial::GetBindingRel(prim);
-    if (usdRel) {
-        // USD shading binding
-        SdfPathVector targetPaths;
-        usdRel.GetForwardedTargets(&targetPaths);
-        if (targetPaths.size() > 0) {
-            if (!targetPaths[0].IsPrimPath()) {
-                FnLogWarn("Target path " << prim.GetPath().GetString() <<
-                          " is not a prim");
-                return FnKat::Attribute();
-            }
-
-            // This is a copy as it could be modified below.
-            SdfPath targetPath = targetPaths[0];
-            UsdPrim targetPrim = data.GetUsdInArgs()->GetStage()->GetPrimAtPath(targetPath);
-            // If the target is inside a master, then it needs to be re-targeted 
-            // to the instance.
-            // 
-            // XXX remove this special awareness once GetMasterWithContext is
-            //     is available as the provided prim will automatically
-            //     retarget (or provide enough context to retarget without
-            //     tracking manually).
-            if (targetPrim && targetPrim.IsInMaster()) {
-                if (!data.GetInstancePath().IsEmpty() &&
-                    !data.GetMasterPath().IsEmpty()) {
-
-                    // Check if the source and the target of the relationship 
-                    // belong to the same master.
-                    // If they do, we have the context necessary to do the 
-                    // re-mapping.
-                    if (data.GetMasterPath().GetCommonPrefix(targetPath).
-                            GetPathElementCount() > 0) {
-                        targetPath = data.GetInstancePath().AppendPath(
-                            targetPath.ReplacePrefix(targetPath.GetPrefixes()[0],
-                                SdfPath::ReflexiveRelativePath()));
-                    } else {
-                        // Warn saying the target of relationship isn't within 
-                        // the same master as the source.
-                        FnLogWarn("Target path " << prim.GetPath().GetString() 
-                            << " isn't within the master " << data.GetMasterPath());
-                        return FnKat::Attribute();
-                    }
-                } else {
-                    // XXX
-                    // When loading beneath a master via an isolatePath
-                    // opArg, we can encounter targets which are within masters
-                    // but not within the context of a material.
-                    // While that would be an error according to the below
-                    // warning, it produces the expected results.
-                    // This case can occur when expanding pointinstancers as
-                    // the sources are made via execution of PxrUsdIn again
-                    // at the sub-trees.
-                    
-                    
-                    // Warn saying target of relationship is in a master, 
-                    // but the associated instance path is unknown!
-                    // FnLogWarn("Target path " << prim.GetPath().GetString() 
-                    //         << " is within a master, but the associated "
-                    //         "instancePath is unknown.");
-                    // return FnKat::Attribute();
-                }
-            }
-
-            // Convert the target path to the equivalent katana location.
-            // XXX: Materials may have an atypical USD->Katana 
-            // path mapping
-            std::string location =
-                PxrUsdKatanaUtils::ConvertUsdMaterialPathToKatLocation(targetPath, data);
-
-            static const bool allowCustomScopes = 
-                TfGetEnvSetting(USD_KATANA_ALLOW_CUSTOM_MATERIAL_SCOPES);
-                
-            // XXX Materials containing only display terminals are causing issues
-            //     with katana material manipulation workflows.
-            //     For now: exclude any material assign which doesn't include
-            //     /Looks/ in the path
-            if (!allowCustomScopes && location.find(UsdKatanaTokens->katanaLooksScopePathSubstring)
-                    == std::string::npos)
-            {
-                return FnKat::Attribute();
-            }
-                
-                
-            // location = TfStringReplace(location, "/Looks/", "/Materials/");
-            // XXX handle multiple assignments
-            return FnKat::StringAttribute(location);
-        }
-    }
-
-    return FnKat::Attribute();
-}
 
 static bool
 _GatherRibAttributes(
@@ -833,7 +736,7 @@ PxrUsdKatanaReadPrim(
     // Set the 'materialAssign' attribute for locations that have shaders.
     //
 
-    attrs.set("materialAssign", _GetMaterialAssignAttr(prim, data));
+    attrs.set("materialAssign", PxrUsdKatanaUtils::GetMaterialAssignAttr(prim, data));
 
     //
     // Set the 'prmanStatements' attribute.
@@ -938,16 +841,48 @@ PxrUsdKatanaReadPrim(
     _AddExtraAttributesOrNamespaces(prim, data, attrs);
 
     // 
-    // Store the applied apiSchemas metadata as a list of typeName strings
+    // Store the applied apiSchemas metadata a either a list of
+    // strings or a group of string attributes whose name will be
+    // the name of the schema and whose value will be the instance
+    // name of the schema. If the API schema has no instance name,
+    // then the string will be empty.
+    //
+    // In a future release, we'll retire the list of strings
+    // representation.
     //
     TfTokenVector appliedSchemaTokens = prim.GetAppliedSchemas();
     if (!appliedSchemaTokens.empty()){
-        std::vector<std::string> appliedSchemas(appliedSchemaTokens.size());
-        std::transform(appliedSchemaTokens.begin(), appliedSchemaTokens.end(), 
-                       appliedSchemas.begin(), [](const TfToken& token){ 
-            return token.GetString();
-        });
-        attrs.set("info.usd.apiSchemas", FnKat::StringAttribute(appliedSchemas));
+        static const bool apiSchemasAsGroupAttr = 
+                TfGetEnvSetting(USD_KATANA_API_SCHEMAS_AS_GROUP_ATTR);
+        if (apiSchemasAsGroupAttr){
+            FnKat::GroupBuilder apiSchemasBuilder;
+            for (const TfToken& schema : appliedSchemaTokens){
+                std::vector<std::string> tokenizedSchema = 
+                    TfStringTokenize(schema.GetString(), ":");
+                if (tokenizedSchema.size() == 1){
+                    apiSchemasBuilder.set(tokenizedSchema[0],
+                                          FnKat::StringAttribute(""));
+                }
+                else if (tokenizedSchema.size() == 2){
+                    apiSchemasBuilder.set(
+                        tokenizedSchema[0],
+                        FnKat::StringAttribute(tokenizedSchema[1]));
+                }
+                else{
+                    TF_WARN("apiSchema token '%s' cannot be decomposed into "
+                            "a schema name and instance name.",
+                            schema.GetText());
+                }
+            }
+            attrs.set("info.usd.apiSchemas", apiSchemasBuilder.build());
+        } else{
+            std::vector<std::string> appliedSchemas(appliedSchemaTokens.size());
+            std::transform(appliedSchemaTokens.begin(), appliedSchemaTokens.end(), 
+                           appliedSchemas.begin(), [](const TfToken& token){ 
+                return token.GetString();
+            });
+            attrs.set("info.usd.apiSchemas", FnKat::StringAttribute(appliedSchemas));
+        }
     }
 
     // 
