@@ -64,6 +64,7 @@ void wrapUsdGeomTokens()
 {
     boost::python::class_<UsdGeomTokensType, boost::noncopyable>
         cls("Tokens", boost::python::no_init);
+    _AddToken(cls, "accelerations", UsdGeomTokens->accelerations);
     _AddToken(cls, "all", UsdGeomTokens->all);
     _AddToken(cls, "angularVelocities", UsdGeomTokens->angularVelocities);
     _AddToken(cls, "axis", UsdGeomTokens->axis);
@@ -156,6 +157,7 @@ void wrapUsdGeomTokens()
     _AddToken(cls, "partition", UsdGeomTokens->partition);
     _AddToken(cls, "periodic", UsdGeomTokens->periodic);
     _AddToken(cls, "perspective", UsdGeomTokens->perspective);
+    _AddToken(cls, "pinned", UsdGeomTokens->pinned);
     _AddToken(cls, "points", UsdGeomTokens->points);
     _AddToken(cls, "pointWeights", UsdGeomTokens->pointWeights);
     _AddToken(cls, "positions", UsdGeomTokens->positions);

@@ -1,7 +1,6 @@
 tg/simple_features/maya_user_attribute_writer_plugins
 tg/simple_features/houdini_shader_output_registry
 tg/simple_features/houdini_st_uv_translation
-tg/simple_features/houdini_expanded_datatype_support
 tg/bugfixes/katana_testsuite_precision
 tg/simple_features/export_root
 tg/simple_features/katana_nurbs_curves
@@ -22,3 +21,5 @@ tg/simple_features/cxx14
 tg/simple_features/katana_texcoord_to_vector
 tg/simple_features/image_extension_case_insensitive
 tg/simple_features/maya_export_usdlux
+tg/simple_features/katana_external_instancer_prototypes
+tg/simple_features/acceleration_for_pointinstancer
