@@ -227,7 +227,8 @@ UsdMayaTranslatorUtil::CreateShaderNode(
         const MString& nodeTypeName,
         UsdMayaShadingNodeType shadingNodeType,
         MStatus* status,
-        MObject* shaderObj)
+        MObject* shaderObj,
+        MObject parentNode)
 {
     MString typeFlag;
     switch (shadingNodeType) {
@@ -259,10 +260,19 @@ UsdMayaTranslatorUtil::CreateShaderNode(
         }
     }
 
+    MString parentFlag;
+    if(!parentNode.isNull()) {
+        MFnDagNode parentDag(parentNode, status);
+        CHECK_MSTATUS_AND_RETURN(*status, false);
+        *status = parentFlag.format(" -p \"^1s\"",
+                                    parentDag.fullPathName());
+        CHECK_MSTATUS_AND_RETURN(*status, false);
+    }
+
     MString cmd;
     // ss = skipSelect
-    *status = cmd.format("shadingNode ^1s -ss -n \"^2s\" \"^3s\"",
-               typeFlag, nodeName, nodeTypeName);
+    *status = cmd.format("shadingNode ^1s^2s -ss -n \"^3s\" \"^4s\"",
+               typeFlag, parentFlag, nodeName, nodeTypeName);
     //MGlobal::displayInfo(cmd);
     CHECK_MSTATUS_AND_RETURN(*status, false);
 
@@ -273,26 +283,6 @@ UsdMayaTranslatorUtil::CreateShaderNode(
     CHECK_MSTATUS_AND_RETURN(*status, false);
     *status = msel.getDependNode(0, *shaderObj);
     CHECK_MSTATUS_AND_RETURN(*status, false);
-    return true;
-}
-
-/* static */
-bool
-UsdMayaTranslatorUtil::ConnectDefaultLightNode(
-        MObject& lightNode,
-        MStatus* status)
-{
-    MObject lightSetObject = UsdMayaUtil::GetDefaultLightSetObject();
-    if (lightSetObject.isNull()) {
-        return false;
-    }
-
-    MFnSet setFn(lightSetObject, status);
-    CHECK_MSTATUS_AND_RETURN(*status, false);
-
-    *status = setFn.addMember(lightNode);
-    CHECK_MSTATUS_AND_RETURN(*status, false);
-
     return true;
 }
 
