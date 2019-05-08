@@ -1,0 +1,10 @@
+From: Paul Molodowitch <paulm@lumapictures.com>
+Subject: [usdMaya] make UsdMayaTranslatorUtil::CreateShaderNode use shadingNode
+
+The docs said it was intended to mimic this command, but it was lacking some
+functionality; in theory, we might have been able to add the (known) missing
+functionality, but past experience has shown attempting to replicate this
+command not worth the small efficiency gain by avoiding the string conversions
+needed by mel commands.
+
+Also eliminated ConnectDefaultLightNode, since it was also mimicing this command
