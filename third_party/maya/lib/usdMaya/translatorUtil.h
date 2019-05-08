@@ -124,12 +124,16 @@ struct UsdMayaTranslatorUtil
 
     /// \brief Helper to create shadingNodes.  Wrapper around mel "shadingNode".
     ///
-    /// if shaderType is ShadingNodeType::Unspecified, it will attempt to
+    /// This does several things beyond just creating the node, including but
+    /// not limited to:
+    ///     - hook up the node to appropriate default groups (ie,
+    ///       defaultShadingList1 for shaders, defaultLightSet for lights)
+    ///     - handle basic color management setup for textures
+    ///     - make sure nodes show up in the hypershade
+    ///
+    /// TODO: add a ShadingNodeType::Unspecified, which will make this function
     /// determine the type of node automatically using it's classification
     /// string
-    ///
-    /// If there are other side-effects of using "shadingNode" (as opposed to
-    /// "createNode" directly), this should be udpated accordingly.
     PXRUSDMAYA_API
     static bool
     CreateShaderNode(
@@ -137,21 +141,8 @@ struct UsdMayaTranslatorUtil
             const MString& nodeTypeName,
             UsdMayaShadingNodeType shadingNodeType,
             MStatus* status,
-            MObject* shaderObj);
-
-    /// \brief Helper to set up a light node as a default light.  
-    /// This is intended to mimic the mel command "shadingNode ... -asLight".
-    ///
-    /// In particular, this makes sure the light nodes are members of the
-    /// "defaultLightSet" which allows lights to be recognized on the stage
-    ///
-    /// If there are other side-effects of using "shadingNode" (as opposed to
-    /// "createNode" directly), this should be updated accordingly.
-    PXRUSDMAYA_API
-    static bool
-    ConnectDefaultLightNode(
-            MObject& lightNode,
-            MStatus* status);
+            MObject* shaderObj,
+            MObject parentNode=MObject::kNullObj);
 
     /// Gets an API schema of the requested type for the given \p usdPrim.
     ///
