@@ -580,9 +580,12 @@ DEFINE_SHADING_MODE_IMPORTER(pxrRis, context)
         displacementShader = UsdRiMaterialAPI(shadeMaterial).GetDisplacement();
     }
 
-    MObject surfaceShaderObj = _GetOrCreateShaderObject(surfaceShader, UsdMayaShadingNodeType::Shader, context);
-    MObject volumeShaderObj = _GetOrCreateShaderObject(volumeShader, UsdMayaShadingNodeType::Shader, context);
-    MObject displacementShaderObj = _GetOrCreateShaderObject(displacementShader, UsdMayaShadingNodeType::Shader, context);
+    MObject surfaceShaderObj = _GetOrCreateShaderObject(
+            surfaceShader, UsdMayaShadingNodeType::Shader, context);
+    MObject volumeShaderObj = _GetOrCreateShaderObject(
+            volumeShader, UsdMayaShadingNodeType::Shader, context);
+    MObject displacementShaderObj = _GetOrCreateShaderObject(
+            displacementShader, UsdMayaShadingNodeType::Shader, context);
 
     if (surfaceShaderObj.isNull() &&
             volumeShaderObj.isNull() &&
