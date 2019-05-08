@@ -36,7 +36,6 @@
 #include "pxr/usd/usdGeom/xformable.h"
 
 #include <maya/MDagModifier.h>
-#include <maya/MFnSet.h>
 #include <maya/MGlobal.h>
 #include <maya/MObject.h>
 #include <maya/MSelectionList.h>
