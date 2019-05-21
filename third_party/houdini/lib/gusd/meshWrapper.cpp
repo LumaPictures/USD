@@ -24,29 +24,26 @@
 #include "meshWrapper.h"
 
 #include "context.h"
-#include "UT_Gf.h"
-#include "GU_USD.h"
 #include "GT_VtArray.h"
-#include "GT_VtStringArray.h"
 #include "tokens.h"
 #include "USD_XformCache.h"
+#include "UT_Gf.h"
 
+#include <GT/GT_DAConstant.h>
 #include <GT/GT_DAConstantValue.h>
-#include <GT/GT_DANumeric.h>
-#include <GT/GT_PrimPolygonMesh.h>
-#include <GT/GT_PrimSubdivisionMesh.h>
-#include <GT/GT_RefineParms.h>
-#include <GT/GT_Refine.h>
-#include <GT/GT_DAIndexedString.h>
-#include <GT/GT_TransformArray.h>
-#include <GT/GT_PrimInstance.h>
 #include <GT/GT_DAIndirect.h>
+#include <GT/GT_DANumeric.h>
 #include <GT/GT_DASubArray.h>
 #include <GT/GT_GEOPrimPacked.h>
-#include <GT/GT_DAConstant.h>
+#include <GT/GT_PrimPolygonMesh.h>
+#include <GT/GT_PrimSubdivisionMesh.h>
+#include <GT/GT_Refine.h>
+#include <GT/GT_RefineParms.h>
+#include <GT/GT_UtilOpenSubdiv.h>
 #include <SYS/SYS_Version.h>
-#include <numeric>
+
 #include <iostream>
+#include <numeric>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -54,6 +51,10 @@ using std::cerr;
 using std::endl;
 using std::string;
 using std::map;
+
+#if SYS_VERSION_FULL_INT >= 0x10050000
+using osd = GT_UtilOpenSubdiv::SdcOptions;
+#endif
 
 #ifdef DEBUG
 #define DBG(x) x
@@ -330,7 +331,7 @@ GusdMeshWrapper::refine(
     gtPointAttrs = gtPointAttrs->addAttribute("P", gtPoints, true);
 
     UsdAttribute normalsAttr = m_usdMesh.GetNormalsAttr();
-    if( normalsAttr.HasAuthoredValue() && normalsAttr.Get(&vtVec3Array, m_time) ) {
+    if( normalsAttr.Get(&vtVec3Array, m_time) ) {
         
         GT_DataArrayHandle gtNormals = 
                 new GusdGT_VtArray<GfVec3f>(vtVec3Array, GT_TYPE_NORMAL);
@@ -357,7 +358,7 @@ GusdMeshWrapper::refine(
 
         // point velocities
         UsdAttribute velAttr = m_usdMesh.GetVelocitiesAttr();
-        if ( velAttr.HasAuthoredValue() && velAttr.Get(&vtVec3Array, m_time) ) {
+        if ( velAttr.Get(&vtVec3Array, m_time) ) {
             
             GT_DataArrayHandle gtVel = 
                     new GusdGT_VtArray<GfVec3f>(vtVec3Array, GT_TYPE_VECTOR);
@@ -450,19 +451,19 @@ GusdMeshWrapper::refine(
     }
 
     if( gtVertexAttrs->entries() > 0 ) {
-	if( reverseWindingOrder ) {
-	    // Construct an index array which will be used to lookup vertex
-	    // attributes in the correct order.
-	    GT_Int32Array* vertexIndirect
-		= new GT_Int32Array(gtIndicesHandle->entries(), 1);
-	    GT_DataArrayHandle vertexIndirectHandle(vertexIndirect);
-	    for(int i=0; i<gtIndicesHandle->entries(); ++i) {
-		vertexIndirect->set(i, i);
-	    }
-	    _reverseWindingOrder(vertexIndirect, gtVertexCounts );
+        if( reverseWindingOrder ) {
+            // Construct an index array which will be used to lookup vertex
+            // attributes in the correct order.
+            GT_Int32Array* vertexIndirect
+                = new GT_Int32Array(gtIndicesHandle->entries(), 1);
+            GT_DataArrayHandle vertexIndirectHandle(vertexIndirect);
+            for(int i=0; i<gtIndicesHandle->entries(); ++i) {
+                vertexIndirect->set(i, i);
+            }
+            _reverseWindingOrder(vertexIndirect, gtVertexCounts );
 
-	    gtVertexAttrs = gtVertexAttrs->createIndirect(vertexIndirect);
-	}
+            gtVertexAttrs = gtVertexAttrs->createIndirect(vertexIndirect);
+        }
     }
 
     // build GT_Primitive
@@ -595,7 +596,82 @@ GusdMeshWrapper::refine(
             subdPrim->appendIntTag("hole", GT_DataArrayHandle(
                                        new GusdGT_VtArray<int>(holeIndices)));
         }
+#if SYS_VERSION_FULL_INT >= 0x10050000
+        // The following attributes from the m_usdMesh need to be stored as
+        // specially named tags. (See the help docs for houdini's Subdivide
+        // SOP for more info).
+        UsdAttribute attr;
+        TfToken token;
 
+        // Interpolate boundary -> "osd_vtxboundaryinterpolation"
+        attr = m_usdMesh.GetInterpolateBoundaryAttr();
+        if (attr.IsValid() && attr.HasAuthoredValue() &&
+            attr.Get(&token, m_time)) {
+            int value(-1);
+            if (token == UsdGeomTokens->none) {
+                value = osd::VTX_BOUNDARY_NONE;
+
+            } else if (token == UsdGeomTokens->edgeOnly) {
+                value = osd::VTX_BOUNDARY_EDGE_ONLY;
+
+            } else if (token == UsdGeomTokens->edgeAndCorner) {
+                value = osd::VTX_BOUNDARY_EDGE_AND_CORNER;
+            }
+            if (value != -1) {
+                subdPrim->appendIntTag("osd_vtxboundaryinterpolation",
+                    GT_DataArrayHandle(new GT_IntConstant(1, value)));
+            }
+        }
+
+        // Face varying linear interpolation -> "osd_fvarlinearinterpolation"
+        attr = m_usdMesh.GetFaceVaryingLinearInterpolationAttr();
+        if (attr.IsValid() && attr.HasAuthoredValue() &&
+            attr.Get(&token, m_time)) {
+            int value(-1);
+            if (token == UsdGeomTokens->none) {
+                value = osd::FVAR_LINEAR_NONE;
+
+            } else if (token == UsdGeomTokens->cornersOnly) {
+                value = osd::FVAR_LINEAR_CORNERS_ONLY;
+
+            } else if (token == UsdGeomTokens->cornersPlus1) {
+                value = osd::FVAR_LINEAR_CORNERS_PLUS1;
+
+            } else if (token == UsdGeomTokens->cornersPlus2) {
+                value = osd::FVAR_LINEAR_CORNERS_PLUS2;
+
+            } else if (token == UsdGeomTokens->boundaries) {
+                value = osd::FVAR_LINEAR_BOUNDARIES;
+
+            } else if (token == UsdGeomTokens->all) {
+                value = osd::FVAR_LINEAR_ALL;
+            }
+            if (value != -1) {
+                subdPrim->appendIntTag("osd_fvarlinearinterpolation",
+                    GT_DataArrayHandle(new GT_IntConstant(1, value)));
+            }
+        }
+
+        // Triangle subdivision rule -> "osd_trianglesubdiv"
+        attr = m_usdMesh.GetTriangleSubdivisionRuleAttr();
+        if (attr.IsValid() && attr.HasAuthoredValue() &&
+            attr.Get(&token, m_time)) {
+            int value(-1);
+            if (token == UsdGeomTokens->catmullClark) {
+                value = osd::TRI_SUB_CATMARK;
+
+            } else if (token == UsdGeomTokens->smooth) {
+                value = osd::VTX_BOUNDARY_EDGE_ONLY;
+
+            } else if (token == UsdGeomTokens->edgeAndCorner) {
+                value = osd::TRI_SUB_SMOOTH;
+            }
+            if (value != -1) {
+                subdPrim->appendIntTag("osd_trianglesubdiv",
+                    GT_DataArrayHandle(new GT_IntConstant(1, value)));
+            }
+        }
+#else // for versions earliear than 16.5
         // Interpolation boundaries
         UsdAttribute interpBoundaryAttr = m_usdMesh.GetInterpolateBoundaryAttr();
         if(interpBoundaryAttr.IsValid()) {
@@ -604,18 +680,7 @@ GusdMeshWrapper::refine(
             GT_DataArrayHandle interpBoundaryHandle = new GT_IntConstant(1, 1);
             subdPrim->appendIntTag("interpolateboundary", interpBoundaryHandle);
         }
-        //if (ival = sample.getFaceVaryingInterpolateBoundary())
-        //{
-            //GT_IntConstant    *val = new GT_IntConstant(1, ival);
-            //gt->appendIntTag("facevaryinginterpolateboundary",
-                //GT_DataArrayHandle(val));
-        //}
-        //if (ival = sample.getFaceVaryingPropagateCorners())
-        //{
-            //GT_IntConstant    *val = new GT_IntConstant(1, ival);
-            //gt->appendIntTag("facevaryingpropagatecorners",
-                //GT_DataArrayHandle(val));
-        //}
+#endif
     }
     else {
         meshPrim
