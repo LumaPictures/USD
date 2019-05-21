@@ -52,7 +52,8 @@ UsdImagingImagePlaneAdapter::Populate(
     UsdImagingIndexProxy* index,
     const UsdImagingInstancerContext* instancerContext /*= nullptr*/){
     return _isImagePlaneEnabled() ? _AddRprim(HdPrimTypeTokens->mesh,
-                     prim, index, GetMaterialId(prim), instancerContext) : SdfPath();
+                     prim, index, GetMaterialUsdPath(prim), instancerContext) :
+                     SdfPath();
 }
 
 void
