@@ -180,13 +180,13 @@ public:
     /// adapter plug-ins should override this method to free any per-prim state
     /// that was accumulated in the adapter.
     USDIMAGING_API
-    virtual void ProcessPrimResync(SdfPath const& primPath,
+    virtual void ProcessPrimResync(SdfPath const& cachePath,
                                    UsdImagingIndexProxy* index);
 
     /// Removes all associated Rprims and dependencies from the render index
     /// without scheduling them for repopulation. 
     USDIMAGING_API
-    virtual void ProcessPrimRemoval(SdfPath const& primPath,
+    virtual void ProcessPrimRemoval(SdfPath const& cachePath,
                                    UsdImagingIndexProxy* index);
 
 
@@ -383,10 +383,18 @@ public:
     GfMatrix4d GetTransform(UsdPrim const& prim, UsdTimeCode time,
                             bool ignoreRootTransform = false) const;
 
+    /// Samples the transform for the given prim.
+    USDIMAGING_API
+    virtual size_t
+    SampleTransform(UsdPrim const& prim, SdfPath const& cachePath,
+                    const std::vector<float>& configuredSampleTimes,
+                    size_t maxNumSamples, float *sampleTimes,
+                    GfMatrix4d *sampleValues);
+
     /// Gets the material path for the given prim, walking up namespace if
     /// necessary.  
     USDIMAGING_API
-    SdfPath GetMaterialId(UsdPrim const& prim) const; 
+    SdfPath GetMaterialUsdPath(UsdPrim const& prim) const; 
 
     /// Gets the instancer ID for the given prim and instancerContext.
     USDIMAGING_API
@@ -443,6 +451,10 @@ protected:
     const UsdImagingPrimAdapterSharedPtr& 
     _GetPrimAdapter(UsdPrim const& prim, bool ignoreInstancing = false) const;
 
+    USDIMAGING_API
+    const UsdImagingPrimAdapterSharedPtr& 
+    _GetAdapter(TfToken const& adapterKey) const;
+
     // XXX: Transitional API
     // Returns the instance proxy prim path for a USD-instanced prim, given the
     // instance chain leading to that prim. The paths are sorted from more to
@@ -455,9 +467,13 @@ protected:
     USDIMAGING_API
     UsdTimeCode _GetTimeWithOffset(float offset) const;
 
-    // Converts \p stagePath to the path in the render index
+    // Converts \p cachePath to the path in the render index.
     USDIMAGING_API
-    SdfPath _GetPathForIndex(SdfPath const& usdPath) const;
+    SdfPath _ConvertCachePathToIndexPath(SdfPath const& cachePath) const;
+
+    // Converts \p indexPath to the path in the USD stage
+    USDIMAGING_API
+    SdfPath _ConvertIndexPathToCachePath(SdfPath const& indexPath) const;
 
     // Returns the rprim paths in the renderIndex rooted at \p indexPath.
     USDIMAGING_API
@@ -532,6 +548,13 @@ protected:
 
     USDIMAGING_API
     UsdImaging_CollectionCache& _GetCollectionCache() const;
+
+    USDIMAGING_API
+    UsdImaging_CoordSysBindingStrategy::value_type
+    _GetCoordSysBindings(UsdPrim const& prim) const;
+
+    USDIMAGING_API
+    bool _DoesDelegateSupportCoordSys() const;
 
     // Conversion functions between usd and hydra enums.
     USDIMAGING_API
