@@ -30,6 +30,7 @@ PXR_NAMESPACE_USING_DIRECTIVE
 TF_WRAP_MODULE
 {
     TF_WRAP( Dependency );
+    TF_WRAP( DynamicFileFormatDependencyData );
     TF_WRAP( Cache );
     TF_WRAP( Errors );
     TF_WRAP( InstanceKey );
