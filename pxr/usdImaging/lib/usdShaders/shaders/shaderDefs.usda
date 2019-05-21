@@ -103,22 +103,6 @@ def Shader "UsdPreviewSurface" (
     )
 }
 
-def Shader "UsdPreviewSurfaceTranslucent" (
-    sdrMetadata = {
-       token role = "surface"
-    }
-    inherits = </UsdPreviewSurface>
-)
-{
-    uniform token info:id = "UsdPreviewSurfaceTranslucent"
-    uniform token info:implementationSource = "sourceAsset"
-
-    # XXX: This doesn't resolve if it's defined as a search path.
-    # Might require special resolver configuration, to include the resources
-    # directory.
-    uniform asset info:glslfx:sourceAsset = @./previewSurfaceTranslucent.glslfx@
-}
-
 def Shader "UsdUVTexture" (
     doc = """Texture Node Specification represents a node that can be used to 
     read UV textures, including tiled textures such as Mari UDIM's.
