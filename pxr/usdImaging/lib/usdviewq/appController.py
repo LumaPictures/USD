@@ -32,6 +32,8 @@ from collections import deque, OrderedDict
 
 # Usd Library Components
 from pxr import Usd, UsdGeom, UsdShade, UsdUtils, UsdImagingGL, Glf, Sdf, Tf, Ar
+from pxr import UsdAppUtils
+from pxr.UsdAppUtils.complexityArgs import RefinementComplexities
 
 # UI Components
 from ._usdviewq import Utils
@@ -63,7 +65,7 @@ from common import (UIBaseColors, UIPropertyValueSourceColors, UIFonts,
                     PickModes, SelectionHighlightModes, CameraMaskModes,
                     PropTreeWidgetTypeIsRel, PrimNotFoundException,
                     GetRootLayerStackInfo, HasSessionVis, GetEnclosingModelPrim,
-                    GetPrimsLoadability, Complexities, ClearColors,
+                    GetPrimsLoadability, ClearColors,
                     HighlightColors)
 
 import settings2
@@ -93,15 +95,6 @@ class HUDEntries(ConstantGroup):
 
 class PropertyIndex(ConstantGroup):
     VALUE, METADATA, LAYERSTACK, COMPOSITION = range(4)
-
-class DebugTypes(ConstantGroup):
-    # Tf Debug entries to include in debug menu
-    HDST = "HDST"
-    HD = "HD"
-    HDX = "HDX"
-    USD = "USD"
-    USDIMAGING = "USDIMAGING"
-    USDVIEWQ = "USDVIEWQ"
 
 class UIDefaults(ConstantGroup):
     STAGE_VIEW_WIDTH = 604
@@ -322,6 +315,7 @@ class AppController(QtCore.QObject):
             self._currentSpec = None
             self._currentLayer = None
             self._console = None
+            self._debugFlagsWindow = None
             self._interpreter = None
             self._parserData = parserData
             self._noRender = parserData.noRender
@@ -418,10 +412,9 @@ class AppController(QtCore.QObject):
                 self._initialSelectPrim = None
 
             try:
-                self._dataModel.viewSettings.complexity = Complexities.fromId(
-                    parserData.complexity)
+                self._dataModel.viewSettings.complexity = parserData.complexity
             except ValueError:
-                fallback = Complexities.LOW
+                fallback = RefinementComplexities.LOW
                 sys.stderr.write(("Error: Invalid complexity '{}'. "
                     "Using fallback '{}' instead.\n").format(
                         parserData.complexity, fallback.id))
@@ -431,11 +424,12 @@ class AppController(QtCore.QObject):
             self._timeSamples = None
             self._stageView = None
             self._startingPrimCamera = None
-            if isinstance(parserData.camera, Sdf.Path):
+            if (parserData.camera.IsAbsolutePath() or
+                    parserData.camera.pathElementCount > 1):
                 self._startingPrimCameraName = None
                 self._startingPrimCameraPath = parserData.camera
             else:
-                self._startingPrimCameraName = parserData.camera
+                self._startingPrimCameraName = parserData.camera.pathString
                 self._startingPrimCameraPath = None
 
             settingsPathDir = self._outputBaseDirectory()
@@ -768,6 +762,8 @@ class AppController(QtCore.QObject):
 
             self._ui.showInterpreter.triggered.connect(self._showInterpreter)
 
+            self._ui.showDebugFlags.triggered.connect(self._showDebugFlags)
+
             self._ui.redrawOnScrub.toggled.connect(self._redrawOptionToggled)
 
             self._ui.authoredStepsOnly.toggled.connect(self._authoredOptionToggled)
@@ -1036,8 +1032,6 @@ class AppController(QtCore.QObject):
             self._ui.actionActivate.triggered.connect(self.activateSelectedPrims)
 
             self._ui.actionDeactivate.triggered.connect(self.deactivateSelectedPrims)
-
-            self._setupDebugMenu()
 
             # We refresh as if all view settings changed. In the future, we
             # should do more granular refreshes. This first requires more
@@ -1692,17 +1686,17 @@ class AppController(QtCore.QObject):
 
     def _incrementComplexity(self):
         """Jump up to the next level of complexity."""
-        self._setComplexity(Complexities.next(
+        self._setComplexity(RefinementComplexities.next(
             self._dataModel.viewSettings.complexity))
 
     def _decrementComplexity(self):
         """Jump back to the previous level of complexity."""
-        self._setComplexity(Complexities.prev(
+        self._setComplexity(RefinementComplexities.prev(
             self._dataModel.viewSettings.complexity))
 
     def _changeComplexity(self, action):
         """Update the complexity from a selected QAction."""
-        self._setComplexity(Complexities.fromName(action.text()))
+        self._setComplexity(RefinementComplexities.fromName(action.text()))
 
     def _adjustFOV(self):
         fov = QtWidgets.QInputDialog.getDouble(self._mainWindow, "Adjust FOV",
@@ -2290,6 +2284,13 @@ class AppController(QtCore.QObject):
         self._interpreter.show()
         self._interpreter.activateWindow()
         self._interpreter.setFocus()
+
+    def _showDebugFlags(self):
+        if self._debugFlagsWindow is None:
+            from debugFlagsWidget import DebugFlagsWidget
+            self._debugFlagsWindow = DebugFlagsWidget()
+
+        self._debugFlagsWindow.show()
 
     # Screen capture functionality ===========================================
 
@@ -4093,29 +4094,6 @@ class AppController(QtCore.QObject):
             print "Error encountered while computing prim subtree HUD info: %s" % err
         finally:
             QtWidgets.QApplication.restoreOverrideCursor()
-
-
-    def _setupDebugMenu(self):
-        def __helper(debugType, menu):
-            return lambda: self._createTfDebugMenu(menu, '{0}_'.format(debugType))
-
-        for debugType in DebugTypes:
-            menu = self._ui.menuDebug.addMenu('{0} Flags'.format(debugType))
-            menu.aboutToShow.connect(__helper(debugType, menu))
-
-    def _createTfDebugMenu(self, menu, flagFilter):
-        def __createTriggerLambda(flagToSet, value):
-            return lambda: Tf.Debug.SetDebugSymbolsByName(flagToSet, value)
-
-        flags = [flag for flag in Tf.Debug.GetDebugSymbolNames() if flag.startswith(flagFilter)]
-        menu.clear()
-        for flag in flags:
-            action = menu.addAction(flag)
-            isEnabled = Tf.Debug.IsDebugSymbolNameEnabled(flag)
-            action.setCheckable(True)
-            action.setChecked(isEnabled)
-            action.setStatusTip(Tf.Debug.GetDebugSymbolDescription(flag))
-            action.triggered[bool].connect(__createTriggerLambda(flag, not isEnabled))
 
     def _updateNavigationMenu(self):
         """Make the Navigation menu items enabled or disabled depending on the
