@@ -526,8 +526,7 @@ UsdImagingGLHydraMaterialAdapter::_GetShaderSource(
             if (shader.GetShaderId(&shaderId)) {
                 // XXX: Process other shaderIds here using a shader 
                 // registry.
-                if (shaderId == UsdImagingTokens->UsdPreviewSurface ||
-                    shaderId == UsdImagingTokens->UsdPreviewSurfaceTranslucent) {
+                if (shaderId == UsdImagingTokens->UsdPreviewSurface) {
                     auto &shaderReg = SdrRegistry::GetInstance();
                     if (SdrShaderNodeConstPtr sdrNode = 
                             shaderReg.GetShaderNodeByIdentifierAndType(shaderId, 
