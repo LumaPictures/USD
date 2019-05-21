@@ -53,7 +53,6 @@ PXR_NAMESPACE_OPEN_SCOPE
     (uvPrimvar)             \
     (UsdImagePlaneSurface)  \
     (UsdPreviewSurface)     \
-    (UsdPreviewSurfaceTranslucent) \
     (UsdUVTexture)          \
     (UsdPrimvarReader_float)\
     (UsdPrimvarReader_float2)\
