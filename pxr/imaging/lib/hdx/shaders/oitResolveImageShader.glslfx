@@ -72,12 +72,13 @@ vec4 imageShader(vec2 uv)
     int depth = 0;
     vec4 colorAccum = vec4(0,0,0,0);
     while (depth < numDepths) {
-        vec3 cb = sortedColor[depth].rgb * sortedColor[depth].a; 
-        colorAccum.rgb = colorAccum.rgb + cb * (1 - colorAccum.a);
-        colorAccum.a = colorAccum.a + sortedColor[depth].a; 
+        float ca = sortedColor[depth].a * (1 - colorAccum.a);
+        vec3 cb = sortedColor[depth].rgb;
+        colorAccum.rgb = colorAccum.rgb + cb * ca;
+        colorAccum.a = colorAccum.a + ca;
 
         colorAccum = clamp(colorAccum, vec4(0), vec4(1));
-        if (colorAccum.a >= 1.0) break;
+        if (colorAccum.a >= 0.99) break;
 
         depth += 1; 
     }
