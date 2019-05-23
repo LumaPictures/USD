@@ -71,6 +71,9 @@ public:
     HDX_API
     virtual void Execute(HdTaskContext* ctx) override;
 
+    HDX_API
+    static int GetOITLayerCount();
+
 private:
     HdRenderPassSharedPtr _renderPass;
     HdRenderPassStateSharedPtr _renderPassState;
