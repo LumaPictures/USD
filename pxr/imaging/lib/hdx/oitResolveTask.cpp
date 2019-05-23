@@ -23,6 +23,8 @@
 //
 #include "pxr/imaging/glf/glew.h"
 
+#include "pxr/base/tf/envSetting.h"
+
 #include "pxr/imaging/hdx/oitResolveTask.h"
 #include "pxr/imaging/hdx/tokens.h"
 #include "pxr/imaging/hdx/debugCodes.h"
@@ -43,6 +45,38 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+TF_DEFINE_ENV_SETTING(
+    PXR_HDST_OIT_LAYER_COUNT, 8,
+"Sets the number of OIT layers per pixel. Default value is 8, increasing this "
+"value will increase GPU memory usage.");
+
+namespace {
+
+class HdxOitResolveRenderPassShader : public HdStRenderPassShader {
+public:
+    HdxOitResolveRenderPassShader() :
+        HdStRenderPassShader(HdxPackageOitResolveImageShader())
+    { }
+
+    std::string GetSource(const TfToken& shaderStageKey) const override
+    {
+        const auto src = HdStRenderPassShader::GetSource(shaderStageKey);
+
+        std::stringstream defines;
+        defines << "#define OIT_LAYER_COUNT "
+                << HdxOitResolveTask::GetOITLayerCount()
+                << "\n";
+
+        return defines.str() + src;
+    }
+
+    ~HdxOitResolveRenderPassShader() override = default;
+private:
+    HdxOitResolveRenderPassShader(const HdxOitResolveRenderPassShader&)             = delete;
+    HdxOitResolveRenderPassShader& operator=(const  HdxOitResolveRenderPassShader&) = delete;
+};
+
+}
 
 HdxOitResolveTask::HdxOitResolveTask(
     HdSceneDelegate* delegate, 
@@ -95,8 +129,7 @@ HdxOitResolveTask::Prepare(HdTaskContext* ctx,
             HdBlendFactor::HdBlendFactorOne,
             HdBlendFactor::HdBlendFactorOne);
 
-        _renderPassShader.reset(
-            new HdStRenderPassShader(HdxPackageOitResolveImageShader()));
+        _renderPassShader.reset(new HdxOitResolveRenderPassShader());
 
         HdStRenderPassState* stRenderPassState =
             dynamic_cast<HdStRenderPassState*>(_renderPassState.get());
@@ -176,6 +209,12 @@ HdxOitResolveTask::Execute(HdTaskContext* ctx)
     glEnable(GL_DEPTH_TEST);
 
     _renderPassState->Unbind();
+}
+
+int HdxOitResolveTask::GetOITLayerCount()
+{
+    static int oitLayerCount = TfGetEnvSetting(PXR_HDST_OIT_LAYER_COUNT);
+    return oitLayerCount;
 }
 
 
