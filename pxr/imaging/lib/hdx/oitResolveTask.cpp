@@ -23,8 +23,6 @@
 //
 #include "pxr/imaging/glf/glew.h"
 
-#include "pxr/base/tf/envSetting.h"
-
 #include "pxr/imaging/hdx/oitResolveTask.h"
 #include "pxr/imaging/hdx/tokens.h"
 #include "pxr/imaging/hdx/debugCodes.h"
@@ -42,21 +40,25 @@
 #include "pxr/imaging/hdSt/renderPassState.h"
 #include "pxr/imaging/hdSt/renderDelegate.h"
 #include "pxr/imaging/hdSt/imageShaderRenderPass.h"
+#include "pxr/imaging/hdSt/tokens.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
-
-TF_DEFINE_ENV_SETTING(
-    PXR_HDST_OIT_LAYER_COUNT, 8,
-"Sets the number of OIT layers per pixel. Default value is 8, increasing this "
-"value will increase GPU memory usage.");
 
 namespace {
 
 class HdxOitResolveRenderPassShader : public HdStRenderPassShader {
 public:
-    HdxOitResolveRenderPassShader() :
-        HdStRenderPassShader(HdxPackageOitResolveImageShader())
-    { }
+    HdxOitResolveRenderPassShader(int layerCount, int stepFunctionResolution) :
+        HdStRenderPassShader(HdxPackageOitResolveImageShader()),
+        _layerCount(layerCount),
+        _stepFunctionResolution(stepFunctionResolution)
+    {
+        // The hash of this shader is constant, no custom bindings and the
+        // input parameters are constant.
+        _hash = HdStRenderPassShader::ComputeHash();
+        boost::hash_combine(_hash, layerCount);
+        boost::hash_combine(_hash, stepFunctionResolution);
+    }
 
     std::string GetSource(const TfToken& shaderStageKey) const override
     {
@@ -64,16 +66,28 @@ public:
 
         std::stringstream defines;
         defines << "#define OIT_LAYER_COUNT "
-                << HdxOitResolveTask::GetOITLayerCount()
+                << _layerCount
+                << "\n"
+                << "#define OIT_STEP_FUNCTION_RESOLUTION "
+                << _stepFunctionResolution
                 << "\n";
 
         return defines.str() + src;
+    }
+
+    ID ComputeHash() const override
+    {
+        return _hash;
     }
 
     ~HdxOitResolveRenderPassShader() override = default;
 private:
     HdxOitResolveRenderPassShader(const HdxOitResolveRenderPassShader&)             = delete;
     HdxOitResolveRenderPassShader& operator=(const  HdxOitResolveRenderPassShader&) = delete;
+
+    const int _layerCount;
+    const int _stepFunctionResolution;
+    ID _hash;
 };
 
 }
@@ -103,14 +117,36 @@ void
 HdxOitResolveTask::Prepare(HdTaskContext* ctx,
                        HdRenderIndex* renderIndex)
 {
+    HdRenderDelegate* renderDelegate = renderIndex->GetRenderDelegate();
+    if (!TF_VERIFY(dynamic_cast<HdStRenderDelegate*>(renderDelegate),
+                   "OIT Task only works with HdSt")) {
+        return;
+    }
+    VtValue oitLayerCount = renderDelegate
+        ->GetRenderSetting(HdStRenderSettingsTokens->oitLayerCount);
+    if (!TF_VERIFY(oitLayerCount.IsHolding<int>(),
+        "OIT Layer count is not an integer!")) {
+        return;
+    }
+    const int layerCount = oitLayerCount.UncheckedGet<int>();
+    VtValue oitStepFunctionResolution = renderDelegate
+        ->GetRenderSetting(HdStRenderSettingsTokens->oitStepFunctionResolution);
+    if (!TF_VERIFY(oitStepFunctionResolution.IsHolding<int>(),
+                   "OIT Step Function Resolution is not an integer!")) {
+        return;
+    }
+    const int stepFunctionResolution =
+        oitStepFunctionResolution.UncheckedGet<int>();
+    bool rebuildShader = false;
+    if (layerCount != _layerCount ||
+        stepFunctionResolution != _stepFunctionResolution) {
+        _layerCount = layerCount;
+        _stepFunctionResolution = stepFunctionResolution;
+        rebuildShader = true;
+    }
+
     if (!_renderPass) {
         HdRprimCollection collection;
-        HdRenderDelegate* renderDelegate = renderIndex->GetRenderDelegate();
-
-        if (!TF_VERIFY(dynamic_cast<HdStRenderDelegate*>(renderDelegate), 
-             "OIT Task only works with HdSt")) {
-            return;
-        }
 
         _renderPass = HdRenderPassSharedPtr(
             new HdSt_ImageShaderRenderPass(renderIndex, collection));
@@ -129,8 +165,15 @@ HdxOitResolveTask::Prepare(HdTaskContext* ctx,
             HdBlendFactor::HdBlendFactorOne,
             HdBlendFactor::HdBlendFactorOne);
 
-        _renderPassShader.reset(new HdxOitResolveRenderPassShader());
+        _renderPassShader.reset(new HdxOitResolveRenderPassShader(
+            _layerCount, _stepFunctionResolution));
 
+        HdStRenderPassState* stRenderPassState =
+            dynamic_cast<HdStRenderPassState*>(_renderPassState.get());
+        stRenderPassState->SetRenderPassShader(_renderPassShader);
+    } else if (rebuildShader) {
+        _renderPassShader.reset(new HdxOitResolveRenderPassShader(
+            _layerCount, _stepFunctionResolution));
         HdStRenderPassState* stRenderPassState =
             dynamic_cast<HdStRenderPassState*>(_renderPassState.get());
         stRenderPassState->SetRenderPassShader(_renderPassShader);
@@ -209,12 +252,6 @@ HdxOitResolveTask::Execute(HdTaskContext* ctx)
     glEnable(GL_DEPTH_TEST);
 
     _renderPassState->Unbind();
-}
-
-int HdxOitResolveTask::GetOITLayerCount()
-{
-    static int oitLayerCount = TfGetEnvSetting(PXR_HDST_OIT_LAYER_COUNT);
-    return oitLayerCount;
 }
 
 
