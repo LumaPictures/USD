@@ -57,6 +57,17 @@ PXR_NAMESPACE_OPEN_SCOPE
 TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_TINY_PRIM_CULLING, false,
                       "Enable tiny prim culling");
 
+TF_DEFINE_ENV_SETTING(HD_OIT_LAYER_COUNT, 8,
+                      "Number of Object Independent Transparency layers per "
+                      "pixel. Increasing the value decreases translucency "
+                      "artifacts and flicker, but significantly increases "
+                      "memory usage and degrades performance");
+
+TF_DEFINE_ENV_SETTING(HD_OIT_STEP_FUNCTION_RESOLUTION, 4,
+                      "Resolution of the step function used to approximate "
+                      "translucency. Increasing the value improves"
+                      "translucency accuracy, but degrades performance.");
+
 const TfTokenVector HdStRenderDelegate::SUPPORTED_RPRIM_TYPES =
 {
     HdPrimTypeTokens->mesh,
@@ -109,10 +120,16 @@ HdStRenderDelegate::_Initialize()
     }
 
     // Initialize the settings and settings descriptors.
-    _settingDescriptors.resize(1);
+    _settingDescriptors.resize(3);
     _settingDescriptors[0] = { "Enable Tiny Prim Culling",
         HdStRenderSettingsTokens->enableTinyPrimCulling,
         VtValue(bool(TfGetEnvSetting(HD_ENABLE_GPU_TINY_PRIM_CULLING))) };
+    _settingDescriptors[1] = { "OIT Layer Count",
+        HdStRenderSettingsTokens->oitLayerCount,
+        VtValue(int(TfGetEnvSetting(HD_OIT_LAYER_COUNT))) };
+    _settingDescriptors[2] = { "OIT Step Function Resolution",
+        HdStRenderSettingsTokens->oitStepFunctionResolution,
+        VtValue(int(TfGetEnvSetting(HD_OIT_STEP_FUNCTION_RESOLUTION))) };
     _PopulateDefaultSettings(_settingDescriptors);
 }
 

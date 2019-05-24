@@ -71,9 +71,6 @@ public:
     HDX_API
     virtual void Execute(HdTaskContext* ctx) override;
 
-    HDX_API
-    static int GetOITLayerCount();
-
 private:
     HdRenderPassSharedPtr _renderPass;
     HdRenderPassStateSharedPtr _renderPassState;
@@ -82,6 +79,9 @@ private:
     HdxOitResolveTask() = delete;
     HdxOitResolveTask(const HdxOitResolveTask &) = delete;
     HdxOitResolveTask &operator =(const HdxOitResolveTask &) = delete;
+
+    int _layerCount = -1;
+    int _stepFunctionResolution = -1;
 };
 
 
