@@ -69,7 +69,7 @@ vec4 imageShader(vec2 uv)
         sortedDepth[insertIndex] = hdxOitDepthBuffer[nodeIndex];
         numDepths += 1; 
         nodeIndex = hdxOitIndexBuffer[nodeIndex]; 
-    } 
+    }
     int depth = 0;
     vec4 colorAccum = vec4(0,0,0,0);
     while (depth < numDepths) {
