@@ -42,6 +42,8 @@
 #include "pxr/imaging/hdSt/renderPassShader.h"
 #include "pxr/imaging/hdSt/bufferArrayRangeGL.h"
 #include "pxr/imaging/hdSt/bufferResourceGL.h"
+#include "pxr/imaging/hdSt/renderDelegate.h"
+#include "pxr/imaging/hdSt/tokens.h"
 
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -168,7 +170,22 @@ HdxOitRenderTask::_PrepareOitBuffers(
     HdTaskContext* ctx, 
     HdRenderIndex* renderIndex)
 {
-    const int numSamples = HdxOitResolveTask::GetOITLayerCount();
+    HdRenderDelegate* renderDelegate = renderIndex->GetRenderDelegate();
+    if (!TF_VERIFY(dynamic_cast<HdStRenderDelegate*>(renderDelegate),
+                  "OIT Task only works with HdSt")) {
+        return;
+    }
+    VtValue oitLayerCount = renderDelegate
+        ->GetRenderSetting(HdStRenderSettingsTokens->oitLayerCount);
+    if (!TF_VERIFY(oitLayerCount.IsHolding<int>(),
+        "OIT Layer count is not an integer!")) {
+        return;
+    }
+    const int layerCount = std::max(1, oitLayerCount.UncheckedGet<int>());
+    if (_layerCount != layerCount) {
+        _rebuildOitBuffers = true;
+        _layerCount = layerCount;
+    }
 
     HdResourceRegistrySharedPtr const& resourceRegistry = 
         renderIndex->GetResourceRegistry();
@@ -219,7 +236,7 @@ HdxOitRenderTask::_PrepareOitBuffers(
                                             /*role*/HdxTokens->oitIndices,
                                             specs,
                                             HdBufferArrayUsageHint());
-        _indexBar->Resize(_viewport[2] * _viewport[3] * numSamples);
+        _indexBar->Resize(_viewport[2] * _viewport[3] * _layerCount);
     }
 
     (*ctx)[HdxTokens->oitIndexBufferBar] = _indexBar;
@@ -236,7 +253,7 @@ HdxOitRenderTask::_PrepareOitBuffers(
                                             /*role*/HdxTokens->oitData,
                                             specs,
                                             HdBufferArrayUsageHint());
-        _dataBar->Resize(_viewport[2] * _viewport[3] * numSamples);
+        _dataBar->Resize(_viewport[2] * _viewport[3] * _layerCount);
     }
 
     (*ctx)[HdxTokens->oitDataBufferBar] = _dataBar;
@@ -253,7 +270,7 @@ HdxOitRenderTask::_PrepareOitBuffers(
                                             /*role*/HdxTokens->oitDepth,
                                             specs,
                                             HdBufferArrayUsageHint());
-        _depthBar->Resize(_viewport[2] * _viewport[3] * numSamples);
+        _depthBar->Resize(_viewport[2] * _viewport[3] * _layerCount);
     }
 
     (*ctx)[HdxTokens->oitDepthBufferBar] = _depthBar;
@@ -280,7 +297,7 @@ HdxOitRenderTask::_PrepareOitBuffers(
                                     VtValue((int)_viewport[3]))));
         uniformSources.push_back(HdBufferSourceSharedPtr(
                 new HdVtBufferSource(HdxTokens->oitSamples,
-                                    VtValue(numSamples))));
+                                    VtValue(_layerCount))));
         resourceRegistry->AddSources(_uniformBar, uniformSources);
     }
 
