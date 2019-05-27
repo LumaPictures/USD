@@ -48,16 +48,20 @@ namespace {
 
 class HdxOitResolveRenderPassShader : public HdStRenderPassShader {
 public:
-    HdxOitResolveRenderPassShader(int layerCount, int stepFunctionResolution) :
+    HdxOitResolveRenderPassShader(int layerCount,
+                                  int stepFunctionResolution,
+                                  bool enableApproximation) :
         HdStRenderPassShader(HdxPackageOitResolveImageShader()),
         _layerCount(layerCount),
-        _stepFunctionResolution(stepFunctionResolution)
+        _stepFunctionResolution(stepFunctionResolution),
+        _enableApproximation(enableApproximation)
     {
         // The hash of this shader is constant, no custom bindings and the
         // input parameters are constant.
         _hash = HdStRenderPassShader::ComputeHash();
         boost::hash_combine(_hash, layerCount);
         boost::hash_combine(_hash, stepFunctionResolution);
+        boost::hash_combine(_hash, enableApproximation);
     }
 
     std::string GetSource(const TfToken& shaderStageKey) const override
@@ -67,6 +71,9 @@ public:
         std::stringstream defines;
         defines << "#define OIT_LAYER_COUNT "
                 << _layerCount
+                << "\n"
+                << "#define OIT_ENABLE_APPROXIMATION "
+                << (_enableApproximation ? "1" : "0")
                 << "\n"
                 << "#define OIT_STEP_FUNCTION_RESOLUTION "
                 << _stepFunctionResolution
@@ -88,6 +95,7 @@ private:
     const int _layerCount;
     const int _stepFunctionResolution;
     ID _hash;
+    const bool _enableApproximation;
 };
 
 }
@@ -137,11 +145,21 @@ HdxOitResolveTask::Prepare(HdTaskContext* ctx,
     }
     const int stepFunctionResolution =
         oitStepFunctionResolution.UncheckedGet<int>();
+    VtValue oitEnableApproximation = renderDelegate
+        ->GetRenderSetting(HdStRenderSettingsTokens->oitEnableApproximation);
+    if (!TF_VERIFY(oitEnableApproximation.IsHolding<bool>(),
+                   "OIT Enable Approximation is not a boolean!")) {
+        return;
+    }
+    const bool enableApproximation =
+        oitEnableApproximation.UncheckedGet<bool>();
     bool rebuildShader = false;
     if (layerCount != _layerCount ||
-        stepFunctionResolution != _stepFunctionResolution) {
+        stepFunctionResolution != _stepFunctionResolution ||
+        enableApproximation != _enableApproximation) {
         _layerCount = layerCount;
         _stepFunctionResolution = stepFunctionResolution;
+        _enableApproximation = enableApproximation;
         rebuildShader = true;
     }
 
@@ -166,14 +184,14 @@ HdxOitResolveTask::Prepare(HdTaskContext* ctx,
             HdBlendFactor::HdBlendFactorOne);
 
         _renderPassShader.reset(new HdxOitResolveRenderPassShader(
-            _layerCount, _stepFunctionResolution));
+            _layerCount, _stepFunctionResolution, _enableApproximation));
 
         HdStRenderPassState* stRenderPassState =
             dynamic_cast<HdStRenderPassState*>(_renderPassState.get());
         stRenderPassState->SetRenderPassShader(_renderPassShader);
     } else if (rebuildShader) {
         _renderPassShader.reset(new HdxOitResolveRenderPassShader(
-            _layerCount, _stepFunctionResolution));
+            _layerCount, _stepFunctionResolution, _enableApproximation));
         HdStRenderPassState* stRenderPassState =
             dynamic_cast<HdStRenderPassState*>(_renderPassState.get());
         stRenderPassState->SetRenderPassShader(_renderPassShader);
