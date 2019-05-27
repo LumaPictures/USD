@@ -82,6 +82,7 @@ private:
 
     int _layerCount = -1;
     int _stepFunctionResolution = -1;
+    bool _enableApproximation = false;
 };
 
 

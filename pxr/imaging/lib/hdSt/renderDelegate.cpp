@@ -63,6 +63,12 @@ TF_DEFINE_ENV_SETTING(HD_OIT_LAYER_COUNT, 8,
                       "artifacts and flicker, but significantly increases "
                       "memory usage and degrades performance");
 
+TF_DEFINE_ENV_SETTING(HD_OIT_ENABLE_APPROXIMATION, false,
+                      "Enable the use of a step function to approximate Object "
+                      "Independent Transparency. Enabling this option "
+                      "increases performance, but decreases translucency "
+                      "accuracy.")
+
 TF_DEFINE_ENV_SETTING(HD_OIT_STEP_FUNCTION_RESOLUTION, 4,
                       "Resolution of the step function used to approximate "
                       "translucency. Increasing the value improves"
@@ -120,14 +126,17 @@ HdStRenderDelegate::_Initialize()
     }
 
     // Initialize the settings and settings descriptors.
-    _settingDescriptors.resize(3);
+    _settingDescriptors.resize(4);
     _settingDescriptors[0] = { "Enable Tiny Prim Culling",
         HdStRenderSettingsTokens->enableTinyPrimCulling,
         VtValue(bool(TfGetEnvSetting(HD_ENABLE_GPU_TINY_PRIM_CULLING))) };
     _settingDescriptors[1] = { "OIT Layer Count",
         HdStRenderSettingsTokens->oitLayerCount,
         VtValue(int(TfGetEnvSetting(HD_OIT_LAYER_COUNT))) };
-    _settingDescriptors[2] = { "OIT Step Function Resolution",
+    _settingDescriptors[2] = { "OIT Enable Approximation",
+        HdStRenderSettingsTokens->oitEnableApproximation,
+        VtValue(bool(TfGetEnvSetting(HD_OIT_ENABLE_APPROXIMATION))) };
+    _settingDescriptors[3] = { "OIT Step Function Resolution",
         HdStRenderSettingsTokens->oitStepFunctionResolution,
         VtValue(int(TfGetEnvSetting(HD_OIT_STEP_FUNCTION_RESOLUTION))) };
     _PopulateDefaultSettings(_settingDescriptors);
