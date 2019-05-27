@@ -37,6 +37,17 @@
 
 -- glsl OitResolve.Image
 
+#ifdef OIT_ENABLE_APPROXIMATION
+
+#define OSR OIT_STEP_FUNCTION_RESOLUTION
+
+struct StepNodes {
+    float depth[OSR];
+    float alpha[OSR];
+};
+
+#endif
+
 vec4 imageShader(vec2 uv)
 {
     int screenWidth = HdGet_oitWidth();
@@ -46,6 +57,24 @@ vec4 imageShader(vec2 uv)
 
     int screenIndex = int(gl_FragCoord.x) + int(gl_FragCoord.y) * screenWidth;
     int nodeIndex = hdxOitCounterBuffer[screenIndex+1];
+#ifdef OIT_ENABLE_APPROXIMATION
+    if (nodeIndex == -1) {
+        return vec4(0.0, 0.0, 0.0, 0.0);
+    }
+
+    StepNodes nodes;
+    for (int id = 0; id < OSR; id += 1) {
+        nodes.depth[id] = 1.0e30;
+        nodes.alpha[id] = 1.0;
+    }
+
+    for (int id = nodeIndex; id != -1; id = hdxOitIndexBuffer[id]) {
+        float currentDepth = hdxOitDepthBuffer[id];
+        float currentAlpha = hdxOitDataBuffer[id].w;
+    }
+
+    return vec4(0.0, 0.0, 0.0, 0.0);
+#else
     int numDepths = 0;
 
     // XXX renderPass.WriteOitLayersToBuffer does not clamp the number of
@@ -85,4 +114,5 @@ vec4 imageShader(vec2 uv)
     }
 
     return colorAccum;
+#endif
 }
