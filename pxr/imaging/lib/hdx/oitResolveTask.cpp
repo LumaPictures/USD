@@ -72,12 +72,12 @@ public:
         defines << "#define OIT_LAYER_COUNT "
                 << _layerCount
                 << "\n"
-                << "#define OIT_ENABLE_APPROXIMATION "
-                << (_enableApproximation ? "1" : "0")
-                << "\n"
                 << "#define OIT_STEP_FUNCTION_RESOLUTION "
                 << _stepFunctionResolution
                 << "\n";
+        if (_enableApproximation) {
+            defines << "#define OIT_ENABLE_APPROXIMATION\n";
+        }
 
         return defines.str() + src;
     }
