@@ -42,9 +42,33 @@
 #define OSR OIT_STEP_FUNCTION_RESOLUTION
 
 struct StepNodes {
+    int count;
     float depth[OSR];
-    float alpha[OSR];
+    float trans[OSR];
 };
+
+void insertNode(float depth, float trans, inout StepNodes nodes) {
+    // No compression for now.
+    // Should we linearize depth? It might be better to put bigger importance
+    // on front fragments, when compressing.
+    int insertIndex = 0;
+    while (insertIndex < min(OSR, nodes.count) &&
+           depth > nodes.depth[insertIndex]) {
+        insertIndex += 1;
+    }
+    if (insertIndex == OSR) {
+        return;
+    }
+
+    for (int id = min(nodes.count, OSR) - 1; id > insertIndex; id -= 1) {
+        nodes.depth[id] = nodes.depth[id - 1];
+        nodes.trans[id] = nodes.trans[id - 1] * trans;
+    }
+
+    nodes.depth[insertIndex] = depth;
+    nodes.depth[insertIndex] = trans;
+    nodes.count += 1;
+}
 
 #endif
 
@@ -65,15 +89,33 @@ vec4 imageShader(vec2 uv)
     StepNodes nodes;
     for (int id = 0; id < OSR; id += 1) {
         nodes.depth[id] = 1.0e30;
-        nodes.alpha[id] = 1.0;
+        nodes.trans[id] = 1.0;
     }
+    nodes.count = 0;
 
     for (int id = nodeIndex; id != -1; id = hdxOitIndexBuffer[id]) {
         float currentDepth = hdxOitDepthBuffer[id];
-        float currentAlpha = hdxOitDataBuffer[id].w;
+        float currentTrans = 1.0 - hdxOitDataBuffer[id].w;
+        insertNode(currentDepth, currentTrans, nodes);
     }
 
-    return vec4(0.0, 0.0, 0.0, 0.0);
+    vec3 color = vec3(0.0, 0.0, 0.0);
+    for (int id = nodeIndex; id != -1; id = hdxOitIndexBuffer[id]) {
+        float currentDepth = hdxOitDepthBuffer[id];
+        vec4 currentSample = hdxOitDataBuffer[id];
+        float currentTrans = 1.0 - currentSample.w;
+
+        int closestIndex = 0;
+        while (closestIndex < min(OSR, nodes.count) &&
+               currentDepth > nodes.depth[closestIndex]) {
+            closestIndex += 1;
+        }
+        if (closestIndex != OSR) {
+            color += currentSample.xyz * currentTrans * nodes.trans[closestIndex];
+        }
+    }
+
+    return vec4(color, 1.0);
 #else
     int numDepths = 0;
 
