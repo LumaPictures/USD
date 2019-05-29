@@ -23,6 +23,7 @@
 //
 #include "pxr/usdImaging/usdImaging/gprimAdapter.h"
 
+#include "pxr/usdImaging/usdImaging/coordSysAdapter.h"
 #include "pxr/usdImaging/usdImaging/debugCodes.h"
 #include "pxr/usdImaging/usdImaging/delegate.h"
 #include "pxr/usdImaging/usdImaging/indexProxy.h"
@@ -34,6 +35,7 @@
 #include "pxr/imaging/hd/sceneDelegate.h"
 
 #include "pxr/usd/usdGeom/gprim.h"
+#include "pxr/usd/usdGeom/pointBased.h"
 #include "pxr/usd/usdGeom/primvarsAPI.h"
 
 #include "pxr/usd/usdShade/connectableAPI.h"
@@ -58,13 +60,13 @@ UsdImagingGprimAdapter::~UsdImagingGprimAdapter()
 
 /* static */
 SdfPath
-UsdImagingGprimAdapter::_ResolveCachePath(SdfPath const& primPath,
+UsdImagingGprimAdapter::_ResolveCachePath(SdfPath const& usdPath,
                                           UsdImagingInstancerContext const*
                                               instancerContext)
 {
-    SdfPath cachePath = primPath;
+    SdfPath cachePath = usdPath;
 
-    // For non-instanced prims, cachePath and primPath will be the same, however
+    // For non-instanced prims, cachePath and usdPath will be the same, however
     // for instanced prims, cachePath will be something like:
     //
     // primPath: /__Master_1/cube
@@ -74,7 +76,7 @@ UsdImagingGprimAdapter::_ResolveCachePath(SdfPath const& primPath,
     // same underlying UsdPrim.
 
     if (instancerContext != nullptr) {
-        SdfPath const& instancer = instancerContext->instancerId;
+        SdfPath const& instancer = instancerContext->instancerCachePath;
         TfToken const& childName = instancerContext->childName;
 
         if (!instancer.IsEmpty()) {
@@ -87,30 +89,33 @@ UsdImagingGprimAdapter::_ResolveCachePath(SdfPath const& primPath,
     return cachePath;
 }
 
-/* static */
 SdfPath
 UsdImagingGprimAdapter::_AddRprim(TfToken const& primType,
                                   UsdPrim const& usdPrim,
                                   UsdImagingIndexProxy* index,
-                                  SdfPath const& materialId,
+                                  SdfPath const& materialUsdPath,
                                   UsdImagingInstancerContext const*
                                       instancerContext)
 {
     SdfPath cachePath = _ResolveCachePath(usdPrim.GetPath(), instancerContext);
     SdfPath instancer = instancerContext ?
-        instancerContext->instancerId : SdfPath();
-    UsdPrim cachePrim = usdPrim.GetStage()->GetPrimAtPath(
+        instancerContext->instancerCachePath : SdfPath();
+
+    // For an instanced gprim, this is the instancer prim.
+    // For a non-instanced gprim, this is just the gprim.
+    UsdPrim proxyPrim = usdPrim.GetStage()->GetPrimAtPath(
         cachePath.GetAbsoluteRootOrPrimPath());
 
-    index->InsertRprim(primType, cachePath, instancer, cachePrim,
+    index->InsertRprim(primType, cachePath, instancer, proxyPrim,
         instancerContext ? instancerContext->instancerAdapter
             : UsdImagingPrimAdapterSharedPtr());
     HD_PERF_COUNTER_INCR(UsdImagingTokens->usdPopulatedPrimCount);
 
-    // Populate shaders by reference from rprims.
-    SdfPath materialPath = instancerContext ?
-        instancerContext->instanceMaterialId : materialId;
-    UsdPrim materialPrim = usdPrim.GetStage()->GetPrimAtPath(materialPath);
+    // Allow instancer context to override the material binding.
+    SdfPath resolvedUsdMaterialPath = instancerContext ?
+        instancerContext->instancerMaterialUsdPath : materialUsdPath;
+    UsdPrim materialPrim =
+        usdPrim.GetStage()->GetPrimAtPath(resolvedUsdMaterialPath);
 
     if (materialPrim) {
         if (materialPrim.IsA<UsdShadeMaterial>()) {
@@ -124,6 +129,14 @@ UsdImagingGprimAdapter::_AddRprim(TfToken const& primType,
                     "prim <%s> of type (%s)", usdPrim.GetPath().GetText(),
                     materialPrim.GetPath().GetText(),
                     materialPrim.GetTypeName().GetText());
+        }
+    }
+
+    // Populate coordinate system sprims bound to rprims.
+    if (_DoesDelegateSupportCoordSys()) {
+        if (UsdImagingPrimAdapterSharedPtr coordSysAdapter =
+            _GetAdapter(HdPrimTypeTokens->coordSys)) {
+            coordSysAdapter->Populate(usdPrim, index, instancerContext);
         }
     }
 
@@ -223,18 +236,35 @@ UsdImagingGprimAdapter::UpdateForTime(UsdPrim const& prim,
             HdTokens->points,
             HdInterpolationVertex,
             HdPrimvarRoleTokens->point);
+
+        // Velocity information is expected to be authored at the same sample
+        // rate as points data, so use the points dirty bit to let us know when
+        // to publish velocities.
+        UsdGeomPointBased pointBased(prim);
+        VtVec3fArray velocities;
+        if (pointBased.GetVelocitiesAttr() &&
+            pointBased.GetVelocitiesAttr().Get(&velocities, time)) {
+            // Expose velocities as a primvar.
+            _MergePrimvar(
+                &primvars,
+                HdTokens->velocities,
+                HdInterpolationVertex,
+                HdPrimvarRoleTokens->vector);
+            valueCache->GetPrimvar(cachePath, HdTokens->velocities) = 
+                VtValue(velocities);
+        }
     }
 
-    SdfPath usdMaterialPath;
+    SdfPath materialUsdPath;
     if (requestedBits & (HdChangeTracker::DirtyPrimvar |
                          HdChangeTracker::DirtyMaterialId)) {
-        usdMaterialPath = GetMaterialId(prim);
+        materialUsdPath = GetMaterialUsdPath(prim);
 
         // If we're processing this gprim on behalf of an instancer,
         // use the material binding specified by the instancer if we
         // aren't able to find a material binding for this prim itself.
-        if (instancerContext && usdMaterialPath.IsEmpty()) {
-            usdMaterialPath = instancerContext->instanceMaterialId;
+        if (instancerContext && materialUsdPath.IsEmpty()) {
+            materialUsdPath = instancerContext->instancerMaterialUsdPath;
         }
     }
 
@@ -281,12 +311,12 @@ UsdImagingGprimAdapter::UpdateForTime(UsdPrim const& prim,
             }
         } else {
 
-            if (!usdMaterialPath.IsEmpty()) {
+            if (!materialUsdPath.IsEmpty()) {
                 // Obtain the primvars used in the material bound to this prim
                 // and check if they are in this prim, if so, add them to the 
                 // primvars descriptions.
                 TfTokenVector matPrimvarNames;
-                valueCache->FindMaterialPrimvars(usdMaterialPath, 
+                valueCache->FindMaterialPrimvars(materialUsdPath, 
                                                  &matPrimvarNames);
 
                 UsdGeomPrimvarsAPI primvars(gprim);
@@ -324,10 +354,13 @@ UsdImagingGprimAdapter::UpdateForTime(UsdPrim const& prim,
     }
 
     if (requestedBits & HdChangeTracker::DirtyMaterialId){
-        valueCache->GetMaterialId(cachePath) = usdMaterialPath;
+        // Although the material binding cache generally holds
+        // cachePaths, not usdPaths, we can use the usdPath
+        // directly here since we do not instance sprims.
+        valueCache->GetMaterialId(cachePath) = materialUsdPath;
 
         TF_DEBUG(USDIMAGING_SHADERS).Msg("Shader for <%s> is <%s>\n",
-                prim.GetPath().GetText(), usdMaterialPath.GetText());
+                prim.GetPath().GetText(), materialUsdPath.GetText());
 
     }
 }
