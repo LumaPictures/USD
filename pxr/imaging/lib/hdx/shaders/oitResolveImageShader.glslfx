@@ -37,6 +37,41 @@
 
 -- glsl OitResolve.Image
 
+#ifdef OIT_ENABLE_APPROXIMATION
+
+#define OSR OIT_STEP_FUNCTION_RESOLUTION
+
+struct StepNodes {
+    int count;
+    float depth[OSR];
+    float trans[OSR];
+};
+
+void insertNode(float depth, float trans, inout StepNodes nodes) {
+    // No compression for now.
+    // Should we linearize depth? It might be better to put bigger importance
+    // on front fragments, when compressing.
+    int insertIndex = 0;
+    while (insertIndex < min(OSR, nodes.count) &&
+           depth > nodes.depth[insertIndex]) {
+        insertIndex += 1;
+    }
+    if (insertIndex == OSR) {
+        return;
+    }
+
+    for (int id = min(nodes.count, OSR) - 1; id > insertIndex; id -= 1) {
+        nodes.depth[id] = nodes.depth[id - 1];
+        nodes.trans[id] = nodes.trans[id - 1] * trans;
+    }
+
+    nodes.depth[insertIndex] = depth;
+    nodes.depth[insertIndex] = trans;
+    nodes.count += 1;
+}
+
+#endif
+
 vec4 imageShader(vec2 uv)
 {
     int screenWidth = HdGet_oitWidth();
@@ -46,17 +81,54 @@ vec4 imageShader(vec2 uv)
 
     int screenIndex = int(gl_FragCoord.x) + int(gl_FragCoord.y) * screenWidth;
     int nodeIndex = hdxOitCounterBuffer[screenIndex+1];
+#ifdef OIT_ENABLE_APPROXIMATION
+    if (nodeIndex == -1) {
+        return vec4(0.0, 0.0, 0.0, 0.0);
+    }
+
+    StepNodes nodes;
+    for (int id = 0; id < OSR; id += 1) {
+        nodes.depth[id] = 1.0e30;
+        nodes.trans[id] = 1.0;
+    }
+    nodes.count = 0;
+
+    for (int id = nodeIndex; id != -1; id = hdxOitIndexBuffer[id]) {
+        float currentDepth = hdxOitDepthBuffer[id];
+        float currentTrans = 1.0 - hdxOitDataBuffer[id].w;
+        insertNode(currentDepth, currentTrans, nodes);
+    }
+
+    vec3 color = vec3(0.0, 0.0, 0.0);
+    for (int id = nodeIndex; id != -1; id = hdxOitIndexBuffer[id]) {
+        float currentDepth = hdxOitDepthBuffer[id];
+        vec4 currentSample = hdxOitDataBuffer[id];
+        float currentTrans = 1.0 - currentSample.w;
+
+        int closestIndex = 0;
+        while (closestIndex < min(OSR, nodes.count) &&
+               currentDepth > nodes.depth[closestIndex]) {
+            closestIndex += 1;
+        }
+        if (closestIndex != OSR) {
+            color += currentSample.xyz * currentTrans * nodes.trans[closestIndex];
+        }
+    }
+
+    return vec4(color, 1.0);
+#else
     int numDepths = 0;
 
     // XXX renderPass.WriteOitLayersToBuffer does not clamp the number of
     //     depth samples we store for a pixel. Here we process no more than
-    //     'maxSamples' for a pixel. (If there are greater than 'maxSamples'
-    //     samples stored for this pixel some will currently not contribute)
-    const int maxSamples = 8;
-    vec4 sortedColor[maxSamples];
-    float sortedDepth[maxSamples];
+    //     'OIT_LAYER_COUNT' for a pixel. (If there are greater than
+    //     'OIT_LAYER_COUNT' samples stored for this pixel some will
+    //     currently not contribute)
+    vec4 sortedColor[OIT_LAYER_COUNT];
+    float sortedDepth[OIT_LAYER_COUNT];
 
-    while (nodeIndex != -1 && numDepths < maxSamples && nodeIndex < bufferSize){
+    while (nodeIndex != -1 && numDepths < OIT_LAYER_COUNT &&
+           nodeIndex < bufferSize){
         float currentDepth = hdxOitDepthBuffer[nodeIndex]; 
         int insertIndex = numDepths; 
         while (insertIndex > 0 && sortedDepth[insertIndex - 1] > currentDepth) {
@@ -68,19 +140,21 @@ vec4 imageShader(vec2 uv)
         sortedDepth[insertIndex] = hdxOitDepthBuffer[nodeIndex];
         numDepths += 1; 
         nodeIndex = hdxOitIndexBuffer[nodeIndex]; 
-    } 
+    }
     int depth = 0;
     vec4 colorAccum = vec4(0,0,0,0);
     while (depth < numDepths) {
-        vec3 cb = sortedColor[depth].rgb * sortedColor[depth].a; 
-        colorAccum.rgb = colorAccum.rgb + cb * (1 - colorAccum.a);
-        colorAccum.a = colorAccum.a + sortedColor[depth].a; 
+        float ca = sortedColor[depth].a * (1 - colorAccum.a);
+        vec3 cb = sortedColor[depth].rgb;
+        colorAccum.rgb = colorAccum.rgb + cb * ca;
+        colorAccum.a = colorAccum.a + ca;
 
         colorAccum = clamp(colorAccum, vec4(0), vec4(1));
-        if (colorAccum.a >= 1.0) break;
+        if (colorAccum.a >= 0.99) break;
 
         depth += 1; 
     }
 
     return colorAccum;
+#endif
 }
