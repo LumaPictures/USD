@@ -512,7 +512,7 @@ _CreateAndPopulateShaderObject(
         MObject sourceObj = _GetOrCreateShaderObject(
             sourceShaderSchema,
             // any "nested" shader objects are not "shaders"
-            UsdMayaShadingNodeType::None,
+            UsdMayaShadingNodeType::NonShading,
             context);
 
         MFnDependencyNode sourceDepFn(sourceObj, &status);
@@ -581,11 +581,11 @@ DEFINE_SHADING_MODE_IMPORTER(pxrRis, context)
     }
 
     MObject surfaceShaderObj = _GetOrCreateShaderObject(
-            surfaceShader, UsdMayaShadingNodeType::Shader, context);
+        surfaceShader, UsdMayaShadingNodeType::Shader, context);
     MObject volumeShaderObj = _GetOrCreateShaderObject(
-            volumeShader, UsdMayaShadingNodeType::Shader, context);
+        volumeShader, UsdMayaShadingNodeType::Shader, context);
     MObject displacementShaderObj = _GetOrCreateShaderObject(
-            displacementShader, UsdMayaShadingNodeType::Shader, context);
+        displacementShader, UsdMayaShadingNodeType::Shader, context);
 
     if (surfaceShaderObj.isNull() &&
             volumeShaderObj.isNull() &&

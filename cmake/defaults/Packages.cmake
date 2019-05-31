@@ -158,6 +158,10 @@ if (PXR_BUILD_HOUDINI_PLUGIN)
     find_package(USDArnold REQUIRED)
 endif()
 
+if (PXR_BUILD_PRMAN_PLUGIN)
+    find_package(Renderman REQUIRED)
+endif()
+
 if (PXR_BUILD_ALEMBIC_PLUGIN)
     find_package(Alembic REQUIRED)
     find_package(OpenEXR REQUIRED)
