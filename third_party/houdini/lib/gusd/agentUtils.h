@@ -50,6 +50,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
+class GT_RefineParms;
 class UsdSkelBinding;
 class UsdSkelSkeleton;
 class UsdSkelSkinningQuery;
@@ -81,13 +82,14 @@ GusdCreateAgentShapeLib(const UsdSkelBinding& binding,
                         const char* lod=nullptr,
                         GusdPurposeSet purpose=GusdPurposeSet(
                             GUSD_PURPOSE_DEFAULT|GUSD_PURPOSE_PROXY),
-                        UT_ErrorSeverity sev=UT_ERROR_WARNING);
+                        UT_ErrorSeverity sev=UT_ERROR_WARNING,
+                        const GT_RefineParms* refineParms=nullptr);
 
 
 /// Read in all skinnable shapes for \p binding, coalescing them into \p gd.
 /// The \p sev defines the error severity when reading in each shape.
 /// If the severity is less than UT_ERROR_ABORT, the invalid shape is
-/// skipped. Otherwise, creation of the shape lib fails if errors are
+/// skipped. Otherwise, creation of the coalesced detail fails if errors are
 /// produced processing any shapes.
 GUSD_API bool
 GusdCoalesceAgentShapes(GEO_Detail& gd,
@@ -96,7 +98,8 @@ GusdCoalesceAgentShapes(GEO_Detail& gd,
                         const char* lod=nullptr,
                         GusdPurposeSet purpose=GusdPurposeSet(
                             GUSD_PURPOSE_DEFAULT|GUSD_PURPOSE_PROXY),
-                        UT_ErrorSeverity sev=UT_ERROR_WARNING);
+                        UT_ErrorSeverity sev=UT_ERROR_WARNING,
+                        const GT_RefineParms* refineParms=nullptr);
 
 
 /// Read in a skinnable prim given by \p skinningQuery into \p gd.
@@ -115,47 +118,25 @@ GusdReadSkinnablePrim(GU_Detail& gd,
                       const char* lod=nullptr,
                       GusdPurposeSet purpose=GusdPurposeSet(
                           GUSD_PURPOSE_DEFAULT|GUSD_PURPOSE_PROXY),
-                      UT_ErrorSeverity sev=UT_ERROR_ABORT);
+                      UT_ErrorSeverity sev=UT_ERROR_ABORT,
+                      const GT_RefineParms* refineParms=nullptr);
 
 
-/// Helper for writing out a rig, shape library and layer, for 
-/// the skinnable primitives in \p binding.
-///
-/// The Skeleton primitive is converted to a GU_AgentRig, and written to
-/// \p rigFile.
-///
-/// Each skinnable primitive is converted to a shape inside of a
-/// GU_AgentShapeLibrary, with the shape named according to the prim path.
-/// The resulting shape library is written to \p shapeLibFile.
-///
-/// Finally, a new GU_AgentLayer, named \p layerName, is created for the full
-/// set of shapes in the shape library. The layer is saved as \p layerFile.
-///
-/// @warning: This is a *TEMPORARY* method to facilitate conversion of UsdSkel
-/// based assets to GU agents for testing purposes. This method may be removed
-/// in a future release of Gusd, when more robust import mechanisms have been
-/// put in place.
+/// Read shapes for each shape in \p binding.
+/// The \p sev defines the error severity when reading in each shape.
+/// If the severity is less than UT_ERROR_ABORT, invalid shapes are
+/// skipped, and an empty detail handle is stored in \p details for
+/// the corresponding shape. Otherwise, the process returns false if
+/// errors are encountered processing any shapes.
 bool
-GusdWriteAgentFiles(const UsdSkelBinding& binding,
-                    const char* rigFile,
-                    const char* shapeLibFile,
-                    const char* layerFile,
-                    const char* layerName="default");
-
-
-/// Helper for writing out a shape library, consisting of a single shape
-/// resulting from coalescing all prims in \p binding.
-///
-/// The name of the single shape in the shape lib is given by \p shapeName.
-///
-/// @warning: This is a *TEMPORARY* method to facilitate conversion of UsdSkel
-/// based assets to GU agents for testing purposes. This method may be removed
-/// in a future release of Gusd, when more robust import mechanisms have been
-/// put in place.
-bool
-GusdWriteCoalescedShapeLib(const UsdSkelBinding& binding,
-                           const char* shapeLibFile,
-                           const char* shapeName);
+GusdReadSkinnablePrims(const UsdSkelBinding& binding,
+                       UT_Array<GU_DetailHandle>& details,
+                       UsdTimeCode time=UsdTimeCode::EarliestTime(),
+                       const char* lod=nullptr,
+                       GusdPurposeSet purpose=GusdPurposeSet(
+                            GUSD_PURPOSE_DEFAULT|GUSD_PURPOSE_PROXY),
+                       UT_ErrorSeverity sev=UT_ERROR_WARNING,
+                       const GT_RefineParms* refineParms=nullptr);
 
 
 PXR_NAMESPACE_CLOSE_SCOPE
