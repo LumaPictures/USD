@@ -229,6 +229,13 @@ UsdImagingPrimAdapter::GetInstancer(SdfPath const &cachePath)
 }
 
 /*virtual*/
+std::vector<VtArray<TfToken>>
+UsdImagingPrimAdapter::GetInstanceCategories(UsdPrim const& prim)
+{
+    return std::vector<VtArray<TfToken>>();
+}
+
+/*virtual*/
 size_t
 UsdImagingPrimAdapter::SampleInstancerTransform(
     UsdPrim const& instancerPrim,
@@ -630,6 +637,12 @@ UsdImagingPrimAdapter::_GetCoordSysBindings(UsdPrim const& prim) const
     return _delegate->_coordSysBindingCache.GetValue(prim);
 }
 
+UsdImaging_InheritedPrimvarStrategy::value_type
+UsdImagingPrimAdapter::_GetInheritedPrimvars(UsdPrim const& prim) const
+{
+    return _delegate->_inheritedPrimvarCache.GetValue(prim);
+}
+
 bool
 UsdImagingPrimAdapter::_DoesDelegateSupportCoordSys() const
 {
@@ -743,7 +756,7 @@ UsdImagingPrimAdapter::SampleTransform(
     const std::vector<float>& configuredSampleTimes,
     size_t maxNumSamples, float *times, GfMatrix4d *samples)
 {
-    if (maxNumSamples < 1) {
+    if (maxNumSamples < 1 || configuredSampleTimes.empty()) {
         return 0;
     }
     if (!prim) {
@@ -769,7 +782,7 @@ UsdImagingPrimAdapter::SampleTransform(
             _delegate->GetTimeWithOffset(configuredSampleTimes[i]);
         samples[i] = UsdImaging_XfStrategy::ComputeTransform(
             prim, xfCache.GetRootPath(), sceneTime, 
-            _delegate->_rigidXformOverrides);
+            _delegate->_rigidXformOverrides) * _delegate->_rootXf;
     }
 
     // Some backends benefit if they can avoid time sample animation
@@ -839,7 +852,7 @@ UsdImagingPrimAdapter::GetModelDrawMode(UsdPrim const& prim)
 }
 
 SdfPath
-UsdImagingPrimAdapter::GetInstancerBinding(UsdPrim const& prim,
+UsdImagingPrimAdapter::GetInstancerCachePath(UsdPrim const& prim,
                         UsdImagingInstancerContext const* instancerContext)
 {
     return instancerContext ? instancerContext->instancerCachePath
