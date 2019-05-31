@@ -60,7 +60,6 @@ class PcpCache;
 class PcpPrimIndex;
 class PcpPrimIndexInputs;
 class PcpPrimIndexOutputs;
-class PcpPayloadDecorator;
 class SdfPath;
 
 /// \class PcpPrimIndex
@@ -329,7 +328,6 @@ public:
         , includedPayloads(nullptr)
         , includedPayloadsMutex(nullptr)
         , parentIndex(nullptr)
-        , payloadDecorator(nullptr)
         , cull(true)
         , usd(false) 
     { }
@@ -342,11 +340,6 @@ public:
     /// needed intermediate results.
     PcpPrimIndexInputs& Cache(PcpCache* cache_)
     { cache = cache_; return *this; }
-
-    /// If supplied, the given PcpPayloadDecorator will be invoked when
-    /// processing a payload arc.
-    PcpPrimIndexInputs& PayloadDecorator(PcpPayloadDecorator* decorator)
-    { payloadDecorator = decorator; return *this; }
 
     /// Ordered list of variant names to use for the "standin" variant set
     /// if there is no authored opinion in scene description.
@@ -382,10 +375,10 @@ public:
     PcpPrimIndexInputs& USD(bool doUSD = true)
     { usd = doUSD; return *this; }
 
-    /// The target schema for scene description layers encountered during
+    /// The file format target for scene description layers encountered during
     /// prim index computation.
-    PcpPrimIndexInputs& TargetSchema(const std::string& schema)
-    { targetSchema = schema; return *this; }
+    PcpPrimIndexInputs& FileFormatTarget(const std::string& target)
+    { fileFormatTarget = target; return *this; }
 
 // private:
     PcpCache* cache;
@@ -394,8 +387,7 @@ public:
     tbb::spin_rw_mutex *includedPayloadsMutex;
     std::function<bool (const SdfPath &)> includePayloadPredicate;
     const PcpPrimIndex *parentIndex;
-    std::string targetSchema;
-    PcpPayloadDecorator* payloadDecorator;
+    std::string fileFormatTarget;
     bool cull;
     bool usd;
 };
