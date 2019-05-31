@@ -124,6 +124,7 @@ UsdImagingDelegate::UsdImagingDelegate(
     , _visCache(GetTime())
     , _purposeCache() // note that purpose is uniform, so no GetTime()
     , _drawModeCache(GetTime())
+    , _inheritedPrimvarCache()
     , _displayGuides(true)
     , _enableUsdDrawModes(true)
     , _hasDrawModeAdapter( UsdImagingAdapterRegistry::GetInstance()
@@ -901,6 +902,7 @@ UsdImagingDelegate::ApplyPendingUpdates()
     _purposeCache.Clear();
     _drawModeCache.Clear();
     _coordSysBindingCache.Clear();
+    _inheritedPrimvarCache.Clear();
 
     UsdImagingDelegate::_Worker worker;
     UsdImagingIndexProxy indexProxy(this, &worker);
@@ -2499,6 +2501,19 @@ UsdImagingDelegate::GetCategories(SdfPath const &id)
 {
     SdfPath cachePath = ConvertIndexPathToCachePath(id);
     return _collectionCache.ComputeCollectionsContainingPath(cachePath);
+}
+
+/*virtual*/
+std::vector<VtArray<TfToken>>
+UsdImagingDelegate::GetInstanceCategories(SdfPath const &instancerId)
+{
+    SdfPath cachePath = ConvertIndexPathToCachePath(instancerId);
+    _HdPrimInfo *primInfo = _GetHdPrimInfo(cachePath);
+    if (TF_VERIFY(primInfo)) {
+        return primInfo->adapter
+            ->GetInstanceCategories(primInfo->usdPrim);
+    }
+    return std::vector<VtArray<TfToken>>();
 }
 
 // -------------------------------------------------------------------------- //

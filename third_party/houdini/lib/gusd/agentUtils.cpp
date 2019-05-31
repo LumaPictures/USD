@@ -388,7 +388,8 @@ Gusd_ReadSkinnablePrims(const UsdSkelBinding& binding,
                         const char* lod,
                         GusdPurposeSet purpose,
                         UT_ErrorSeverity sev,
-                        UT_Array<GU_ConstDetailHandle>& details)
+                        const GT_RefineParms* refineParms,
+                        UT_Array<GU_DetailHandle>& details)
 {
     TRACE_FUNCTION();
 
@@ -433,7 +434,7 @@ Gusd_ReadSkinnablePrims(const UsdSkelBinding& binding,
                 if (GusdReadSkinnablePrim(
                         *gdl.getGdp(), binding.GetSkinningTargets()[i],
                         jointNames, invBindTransforms,
-                        time, lod, purpose, sev)) {
+                        time, lod, purpose, sev, refineParms)) {
                     details[i] = gdh;
                 } else if (sev >= UT_ERROR_ABORT) {
                     return;
@@ -465,7 +466,8 @@ Gusd_ReadSkinnablePrims(const UsdSkelBinding& binding,
                         const char* lod,
                         GusdPurposeSet purpose,
                         UT_ErrorSeverity sev,
-                        UT_Array<GU_ConstDetailHandle>& details)
+                        const GT_RefineParms* refineParms,
+                        UT_Array<GU_DetailHandle>& details)
 {
     const UsdSkelSkeleton& skel = binding.GetSkeleton();
 
@@ -496,12 +498,55 @@ Gusd_ReadSkinnablePrims(const UsdSkelBinding& binding,
     // XXX: Want *inverse* bind transforms when writing out capture data.
     Gusd_InvertTransforms(invBindTransforms);
     
-    return Gusd_ReadSkinnablePrims(binding, jointNames, invBindTransforms,
-                                   time, lod, purpose, sev, details);
+    return Gusd_ReadSkinnablePrims(binding, jointNames, invBindTransforms, time,
+                                   lod, purpose, sev, refineParms, details);
 }
 
 
 } // namespace
+
+
+bool
+GusdReadSkinnablePrims(const UsdSkelBinding& binding,
+                       UT_Array<GU_DetailHandle>& details,
+                       UsdTimeCode time,
+                       const char* lod,
+                       GusdPurposeSet purpose,
+                       UT_ErrorSeverity sev,
+                       const GT_RefineParms* refineParms)
+{
+    const UsdSkelSkeleton& skel = binding.GetSkeleton();
+
+    VtTokenArray joints;
+    if (!skel.GetJointsAttr().Get(&joints)) {
+        GUSD_WARN().Msg("%s -- 'joints' attr is invalid",
+                        skel.GetPrim().GetPath().GetText());
+        return false;
+    }
+    VtTokenArray jointNames;
+    if (!Gusd_GetJointNames(skel, joints, jointNames)) {
+        return false;
+    }
+
+    VtMatrix4dArray invBindTransforms;
+    if (!skel.GetBindTransformsAttr().Get(&invBindTransforms)) {
+        GUSD_WARN().Msg("%s -- no authored bindTransforms",
+                        skel.GetPrim().GetPath().GetText());
+        return false;
+    }
+    if (invBindTransforms.size() != joints.size()) {
+        GUSD_WARN().Msg("%s -- size of 'bindTransforms' [%zu] != "
+                        "size of 'joints' [%zu].",
+                        skel.GetPrim().GetPath().GetText(),
+                        invBindTransforms.size(), joints.size());
+        return false;
+    }
+    // XXX: Want *inverse* bind transforms when writing out capture data.
+    Gusd_InvertTransforms(invBindTransforms);
+    
+    return Gusd_ReadSkinnablePrims(binding, jointNames, invBindTransforms, time,
+                                   lod, purpose, sev, refineParms, details);
+}
 
 
 bool
@@ -512,7 +557,8 @@ GusdReadSkinnablePrim(GU_Detail& gd,
                       UsdTimeCode time,
                       const char* lod,
                       GusdPurposeSet purpose,
-                      UT_ErrorSeverity sev)
+                      UT_ErrorSeverity sev,
+                      const GT_RefineParms* refineParms)
 {
     TRACE_FUNCTION();
 
@@ -539,8 +585,7 @@ GusdReadSkinnablePrim(GU_Detail& gd,
 
     return (GusdGU_USD::ImportPrimUnpacked(
                 gd, skinnedPrim, time, lod, purpose, primvarPattern,
-                &GusdUT_Gf::Cast(geomBindTransform),
-                /*addPathAttributes*/ false) &&
+                &GusdUT_Gf::Cast(geomBindTransform), refineParms) &&
             Gusd_CreateCaptureAttributes(
                 gd, invBindTransforms, localJointNames, sev));
 }
@@ -551,14 +596,16 @@ GusdCreateAgentShapeLib(const UsdSkelBinding& binding,
                         UsdTimeCode time,
                         const char* lod,
                         GusdPurposeSet purpose,
-                        UT_ErrorSeverity sev)
+                        UT_ErrorSeverity sev,
+                        const GT_RefineParms* refineParms)
 {
     const UsdSkelSkeleton& skel = binding.GetSkeleton();
 
     // Read geom for each skinning target into its own detail.
 
-    UT_Array<GU_ConstDetailHandle> details;
-    if (!Gusd_ReadSkinnablePrims(binding, time, lod, purpose, sev, details)) {
+    UT_Array<GU_DetailHandle> details;
+    if (!Gusd_ReadSkinnablePrims(binding, time, lod, purpose,
+                                 sev, refineParms, details)) {
         return nullptr;
     }
 
@@ -586,7 +633,7 @@ namespace {
 // TODO: This is the bottle neck in import.
 bool
 _CoalesceShapes(GEO_Detail& coalescedGd,
-                const UT_Array<GU_ConstDetailHandle>& details)
+                const UT_Array<GU_DetailHandle>& details)
 {
     UT_AutoInterrupt task("Coalesce shapes");
 
@@ -611,98 +658,15 @@ GusdCoalesceAgentShapes(GEO_Detail& gd,
                         UsdTimeCode time,
                         const char* lod,
                         GusdPurposeSet purpose,
-                        UT_ErrorSeverity sev)
+                        UT_ErrorSeverity sev,
+                        const GT_RefineParms* refineParms)
 {
-    UT_Array<GU_ConstDetailHandle> details;
-    if (Gusd_ReadSkinnablePrims(binding, time, lod, purpose, sev, details)) {
+    UT_Array<GU_DetailHandle> details;
+    if (GusdReadSkinnablePrims(binding, details, time, lod,
+                               purpose, sev, refineParms)) {
         return _CoalesceShapes(gd, details);
     }
     return false;
-}
-
-
-bool
-GusdWriteAgentFiles(const UsdSkelBinding& binding,
-                    const char* rigFile,
-                    const char* shapeLibFile,
-                    const char* layerFile,
-                    const char* layerName)
-{
-    const UsdSkelSkeleton& skel = binding.GetSkeleton();
-    if (!skel) {
-        TF_CODING_ERROR("'binding' is invalid");
-        return false;
-    }
-
-    bool success = true;
-
-    GU_AgentRigPtr rig = GusdCreateAgentRig(rigFile, binding.GetSkeleton());
-    if (!rig) {
-        TF_WARN("Failed creating rig");
-        return false;
-    }
-
-    UT_AutoJSONWriter rigWriter(rigFile, /*binary*/ false);
-    success &= rig->save(*rigWriter);
-
-    GU_AgentShapeLibPtr shapeLib = GusdCreateAgentShapeLib(binding);
-    if (!shapeLib) {
-        TF_WARN("Failed creating shape library");
-        return false;
-    }
-
-    UT_AutoJSONWriter shapeWriter(shapeLibFile, /*binary*/ true);
-    success &= shapeLib->save(*shapeWriter);
-
-    GU_AgentLayerPtr lyr = GU_AgentLayer::addLayer(layerName, rig, shapeLib);
-    lyr->setName(layerName);
-
-    UT_StringArray names;
-    for (const auto& pair : (*shapeLib)) {
-        names.append(pair.first);
-    }
-    UT_IntArray transforms(names.size(), names.size());
-    transforms.constant(0);
-
-    UT_Array<bool> deforming(names.size(), names.size());
-    deforming.constant(true);
-
-    if (lyr->construct(names, transforms, deforming)) {
-        UT_AutoJSONWriter layerWriter(layerFile, /*binary*/ false);
-        success &= lyr->save(*layerWriter);
-    } else {
-        TF_WARN("Failed creating agent layer '%s' from shape lib", layerName);
-        return false;
-    }
-
-    return success;
-}
-
-
-bool
-GusdWriteCoalescedShapeLib(const UsdSkelBinding& binding,
-                           const char* shapeLibFile,
-                           const char* shapeName)
-{
-    GU_DetailHandle gdh;
-    gdh.allocateAndSet(new GU_Detail);
-
-    {
-        const GU_DetailHandleAutoWriteLock gdl(gdh);
-        if (!GusdCoalesceAgentShapes(*gdl.getGdp(), binding)) {
-            return false;
-        }
-    }
-
-    const UsdSkelSkeleton& skel = binding.GetSkeleton();
-
-    auto shapeLib =
-        GU_AgentShapeLib::addLibrary(skel.GetPrim().GetPath().GetText());
-
-    shapeLib->addShape(shapeName, gdh);
-
-    UT_AutoJSONWriter shapeWriter(shapeLibFile, /*binary*/ true);
-    return shapeLib->save(*shapeWriter);
 }
 
 

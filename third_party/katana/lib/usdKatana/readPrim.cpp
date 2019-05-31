@@ -48,6 +48,7 @@
 #include "pxr/usd/usdGeom/xform.h"
 
 #include "pxr/usd/usdShade/material.h"
+#include "pxr/usd/usdShade/materialBindingAPI.h"
 
 #include "pxr/usd/usdRi/statementsAPI.h"
 
@@ -273,6 +274,15 @@ _AppendPathToIncludeExcludeStr(
     }
 }
 
+
+// CEL cannot use collections whose name contain ":" so we have to do something
+// with those within namespaces (specifically the material-binding ones)
+static
+std::string _GetKatanaCollectionName(const TfToken &collectionName)
+{
+    return pystring::replace(collectionName.GetString(), ":", "__");
+}
+
 static 
 std::string
 _GetKatanaCollectionPath(
@@ -282,6 +292,8 @@ _GetKatanaCollectionPath(
     const TfToken &srcCollectionName,
     const PxrUsdKatanaUsdInPrivateData& data)
 {
+    std::string katanaCollectionName(_GetKatanaCollectionName(collectionName));
+
     if (collPrimPath.HasPrefix(prim.GetPath())) {
         const size_t prefixLength = prim.GetPath().GetString().length();
         std::string relativePath = collPrimPath.GetString().substr(prefixLength);
@@ -293,7 +305,7 @@ _GetKatanaCollectionPath(
             relativePath = "/";
 
         return TfStringPrintf("(%s/$%s)", relativePath.c_str(), 
-                              collectionName.GetText());
+                              katanaCollectionName.c_str());
     } else {
         FnLogWarn("Collection " << srcCollectionName   
             << " includes collection " << collPrimPath << ".collection:" << 
@@ -310,7 +322,7 @@ _GetKatanaCollectionPath(
                 PxrUsdKatanaUtils::ConvertUsdPathToKatLocation(
                     collPrimPath, data);
         return TfStringPrintf("(%s/$%s)", katPrimPath.c_str(), 
-                              collectionName.GetText());
+                              katanaCollectionName.c_str());
     }
 }
 
@@ -379,7 +391,8 @@ _BuildCollections(
             FnKat::StringAttribute collectionAttr = collectionBuilder.build();
             if (collectionAttr.getNearestSample(0).size() > 0) {
                 collectionsBuilder.set(
-                        collection.GetName().GetString() + ".cel",
+                        _GetKatanaCollectionName(collection.GetName())
+                                + ".cel",
                         collectionAttr);
             }
         } else {
@@ -410,7 +423,8 @@ _BuildCollections(
             // If empty, no point creating collection
             FnKat::StringAttribute collectionAttr = collectionBuilder.build();
             if (collectionAttr.getNearestSample(0).size() > 0) {
-                collectionsBuilder.set(collection.GetName().GetString() + ".baked",
+                collectionsBuilder.set(_GetKatanaCollectionName(
+                        collection.GetName()) + ".baked",
                                     collectionAttr);
             }
         }
@@ -737,6 +751,20 @@ PxrUsdKatanaReadPrim(
     //
 
     attrs.set("materialAssign", PxrUsdKatanaUtils::GetMaterialAssignAttr(prim, data));
+
+
+    //
+    // Set the 'usd.materialBindings' attribute from collection-based material
+    // bindings.
+    //
+
+    FnKat::Attribute bindingsAttr =
+            PxrUsdKatanaUtils::GetCollectionBasedMaterialAssignments(prim, data);
+    if (bindingsAttr.isValid())
+    {
+        attrs.set("usd.materialBindings", bindingsAttr);
+    }
+
 
     //
     // Set the 'prmanStatements' attribute.
