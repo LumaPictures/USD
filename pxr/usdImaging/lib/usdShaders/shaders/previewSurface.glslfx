@@ -296,8 +296,9 @@ evaluateLights(
         // Calculate the shadow factor
         float shadow = 1.0;
     #if USE_SHADOWS
+        float slope = tan(acos(NdotL));
         shadow = (lightSource[i].hasShadow) ?
-            shadowing(lightSource[i].shadowIndex, Peye) : 1.0;
+            shadowing(lightSource[i].shadowIndex, Peye, slope) : 1.0;
     #endif
 
         float intensity = atten * spot * shadow;

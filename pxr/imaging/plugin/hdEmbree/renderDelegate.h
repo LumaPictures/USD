@@ -31,7 +31,11 @@
 #include "pxr/base/tf/staticTokens.h"
 
 #include <mutex>
+#if EMBREE_VERSION_MAJOR == 3
+#include <embree3/rtcore.h>
+#else
 #include <embree2/rtcore.h>
+#endif
 
 PXR_NAMESPACE_OPEN_SCOPE
 

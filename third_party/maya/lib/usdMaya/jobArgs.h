@@ -92,6 +92,7 @@ TF_DECLARE_PUBLIC_TOKENS(
     (pythonPostCallback) \
     (renderableOnly) \
     (renderLayerMode) \
+    (root) \
     (shadingMode) \
     (stripNamespaces) \
     (verbose) \
@@ -120,10 +121,15 @@ TF_DECLARE_PUBLIC_TOKENS(
     (metadata) \
     (shadingMode) \
     (useAsAnimationCache) \
+    (instanceMode) \
     /* assemblyRep values */ \
     (Collapsed) \
     (Full) \
     (Import) \
+    /* instanceMode values */ \
+    (asTransform) \
+    (flatten) \
+    (buildSources) \
     ((Unloaded, ""))
 
 TF_DECLARE_PUBLIC_TOKENS(
@@ -197,6 +203,10 @@ struct UsdMayaJobExportArgs
     /// data should be exported.
     const std::vector<double> timeSamples;
 
+    // Optionally specified path to use as top level prim in
+    // place of the scene root.
+    std::string exportRootPath;
+
     // This path is provided when dealing with variants
     // where a _BaseModel_ root path is used instead of
     // the model path. This to allow a proper internal reference.
@@ -260,6 +270,7 @@ struct UsdMayaJobImportArgs
     const TfToken::Set includeAPINames;
     const TfToken::Set includeMetadataKeys;
     TfToken shadingMode; // XXX can we make this const?
+    const TfToken instanceMode;
     const bool useAsAnimationCache;
 
     const bool importWithProxyShapes;

@@ -267,6 +267,23 @@ UsdGeomModelAPI::CreateModelCardTextureZNegAttr(VtValue const &defaultValue, boo
                        writeSparsely);
 }
 
+UsdAttribute
+UsdGeomModelAPI::GetModelCardDisplayFacingAttr() const
+{
+    return GetPrim().GetAttribute(UsdGeomTokens->modelCardDisplayFacing);
+}
+
+UsdAttribute
+UsdGeomModelAPI::CreateModelCardDisplayFacingAttr(VtValue const &defaultValue, bool writeSparsely) const
+{
+    return UsdSchemaBase::_CreateAttr(UsdGeomTokens->modelCardDisplayFacing,
+                       SdfValueTypeNames->Bool,
+                       /* custom = */ false,
+                       SdfVariabilityUniform,
+                       defaultValue,
+                       writeSparsely);
+}
+
 namespace {
 static inline TfTokenVector
 _ConcatenateAttributeNames(const TfTokenVector& left,const TfTokenVector& right)
@@ -294,6 +311,7 @@ UsdGeomModelAPI::GetSchemaAttributeNames(bool includeInherited)
         UsdGeomTokens->modelCardTextureXNeg,
         UsdGeomTokens->modelCardTextureYNeg,
         UsdGeomTokens->modelCardTextureZNeg,
+        UsdGeomTokens->modelCardDisplayFacing,
     };
     static TfTokenVector allNames =
         _ConcatenateAttributeNames(

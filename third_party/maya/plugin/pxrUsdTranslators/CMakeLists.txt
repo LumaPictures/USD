@@ -29,6 +29,7 @@ pxr_plugin(${PXR_PACKAGE}
         fileTextureWriter
         instancerWriter
         jointWriter
+        lightWriter
         locatorWriter
         meshWriter
         nurbsCurveWriter
@@ -38,7 +39,6 @@ pxr_plugin(${PXR_PACKAGE}
     CPPFILES
         cameraReader.cpp
         lightReader.cpp
-        lightWriter.cpp
         materialReader.cpp
         meshReader.cpp
         meshWriter_Primvars.cpp

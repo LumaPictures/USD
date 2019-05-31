@@ -46,6 +46,8 @@
 #include "pxr/usd/sdf/fileFormat.h"
 #include "pxr/usd/sdf/primSpec.h"
 
+#include <pxr/usd/usdAi/aiVolume.h>
+
 #include <CH/CH_Manager.h>
 #include <GA/GA_Range.h>
 #include <GT/GT_GEODetail.h>
@@ -79,9 +81,13 @@
 #include "gusd/UT_Gf.h"
 #include "gusd/UT_Version.h"
 #include "gusd/context.h"
+#include "gusd/shadingModeRegistry.h"
 #include "gusd/xformWrapper.h"
 
 #include "boost/foreach.hpp"
+#include "../../lib/gusd/refiner.h"
+
+#define OPENVDB_USE_BLOSC
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -177,6 +183,18 @@ getTemplates()
     
     static PRM_Name shaderHeadingName("shaderheading", "Shaders");
     static PRM_Name enableShadersName("enableshaders", "Output Shaders");
+    static vector<PRM_Name> shadingModes;
+    if (shadingModes.empty()) {
+        const auto exporters = GusdShadingModeRegistry::listExporters();
+        shadingModes.reserve(exporters.size() + 1);
+        for (const auto& exporter: exporters) {
+            shadingModes.emplace_back(std::get<0>(exporter).GetText(), std::get<1>(exporter).GetText());
+        }
+        shadingModes.emplace_back();
+    }
+    static PRM_ChoiceList shadingModeMenu(PRM_CHOICELIST_SINGLE,
+                                          shadingModes.data());
+    static PRM_Name shadingModeName("shadingmode", "Shading Mode");
     static PRM_Name usdShadingFileName("usdshadingfile", "USD Shading File");
     static PRM_Name usdShaderName("usdshader", "USD Shader");
     static PRM_Name shaderOutDirName("shaderoutdir", "Shader Output Dir");
@@ -189,6 +207,23 @@ getTemplates()
     static PRM_Name useObjTransformName("useobjtransform","Use Object Transform");
     static PRM_Name instanceRefsName("usdinstancing","Enable USD Instancing");
     static PRM_Name authorVariantSelName("authorvariantselection", "Author Variant Selections");
+
+    static vector<PRM_Name> vdbCompressionModes;
+    if (vdbCompressionModes.empty()) {
+        vdbCompressionModes.emplace_back("none", "None");
+        vdbCompressionModes.emplace_back("zip", "ZIP");
+#ifdef OPENVDB_USE_BLOSC
+        vdbCompressionModes.emplace_back("blosc", "Blosc");
+#endif
+        vdbCompressionModes.emplace_back();
+    }
+    static PRM_ChoiceList vdbCompressionModeMenu(PRM_CHOICELIST_SINGLE,
+                                                 vdbCompressionModes.data());
+    static PRM_Name volumeHeadingName("volumeheading", "Volumes");
+    static PRM_Name enableVdbOutputName("enablevdbout", "Enable VDB Output");
+    static PRM_Name vdbCompressionModeName("vdbcompression", "VDB Compression");
+    static PRM_Name vdbOutputName("vdbout", "VDB Output");
+    static PRM_Conditional vdbConditional("{ enablevdbout == 0 }");
 
     static PRM_Name overlayHeadingName( "overlayheading", "Overlay");
     static PRM_Name overlayName("overlay", "Overlay Existing Geometry");
@@ -365,6 +400,58 @@ getTemplates()
             "explicity set when the packed prim was created. This is useful "
             "when writing prototypes for point instancers.",
             0), // disable rules
+
+        PRM_Template(
+            PRM_HEADING,
+            1,
+            &volumeHeadingName,
+            0, // default
+            0, // menu choices
+            0, // range
+            0, // callback
+            0, // thespareptr (leave default)
+            0, // paramgroup (leave default)
+            0, // help string
+            0), // disable rules
+
+        PRM_Template(
+            PRM_TOGGLE,
+            1,
+            &enableVdbOutputName,
+            PRMzeroDefaults,
+            0, // menu choices
+            0, // range
+            0, // callback
+            0, // thespareptr (leave default)
+            0, // paramgroup (leave default)
+            "Enable writing out VDB to a file.", // help string
+            0), // disable rules
+
+        PRM_Template(
+            PRM_ORD,
+            1,
+            &vdbCompressionModeName,
+            nullptr,
+            &vdbCompressionModeMenu,
+            0, // range
+            0, // callback
+            0, // thespareptr
+            0, // parmgroup
+            "Compression for the VDB file. (Currently disabled)", // help string
+            &vdbConditional), // disable rules
+
+        PRM_Template(
+            PRM_STRING,
+            1,
+            &vdbOutputName,
+            0, // default
+            0, // menu choices
+            0, // range
+            0, // callback
+            0, // thespareptr (leave default)
+            0, // paramgroup (leave default)
+            "File path where the VDB is going to be written.", // help string
+            &vdbConditional), // disable rules
 
         PRM_Template(
             PRM_HEADING,
@@ -642,6 +729,13 @@ getTemplates()
             0), // disable rules
 
         PRM_Template(
+            PRM_ORD,
+            1,
+            &shadingModeName,
+            nullptr,
+            &shadingModeMenu),
+
+        PRM_Template(
             PRM_STRING,
             1,
             &shaderOutDirName,
@@ -834,6 +928,7 @@ getVariablePair()
 void GusdROP_usdoutput::
 Register(OP_OperatorTable* table)
 {
+    GusdShadingModeRegistry::loadPlugins(table);
     OP_Operator* usdOutROP = new OP_Operator(
             "pixar::usdoutput",
             "USD Output",
@@ -1433,7 +1528,7 @@ renderFrame(fpreal time,
     //
     // Store maps of per-prim assignments for both shader types.
     UsdRefShaderMap usdRefShaderMap;
-    HouMaterialMap houMaterialMap;
+    GusdShadingModeRegistry::HouMaterialMap houMaterialMap;
 
     // Set up the variables needed for doing multi-seg writing of samples.
     // The default behavior is to write a single sample at the given frame.
@@ -1463,7 +1558,8 @@ renderFrame(fpreal time,
     for (size_t s = 0; s < samples; s++) {
         double sampleFrame = frame + shutterOpen + (segment * s);
 
-        OP_Context houdiniContext(CHgetTimeFromFrame(sampleFrame));
+        fpreal sampleTime = CHgetTimeFromFrame(sampleFrame);
+        OP_Context houdiniContext(sampleTime);
 
         bool useObj = static_cast<bool>(evalInt( "useobjtransform", 0, 0 ));
         // Get the OBJ node transform
@@ -1575,6 +1671,69 @@ renderFrame(fpreal time,
 
         UT_Set<SdfPath> gprimsProcessedThisFrame;
         bool needToUpdateModelExtents = false;
+
+        if (evalInt("enablevdbout", 0, 0) != 0) {
+            UT_String vdbPath;
+            if (!evalParameterOrProperty("vdbout", 0, sampleTime, vdbPath)) {
+                objNode->evalParameterOrProperty("vdbout", 0, sampleTime, vdbPath);
+            }
+            if (vdbPath.isstring() && !refinerCollector.m_vdbs.empty()) {
+                openvdb::io::File vdbFile(vdbPath.c_str());
+
+                UT_String compressionMode;
+                evalString(compressionMode, "vdbcompression", 0, 0);
+                // Following the logic in the official openvdb repository.
+    #ifdef OPENVDB_USE_BLOSC
+                auto compressionFlags = vdbFile.compression();
+                if (compressionMode == "none") {
+                    compressionFlags &= ~(openvdb::io::COMPRESS_ZIP | openvdb::io::COMPRESS_BLOSC);
+                } else if (compressionMode == "zip") {
+                    compressionFlags |= openvdb::io::COMPRESS_ZIP;
+                    compressionFlags &= ~openvdb::io::COMPRESS_BLOSC;
+                } else if (compressionMode == "blosc") {
+                    compressionFlags &= ~openvdb::io::COMPRESS_ZIP;
+                    compressionFlags |= openvdb::io::COMPRESS_BLOSC;
+                }
+    #else
+                uint32_t compressionFlags = openvdb::io::COMPRESS_ACTIVE_MASK;
+                if (compressionMode == "zip") {
+                    compressionFlags |= openvdb::io::COMPRESS_ZIP;
+                }
+    #endif
+                vdbFile.setCompression(compressionFlags);
+
+                const SdfPath volumePath(refiner.createPrimPath("volume"));
+                auto materialFound = false;
+                openvdb::GridCPtrVec outGrids;
+                UT_BoundingBox houdiniBounds(
+                    SYS_FP32_MAX, SYS_FP32_MAX, SYS_FP32_MAX,
+                    SYS_FP32_MIN, SYS_FP32_MIN, SYS_FP32_MIN);
+                for (auto vdbHandle: refinerCollector.m_vdbs) {
+                    auto* vdb = dynamic_cast<GT_PrimVDB*>(vdbHandle.get());
+                    if (vdb == nullptr) { continue; }
+                    // TODO: can we avoid copying the grid?
+                    vdbHandle->enlargeRenderBounds(&houdiniBounds, 1);
+                    outGrids.push_back(openvdb::GridBase::ConstPtr(vdb->getGrid()->copyGrid()));
+                    if (!materialFound) {
+                        auto materialPath = getStringUniformOrDetailAttribute(vdbHandle, "shop_materialpath");
+                        if (!materialPath.empty()) {
+                            addShaderToMap(materialPath, volumePath, houMaterialMap);
+                        }
+                        materialFound = true;
+                    }
+                    GusdGT_Utils::getExtentsArray(vdbHandle);
+                }
+                vdbFile.write(outGrids);
+                vdbFile.close();
+
+                UsdAiVolume volume = UsdAiVolume::Define(m_usdStage, volumePath);
+                volume.CreateFilenameAttr().Set(SdfAssetPath(vdbPath.c_str()), ctxt.time);
+                VtArray<GfVec3f> bounds(2);
+                bounds[0].Set(houdiniBounds.minvec().data());
+                bounds[1].Set(houdiniBounds.maxvec().data());
+                volume.CreateExtentAttr().Set(bounds, ctxt.time);
+            }
+        }
 
         GusdSimpleXformCache xformCache;
 
@@ -1979,7 +2138,7 @@ renderFrame(fpreal time,
 
 ROP_RENDER_CODE GusdROP_usdoutput::
 bindAndWriteShaders(UsdRefShaderMap& usdRefShaderMap,
-                    HouMaterialMap& houMaterialMap)
+                    GusdShadingModeRegistry::HouMaterialMap& houMaterialMap)
 {
     //
     // This ROP supports binding shaders from 2 different sources:
@@ -2064,34 +2223,23 @@ bindAndWriteShaders(UsdRefShaderMap& usdRefShaderMap,
         }
     }
 
-    UT_String shaderOutDir;
-    evalString(shaderOutDir, "shaderoutdir", 0, 0);
-
     //
     // Handle all houdini material shaders last.
     //
-    for (auto assignmentIt = houMaterialMap.begin();
-         assignmentIt != houMaterialMap.end(); ++assignmentIt) {
+    UT_String shaderOutDir;
+    evalString(shaderOutDir, "shaderoutdir", 0, 0);
 
-        VOP_Node* materialVop = findVOPNode(assignmentIt->first.c_str());
-        if (materialVop == NULL ||
-            strcmp(materialVop->getRenderMask(),"RIB") != 0) {
-            continue;
-        }
+    UT_String shadingMode;
+    evalString(shadingMode, "shadingmode", 0, 0);
 
-        UT_String vopPath(materialVop->getFullPath());
-        vopPath.forceAlphaNumeric();
-        SdfPath path = looksPath.AppendPath(SdfPath(vopPath.toStdString()));
-
-        GusdShaderWrapper shader(materialVop, m_usdStage, path.GetString(),
-                                 shaderOutDir.toStdString());
-
-        vector<SdfPath>& primPaths = assignmentIt->second;
-        for (auto primPathIt = primPaths.begin();
-             primPathIt != primPaths.end(); ++primPathIt) {
-            UsdPrim prim = m_usdStage->GetPrimAtPath(*primPathIt);
-            shader.bind(prim);
-        }
+    auto shaderExporter = GusdShadingModeRegistry::getExporter(TfToken(shadingMode.toStdString()));
+    if (shaderExporter != nullptr) {
+        shaderExporter(
+            this,
+            m_usdStage,
+            looksPath,
+            houMaterialMap,
+            shaderOutDir.toStdString());
     }
 
     return ROP_CONTINUE_RENDER;

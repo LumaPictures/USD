@@ -1758,6 +1758,15 @@ class PointInstancer "PointInstancer" (
        \\ref UsdGeom_VelocityInterpolation ."""
   )
 
+  vector3f[] accelerations (
+       doc = """If provided, per-instance 'acceleration' will be used to
+       compute positions between samples for the 'positions' attribute,
+       rather than interpolating between neighboring 'positions' samples.
+       Velocity is measured in position units per second, as per most
+       simulation software. To convert to position units per UsdTimeCode,
+       divide by UsdStage::GetTimeCodesPerSecond()."""
+  )
+
   vector3f[] angularVelocities (
       doc="""If authored, per-instance angular velocity vector to be used for
       interoplating orientations.  Angular velocities should be considered
@@ -2007,6 +2016,10 @@ class "GeomModelAPI"
     asset model:cardTextureZNeg (
         doc = """In \\em cards imaging mode, the texture applied to the Z- quad.
                  The texture axes (s,t) are mapped to model-space axes (-x, -y)."""
+    )
+    uniform bool model:cardDisplayFacing (
+        doc = """If true, in \\em cards imaging mode only the camera facing
+                  quad will be displayed."""
     )
 }
 

@@ -526,6 +526,32 @@ public:
 
 public:
     // --------------------------------------------------------------------- //
+    // ACCELERATIONS 
+    // --------------------------------------------------------------------- //
+    /// If provided, per-instance 'acceleration' will be used to
+    /// compute positions between samples for the 'positions' attribute,
+    /// rather than interpolating between neighboring 'positions' samples.
+    /// Velocity is measured in position units per second, as per most
+    /// simulation software. To convert to position units per UsdTimeCode,
+    /// divide by UsdStage::GetTimeCodesPerSecond().
+    ///
+    /// \n  C++ Type: VtArray<GfVec3f>
+    /// \n  Usd Type: SdfValueTypeNames->Vector3fArray
+    /// \n  Variability: SdfVariabilityVarying
+    /// \n  Fallback Value: No Fallback
+    USDGEOM_API
+    UsdAttribute GetAccelerationsAttr() const;
+
+    /// See GetAccelerationsAttr(), and also 
+    /// \ref Usd_Create_Or_Get_Property for when to use Get vs Create.
+    /// If specified, author \p defaultValue as the attribute's default,
+    /// sparsely (when it makes sense to do so) if \p writeSparsely is \c true -
+    /// the default for \p writeSparsely is \c false.
+    USDGEOM_API
+    UsdAttribute CreateAccelerationsAttr(VtValue const &defaultValue = VtValue(), bool writeSparsely=false) const;
+
+public:
+    // --------------------------------------------------------------------- //
     // ANGULARVELOCITIES 
     // --------------------------------------------------------------------- //
     /// If authored, per-instance angular velocity vector to be used for
@@ -912,6 +938,8 @@ public:
         const VtVec3fArray& positions,
         const VtVec3fArray& velocities,
         UsdTimeCode velocitiesSampleTime,
+        const VtVec3fArray& accelerations,
+        UsdTimeCode accelerationsSampleTime,
         const VtVec3fArray& scales,
         const VtQuathArray& orientations,
         const VtVec3fArray& angularVelocities,
@@ -949,17 +977,34 @@ private:
         UsdTimeCode* velocitiesSampleTime,
         VtVec3fArray* velocities) const;
 
-    // Get the authored positions and velocities for instance transform
-    // computation. This method fails if the positions can't be fetched (see
-    // _GetPositionsForInstanceTransforms). If velocities can't be fetched (see
-    // _GetVelocitiesForInstanceTransforms) or positions are not time-varying,
-    // then \p velocities is cleared and \p velocitiesSampleTime is not changed.
-    bool _GetPositionsAndVelocitiesForInstanceTransforms(
+    // Get the authored accelerations for instance transform computation. Fail
+    // if there are no authored accelerations, the number of accelerations
+    // doesn't match the number of instances, or the acceleration timesample
+    // does not align with the acceleration timesample.
+    bool _GetAccelerationsForInstanceTransforms(
+        UsdTimeCode baseTime,
+        size_t numInstances,
+        UsdTimeCode positionsSampleTime,
+        UsdTimeCode* accelerationsSampleTime,
+        VtVec3fArray* accelerations) const;
+
+    // Get the authored positions, velocities and accelerations for instance
+    // transform computation. This method fails if the positions can't be
+    // fetched (see _GetPositionsForInstanceTransforms). If velocities can't be
+    // fetched (see _GetVelocitiesForInstanceTransforms) or positions are
+    // not time-varying, then \p velocities is cleared and
+    // \p velocitiesSampleTime is not changed. If accelerations can't be fetched
+    // (see _GetAccelerationsForInstanceTransforms) or positions are not
+    // time-varying, then \p accelerations is cleared and
+    // \p accelerationsSampleTime is not changed.
+    bool _GetPositionsAndVelocitiesAndAccelerationsForInstanceTransforms(
         UsdTimeCode baseTime,
         size_t numInstances,
         VtVec3fArray* positions,
         VtVec3fArray* velocities,
-        UsdTimeCode* velocitiesSampleTime) const;
+        UsdTimeCode* velocitiesSampleTime,
+        VtVec3fArray* accelerations,
+        UsdTimeCode* accelerationsSampleTime) const;
 
     // Get the authored scales for instance transform computation. Fail if there
     // are no authored scales or the number of scales doesn't match the number
@@ -1020,6 +1065,8 @@ private:
         VtVec3fArray* positions,
         VtVec3fArray* velocities,
         UsdTimeCode* velocitiesSampleTime,
+        VtVec3fArray* accelerations,
+        UsdTimeCode* accelerationsSampleTime,
         VtVec3fArray* scales,
         VtQuathArray* orientations,
         VtVec3fArray* angularVelocities,

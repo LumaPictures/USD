@@ -24,6 +24,7 @@
 option(PXR_STRICT_BUILD_MODE "Turn on additional warnings. Enforce all warnings as errors." OFF)
 option(PXR_VALIDATE_GENERATED_CODE "Validate script generated code" OFF)
 option(PXR_HEADLESS_TEST_MODE "Disallow GUI based tests, useful for running under headless CI systems." OFF)
+option(PXR_BUILD_USD "Build the core libraries" ON)
 option(PXR_BUILD_TESTS "Build tests" ON)
 option(PXR_BUILD_IMAGING "Build imaging components" ON)
 option(PXR_BUILD_EMBREE_PLUGIN "Build embree imaging plugin" OFF)
@@ -96,6 +97,12 @@ set(PXR_LIB_PREFIX "lib"
     CACHE
     STRING
     "Prefix for build library name"
+)
+
+set(PXR_CXX_STD "11"
+    CACHE
+    STRING
+    "Which C++ standard / version to use, as an integer - ie, 14 means use c++14."
 )
 
 option(BUILD_SHARED_LIBS "Build shared libraries." ON)

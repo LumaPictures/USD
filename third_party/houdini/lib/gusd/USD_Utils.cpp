@@ -746,7 +746,7 @@ SetVariantsFromPath(const SdfPath& path, const SdfLayerHandle& layer)
             if(p.IsPrimVariantSelectionPath()) {
                 auto sel = p.GetVariantSelection();
                 SdfPrimSpecHandle spec =
-                    SdfCreatePrimInLayer(layer, p.GetPrimPath());
+                    SdfCreatePrimInLayer(layer, p.GetPrimPath().StripAllVariantSelections());
                 spec->SetVariantSelection(sel.first, sel.second);
             }
         }

@@ -38,14 +38,20 @@
 #else  // NUM_LIGHTS == 0
 
 struct ShadowMatrix {
-    mat4 eyeToShadowMatrix;
+    mat4 viewToShadowMatrix;
     vec4 basis0;
     vec4 basis1;
     vec4 basis2;
+    // Bias is generally negative
     float bias;
-    float padding0;
-    float padding1;
-    float padding2;
+    // All these values should be positive
+    float radius;
+    float near;
+    float far;
+    float left;
+    float right;
+    float top;
+    float bottom;
 };
 
 layout(std140) uniform Shadow {
@@ -88,6 +94,14 @@ computeShadowFilterWidth(vec4 Peye)
 #define HD_HAS_integrateLights
 #endif
 
+#ifndef USE_PCSS
+#define USE_PCSS 1
+#endif
+
+#ifndef PCSS_USE_POISSON
+#define PCSS_USE_POISSON 1
+#endif
+
 struct LightSource {
     vec4 position;
     vec4 ambient;
@@ -103,14 +117,20 @@ struct LightSource {
 };
 
 struct ShadowMatrix {
-    mat4 eyeToShadowMatrix;
+    mat4 viewToShadowMatrix;
     vec4 basis0;
     vec4 basis1;
     vec4 basis2;
+    // Bias is generally negative
     float bias;
-    float padding0;
-    float padding1;
-    float padding2;
+    // All these values should be positive
+    float radius;
+    float near;
+    float far;
+    float left;
+    float right;
+    float top;
+    float bottom;
 };
 
 struct LightingContribution {
@@ -140,19 +160,6 @@ layout(std140) uniform Shadow {
     ShadowMatrix shadow[NUM_LIGHTS];
 };
 
-vec2
-computeShadowFilterWidth(int index, vec4 Peye)
-{
-    vec4 cx = shadow[index].basis0;
-    vec4 cy = shadow[index].basis1;
-    vec4 cz = shadow[index].basis2;
-
-    // compare homogeneous vector length
-    vec3 x = cx.xyz - cx.w * Peye.xyz;
-    vec3 y = cy.xyz - cy.w * Peye.xyz;
-    vec3 z = cz.xyz - cz.w * Peye.xyz;
-    return vec2(sqrt (1.0 / dot (x,x)), sqrt(1.0 / dot (y,y)));
-}
 
 #endif  // NUM_LIGHTS == 0
 
@@ -188,34 +195,208 @@ integrateLightsDefault(vec4 Peye, vec3 Neye, LightingInterfaceProperties props)
 
 #else // NUM_LIGHTS == 0
 
+// shadowSample() returns depth value.
 float
-shadowCompare(int index, vec4 coord)
+shadowSample(int index, vec2 uv)
+{
+    return texture(shadowTexture, vec3(uv, index)).z;
+}
+
+float
+shadowCompare(int index, vec3 uvz)
 {
     return texture(shadowCompareTexture,
-                   vec4(coord.x/coord.w, coord.y/coord.w, index, coord.z));
+                   vec4(uvz.xy, index, uvz.z));
 }
 
 #ifndef SHADOW_FILTER
 float
-shadowFilter(int index, vec4 coord, vec4 Peye)
+shadowFilter(int index, vec3 uvz, vec4 Peye)
 {
-    return shadowCompare(index, coord);
+    return shadowCompare(index, uvz);
 }
 #endif
 
+
+#if USE_PCSS
+
+// We will search this many steps on each side, plus one "in the middle",
+// for a total of NUM_BLOCKER_SEARCH_SAMPLES * 2 + 1 steps in each of XY
+#define NUM_BLOCKER_SEARCH_SAMPLES 3
+
+// Translate light XYs - generally somewhere in (left, right) / (bottom, top) -
+// to shadow UVs - which are in (0, 1) range
+vec2 LightXYToShadowUV(int index, vec2 lightXY)
+{
+    vec2 nearDim = vec2(shadow[index].right - shadow[index].left,
+        shadow[index].top - shadow[index].bottom);
+    return lightXY / nearDim;
+}
+
+// Translate a point in light XYZ space - generally somewhere in (left, right)
+// (bottom, top) / (-near, -far) - to shadow UVs - which are in (0, 1) range
+// Note that, though in light space the Z coordinate should strictly be negative,
+// we assume here that it's positive
+vec2 LightXYZToShadowUV(int index, vec3 lightXYZ)
+{
+    return LightXYToShadowUV(index, lightXYZ.xy * (shadow[index].near / lightXYZ.z));
+}
+
+// Calculate the size of the region to search, in shadow UV space (0 to 1),
+// for the blocker
+// Calculated based on triangle ratios:
+//    searchSize / (zReceiver - near) == radius / zReceiver
+vec2 BlockerSearchSizeUV(int index, float zReceiver)
+{
+    vec2 lightXY = vec2(shadow[index].radius) * (zReceiver - shadow[index].near) / zReceiver;
+    return clamp(LightXYToShadowUV(index, lightXY), 0.0, .5);
+}
+
+// Calculate the size of shadow filter, in shadow UV space (0 to 1),
+// based on the percentage-closer-soft-shadowing ratio of:
+//    filterSize / (zReceiver - zBlocker) == radius / zBlocker
+vec2 PCSSFilterSize(int index, float zReceiver, float zBlocker)
+{
+    vec3 lightXYZ = vec3(vec2(shadow[index].radius) * (zReceiver - zBlocker) / zBlocker,
+                         zReceiver);
+    return LightXYZToShadowUV(index, lightXYZ);
+}
+
+float ZShadowToZLight(int index, float zShadow)
+{
+    float zNDC = zShadow * 2.0 - 1.0;
+    float far = shadow[index].far;
+    float near = shadow[index].near;
+    return 2 * far * near / ( (far - near) * zNDC - far - near);
+}
+
+#if PCSS_USE_POISSON
+
+vec2 poissonCircle16[16] = vec2[] (
+    vec2(-0.4861386999911106, -0.8131017515698877),
+    vec2(-0.1379418757526687, -0.615688199407407),
+    vec2(-0.7564435654127604, -0.4784037191192021),
+    vec2(-0.3589654315656421, -0.20100347630994497),
+    vec2(0.14915414784025227, -0.2591274969466977),
+    vec2(0.576191505150637, -0.35634542228785826),
+    vec2(-0.8396598211188767, -0.03177255032506765),
+    vec2(-0.03149354030526419, 0.061258513133836345),
+    vec2(0.3048306955444662, 0.1445404519033291),
+    vec2(0.7678050733274815, 0.0771602092932755),
+    vec2(-0.9504236693518691, 0.30329165751818943),
+    vec2(-0.4886426883795304, 0.3260041612432061),
+    vec2(-0.6843564597722496, 0.6891387513886138),
+    vec2(-0.21954418320701996, 0.5975522182405921),
+    vec2(0.3026461552247486, 0.6521013441018921),
+    vec2(-0.13475166555549078, 0.917862124778025)
+);
+
+#endif // PCSS_USE_POISSON
+
+// Returns average blocker depth in the search region, as well as the number of found blockers.
+// Blockers are defined as shadow-map samples between the surface point and the light.
+// receiverPt is in (0,1) shadow space
+void FindBlocker(out float avgBlockerDepth, out float numBlockers,
+                int index, vec3 receiverPt, vec2 blockerSearchSizeUV)
+{
+    float blockerSum = 0;
+    numBlockers = 0;
+
+#if PCSS_USE_POISSON
+
+    for( int i = 0; i < poissonCircle16.length(); ++i )
+    {
+        vec2 offset = poissonCircle16[i] * blockerSearchSizeUV;
+        float shadowMapDepth = shadowSample(index, receiverPt.xy + offset);
+        // TODO: come up with a better bias method
+        float zBiased = receiverPt.z + shadow[index].bias;
+        if ( shadowMapDepth < zBiased )
+        {
+            blockerSum += shadowMapDepth;
+            numBlockers++;
+        }
+    }
+
+#else // PCSS_USE_POISSON
+    vec2 stepUV = blockerSearchSizeUV / NUM_BLOCKER_SEARCH_SAMPLES;
+    for( float x = -NUM_BLOCKER_SEARCH_SAMPLES; x <= NUM_BLOCKER_SEARCH_SAMPLES; ++x )
+    {
+        for( float y = -NUM_BLOCKER_SEARCH_SAMPLES; y <= NUM_BLOCKER_SEARCH_SAMPLES; ++y )
+        {
+            vec2 offset = vec2( x, y ) * stepUV;
+            float shadowMapDepth = shadowSample(index, receiverPt.xy + offset);
+            // TODO: come up with a better bias method
+            float zBiased = receiverPt.z + shadow[index].bias;
+            if ( shadowMapDepth < zBiased )
+            {
+                blockerSum += shadowMapDepth;
+                numBlockers++;
+            }
+        }
+    }
+
+#endif // PCSS_USE_POISSON
+
+    avgBlockerDepth = blockerSum / numBlockers;
+}
+
+vec2
+computeShadowFilterWidth(int index, vec4 Peye)
+{
+    vec4 coord = shadow[index].viewToShadowMatrix * Peye;
+
+    vec3 uvz = coord.xyz / coord.w;
+
+    // Find blocking pts
+    float avgBlockerDepth = 0;
+    float numBlockers = 0;
+    vec2 blockerSearchSizeUV = BlockerSearchSizeUV(index, coord.w);
+    FindBlocker(avgBlockerDepth, numBlockers, index, uvz, blockerSearchSizeUV );
+
+    // Quit if no blockers
+    if (numBlockers == 0) return vec2(0.0);
+
+    // Calculate the filter size based on relative blocker / receiver depths
+    float avgBlockerDepthLight = -ZShadowToZLight(index, avgBlockerDepth);
+    return PCSSFilterSize(index, coord.w, avgBlockerDepthLight);
+}
+
+#else // USE_PCSS
+
+vec2
+computeShadowFilterWidth(int index, vec4 Peye)
+{
+    vec4 cx = shadow[index].basis0;
+    vec4 cy = shadow[index].basis1;
+    vec4 cz = shadow[index].basis2;
+
+    // compare homogeneous vector length
+    vec3 x = cx.xyz - cx.w * Peye.xyz;
+    vec3 y = cy.xyz - cy.w * Peye.xyz;
+    vec3 z = cz.xyz - cz.w * Peye.xyz;
+    return vec2(sqrt (1.0 / dot (x,x)), sqrt(1.0 / dot (y,y)));
+}
+
+
+#endif // USE_PCSS
+
+
 float
-shadowing(int index, vec4 Peye)
+shadowing(int index, vec4 Peye, float slope)
 {
     float result = 1.0;
-    vec4 coord = shadow[index].eyeToShadowMatrix * Peye;
+    vec4 coord = shadow[index].viewToShadowMatrix * Peye;
+
+    // clamping at 1 because zero bias results in self shadowing, and
+    // clamping at 2 to avoid shadows from dissapearing as angle gets very steep.
+    slope = clamp(slope, 1.0, 2.0);
 
     // coord.xy : homogenous shadow uv coordinate
-    // coord.z : cartesian receiver depth
-    // coord.w : shadow projection w
-
-    float dReceiver = coord.z/coord.w;
-    coord.z = min(1, dReceiver + shadow[index].bias);
-    return shadowFilter(index, coord, Peye);
+    // coord.z / coord.w : non-linear NDC "depth": -1 at near to 1 at far
+    // coord.w : z-depth cordinate of shadow receiver, from light
+    coord /= coord.w;
+    coord.z = min(1, coord.z + (shadow[index].bias * slope));
+    return shadowFilter(index, coord.xyz, Peye);
 }
 
 float
@@ -279,7 +460,7 @@ integrateLightsDefault(vec4 Peye, vec3 Neye, LightingInterfaceProperties props)
 
         //Lambert
         float d = NdotL;
-        
+
         //Blinn-Phong
         float s = pow(NdotH, shininess);
 
@@ -287,8 +468,10 @@ integrateLightsDefault(vec4 Peye, vec3 Neye, LightingInterfaceProperties props)
         atten *= lightSpotAttenuation(l, i);
 
 #if USE_SHADOWS
+        // slope factor of fragment from the perspective of light
+        float slope = tan(acos(NdotL));
         float shadow = (lightSource[i].hasShadow) ?
-            shadowing(lightSource[i].shadowIndex, Peye) : 1.0;
+            shadowing(lightSource[i].shadowIndex, Peye, slope) : 1.0;
 #else
         float shadow = 1.0;
 #endif

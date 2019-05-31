@@ -64,6 +64,7 @@ void wrapUsdGeomTokens()
 {
     boost::python::class_<UsdGeomTokensType, boost::noncopyable>
         cls("Tokens", boost::python::no_init);
+    _AddToken(cls, "accelerations", UsdGeomTokens->accelerations);
     _AddToken(cls, "all", UsdGeomTokens->all);
     _AddToken(cls, "angularVelocities", UsdGeomTokens->angularVelocities);
     _AddToken(cls, "axis", UsdGeomTokens->axis);
@@ -131,6 +132,7 @@ void wrapUsdGeomTokens()
     _AddToken(cls, "loop", UsdGeomTokens->loop);
     _AddToken(cls, "metersPerUnit", UsdGeomTokens->metersPerUnit);
     _AddToken(cls, "modelApplyDrawMode", UsdGeomTokens->modelApplyDrawMode);
+    _AddToken(cls, "modelCardDisplayFacing", UsdGeomTokens->modelCardDisplayFacing);
     _AddToken(cls, "modelCardGeometry", UsdGeomTokens->modelCardGeometry);
     _AddToken(cls, "modelCardTextureXNeg", UsdGeomTokens->modelCardTextureXNeg);
     _AddToken(cls, "modelCardTextureXPos", UsdGeomTokens->modelCardTextureXPos);

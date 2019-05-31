@@ -39,6 +39,8 @@
                             "nurbsCurve",
                             "nurbsSurface",
                             "particle",
+                            "pointLight",
+                            "spotLight",
                             "PxrAovLight",
                             "PxrCylinderLight",
                             "PxrDiskLight",

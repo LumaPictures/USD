@@ -28,6 +28,10 @@ set(_PXR_CXX_FLAGS "${_PXR_CXX_FLAGS} /EHsc")
 # Standards compliant.
 set(_PXR_CXX_FLAGS "${_PXR_CXX_FLAGS} /Zc:rvalueCast /Zc:strictStrings /Zc:inline")
 
+if(PXR_CXX_STD GREATER 11)
+    set(_PXR_CXX_FLAGS "${_PXR_CXX_FLAGS} /std:c++${PXR_CXX_STD}")
+endif()
+
 # Turn on all but informational warnings.
 set(_PXR_CXX_FLAGS "${_PXR_CXX_FLAGS} /W3")
 

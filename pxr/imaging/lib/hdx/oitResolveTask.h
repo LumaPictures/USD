@@ -79,6 +79,10 @@ private:
     HdxOitResolveTask() = delete;
     HdxOitResolveTask(const HdxOitResolveTask &) = delete;
     HdxOitResolveTask &operator =(const HdxOitResolveTask &) = delete;
+
+    int _layerCount = -1;
+    int _stepFunctionResolution = -1;
+    bool _enableApproximation = false;
 };
 
 

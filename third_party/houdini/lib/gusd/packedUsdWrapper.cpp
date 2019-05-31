@@ -37,6 +37,8 @@
 #include "GT_PackedUSD.h"
 #include "GU_PackedUSD.h"
 
+#include <iostream>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 using std::string;

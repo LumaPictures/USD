@@ -126,6 +126,12 @@ struct PxrUsdKatanaUtils {
     static std::string ConvertUsdMaterialPathToKatLocation(
             const SdfPath &path,
             const PxrUsdKatanaUsdInPrivateData& data);
+    static FnKat::Attribute GetMaterialAssignAttr(
+            const UsdPrim& prim,
+            const PxrUsdKatanaUsdInPrivateData& data);
+    static FnKat::Attribute GetCollectionBasedMaterialAssignments(
+            const UsdPrim& prim,
+            const PxrUsdKatanaUsdInPrivateData& data);
 
     // XXX: should move these into readModel.h maybe.
     /// \name Model Utilities

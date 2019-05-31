@@ -37,6 +37,7 @@
 #include <GT/GT_RefineParms.h>
 
 #include <numeric>
+#include <iostream>
 
 PXR_NAMESPACE_OPEN_SCOPE
 

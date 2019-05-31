@@ -31,7 +31,11 @@
 #include "pxr/base/gf/matrix4f.h"
 #include "pxr/base/vt/array.h"
 
+#if EMBREE_VERSION_MAJOR == 3
+#include <embree3/rtcore.h>
+#else
 #include <embree2/rtcore.h>
+#endif
 
 PXR_NAMESPACE_OPEN_SCOPE
 

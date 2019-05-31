@@ -52,6 +52,8 @@
 #include <GT/GT_PackedAlembic.h>
 #endif
 
+#include <iostream>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 #ifdef DEBUG

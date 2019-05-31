@@ -112,6 +112,11 @@ HdxShadowTask::Sync(HdSceneDelegate* delegate,
         const HdStLight* light = static_cast<const HdStLight*>(
             renderIndex.GetSprim(HdPrimTypeTokens->simpleLight,
                                  glfLights[lightId].GetID()));
+        // This happens if a non simple light is translated
+        // into the simple light without an SPrim in the render index.
+        if (light == nullptr) {
+            continue;
+        }
 
         if (!glfLights[lightId].HasShadow()) {
             continue;
