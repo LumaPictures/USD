@@ -228,6 +228,7 @@ bool HydraKatana::pick(ViewportWrapperPtr viewport,
 
     // This will set some HdxPickTaskParams, such as cullStyle
     m_taskController->SetRenderParams(m_renderTaskParams);
+    m_taskController->SetRenderTags(m_renderTags);
 
     // Intersector parameters
     HdxPickTaskContextParams pickParams;
