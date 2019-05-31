@@ -33,7 +33,7 @@
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hdx/taskController.h"
 #include "pxr/imaging/hdx/selectionTracker.h"
-#include "pxr/imaging/hdx/intersector.h"
+#include "pxr/imaging/hdx/pickTask.h"
 #include "pxr/imaging/hdx/tokens.h"
 #include "pxr/imaging/glf/glContext.h"
 
@@ -129,7 +129,7 @@ public:
               unsigned int x, unsigned int y,
               unsigned int w, unsigned int h,
               bool deepPicking,
-              HdxIntersector::HitVector& hits);
+              HdxPickHitVector& hits);
 
     /**
      * @brief Highlights the RPrims with the given paths.
