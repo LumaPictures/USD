@@ -339,7 +339,7 @@ void
 HdxOitRenderTask::_ClearOitGpuBuffers(HdTaskContext* ctx)
 {
     // Exit if glew version used by app is too old
-    if ((!_glClearNamedBufferData()) return;
+    if (!_glClearNamedBufferData()) return;
     if (!_counterBar) return;
 
     //
