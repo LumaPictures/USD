@@ -1241,7 +1241,7 @@ _GetMaterialAssignAttrFromPath(
     // XXX: Materials may have an atypical USD->Katana
     // path mapping
     std::string location =
-        ConvertUsdMaterialPathToKatLocation(targetPath, data);
+            PxrUsdKatanaUtils::ConvertUsdMaterialPathToKatLocation(targetPath, data);
 
     static const bool allowCustomScopes =
         TfGetEnvSetting(USD_KATANA_ALLOW_CUSTOM_MATERIAL_SCOPES);
