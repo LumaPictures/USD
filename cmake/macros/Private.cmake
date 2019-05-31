@@ -46,15 +46,35 @@ function(_copy_headers LIBRARY_NAME)
         foreach (f ${_args_FILES})
             set(infile "${CMAKE_CURRENT_SOURCE_DIR}/${f}")
             set(outfile "${header_dest_dir}/${f}")
-            get_filename_component(dir_to_create "${outfile}" PATH)
-            add_custom_command(
-                OUTPUT ${outfile}
-                COMMAND ${CMAKE_COMMAND} -E make_directory "${dir_to_create}"
-                COMMAND ${CMAKE_COMMAND} -Dinfile="${infile}" -Doutfile="${outfile}" -P "${PROJECT_SOURCE_DIR}/cmake/macros/copyHeaderForBuild.cmake"
-                MAIN_DEPENDENCY "${infile}"
-                COMMENT "Copying ${f} ..."
-                VERBATIM
-            )
+            list(APPEND files_copied ${outfile})
+            if(PXR_SYMLINK_HEADER_FILES AND NOT WIN32)
+                # cmake -E create_symlink doesn't create parent directories, while
+                # copy does... so need an extra command to make dir
+
+                # Also, if ${f} has a directory, header_parent_dir will be
+                # different than header_dest_dir                
+                get_filename_component(header_parent_dir ${outfile} DIRECTORY)
+                add_custom_command(
+                        OUTPUT ${outfile}
+                        COMMAND "${CMAKE_COMMAND}"
+                        ARGS -E make_directory "${header_parent_dir}"
+                        COMMAND "${CMAKE_COMMAND}"
+                        ARGS -E create_symlink "${infile}" "${outfile}"
+                        MAIN_DEPENDENCY "${infile}"
+                        COMMENT "Symlinking ${f} ..."
+                        VERBATIM
+                )
+            else()
+                get_filename_component(dir_to_create "${outfile}" PATH)
+                add_custom_command(
+                    OUTPUT ${outfile}
+                    COMMAND ${CMAKE_COMMAND} -E make_directory "${dir_to_create}"
+                    COMMAND ${CMAKE_COMMAND} -Dinfile="${infile}" -Doutfile="${outfile}" -P "${PROJECT_SOURCE_DIR}/cmake/macros/copyHeaderForBuild.cmake"
+                    MAIN_DEPENDENCY "${infile}"
+                    COMMENT "Copying ${f} ..."
+                    VERBATIM
+                )
+            endif()
             list(APPEND files_copied ${outfile})
         endforeach()
     endif()
@@ -1247,6 +1267,10 @@ function(_pxr_library NAME)
             ${apiPrivate}
             ${args_PRIVATE_DEFINITIONS}
     )
+
+    if (PXR_PLUGS_LOADING_FALLBACK)
+        target_compile_definitions(${NAME} PRIVATE "PXR_PLUGS_LOADING_FALLBACK")
+    endif ()
 
     # Copy headers to the build directory and include from there and from
     # external packages.

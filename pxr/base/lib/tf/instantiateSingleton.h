@@ -43,28 +43,17 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-template <class T> std::mutex* TfSingleton<T>::_mutex = 0;
+template <class T> std::mutex TfSingleton<T>::_mutex;
 template <class T> T* TfSingleton<T>::_instance = 0;
 
 template <typename T>
 T&
 TfSingleton<T>::_CreateInstance()
 {
-    // Why is TfSingleton<T>::_mutex a pointer requiring allocation and
-    // construction and not simply an object?  Because the default 
-    // std::mutex c'tor on MSVC 2015 isn't constexpr .  That means the
-    // mutex is dynamically initialized.  That can be too late for
-    // singletons, which are often accessed via ARCH_CONSTRUCTOR()
-    // functions.
-    static std::once_flag once;
-    std::call_once(once, [](){
-        TfSingleton<T>::_mutex = new std::mutex;
-    });
-
     TfAutoMallocTag2 tag2("Tf", "TfSingleton::_CreateInstance");
     TfAutoMallocTag tag("Create Singleton " + ArchGetDemangled<T>());
 
-    std::lock_guard<std::mutex> lock(*TfSingleton<T>::_mutex);
+    std::lock_guard<std::mutex> lock(TfSingleton<T>::_mutex);
     if (!TfSingleton<T>::_instance) {
         ARCH_PRAGMA_PUSH
         ARCH_PRAGMA_MAY_NOT_BE_ALIGNED
@@ -85,7 +74,7 @@ template <typename T>
 void
 TfSingleton<T>::_DestroyInstance()
 {
-    std::lock_guard<std::mutex> lock(*TfSingleton<T>::_mutex);
+    std::lock_guard<std::mutex> lock(TfSingleton<T>::_mutex);
     delete TfSingleton<T>::_instance;
     TfSingleton<T>::_instance = 0;
 }

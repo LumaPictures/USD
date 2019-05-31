@@ -6,7 +6,7 @@
                 "Types": {                                                                  
                     "Glf_OIIOImage" : {
                         "bases": ["GlfImage"],
-                        "imageTypes": ["bmp", "exr", "jpg", "png", "tif", "zfile", "tex", "tx"],
+                        "imageTypes": ["bmp", "exr", "jpg", "png", "tif", "zfile", "tex", "tx", "tga"],
                         "precedence": 0 
                     },
                     "Glf_StbImage" : {

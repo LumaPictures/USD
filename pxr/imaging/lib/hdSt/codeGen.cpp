@@ -542,6 +542,8 @@ HdSt_CodeGen::Compile()
         // typeless binding doesn't need declaration nor accessor.
         if (binDecl->dataType.IsEmpty()) continue;
 
+        _genCommon << "#define HD_HAS_" << binDecl->dataType << "_" << binDecl->name << " 1\n";
+
         _EmitDeclaration(_genCommon,
                      binDecl->name,
                      binDecl->dataType,
@@ -571,6 +573,11 @@ HdSt_CodeGen::Compile()
         // dbIt is StructEntry { name, dataType, offset, numElements }
         TF_FOR_ALL (dbIt, it->second.entries) {
             _genCommon << "#define HD_HAS_" << dbIt->name << " 1\n";
+            if (not dbIt->dataType.IsEmpty()) {
+                _genCommon << "#define HD_HAS_"
+                           << _GetPackedType(dbIt->dataType, false)
+                           << "_" << dbIt->name << " 1\n";
+            }
             declarations << "  " << _GetPackedType(dbIt->dataType, false)
                          << " " << dbIt->name;
             if (dbIt->arraySize > 1) {
@@ -641,18 +648,30 @@ HdSt_CodeGen::Compile()
    if (!_geometricShader->IsPrimTypePoints()) {
       TF_FOR_ALL (it, _metaData.elementData) {
         _genCommon << "#define HD_HAS_" << it->second.name << " 1\n";
+        if (not it->second.dataType.IsEmpty()) {
+            _genCommon << "#define HD_HAS_" << it->second.dataType << "_" << it->second.name << " 1\n";
+        }
       }
       if (hasGS) {
         TF_FOR_ALL (it, _metaData.fvarData) {
            _genCommon << "#define HD_HAS_" << it->second.name << " 1\n";
+           if (not it->second.dataType.IsEmpty()) {
+               _genCommon << "#define HD_HAS_" << it->second.dataType << "_" << it->second.name << " 1\n";
+           }
         }
       }
     }
     TF_FOR_ALL (it, _metaData.vertexData) {
         _genCommon << "#define HD_HAS_" << it->second.name << " 1\n";
+        if (not it->second.dataType.IsEmpty()) {
+            _genCommon << "#define HD_HAS_" << it->second.dataType << "_" << it->second.name << " 1\n";
+        }
     }
     TF_FOR_ALL (it, _metaData.shaderParameterBinding) {
         _genCommon << "#define HD_HAS_" << it->second.name << " 1\n";
+        if (not it->second.dataType.IsEmpty()) {
+            _genCommon << "#define HD_HAS_" << it->second.dataType << "_" << it->second.name << " 1\n";
+        }
     }
 
     // mixin shaders

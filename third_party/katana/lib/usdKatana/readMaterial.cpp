@@ -612,7 +612,102 @@ _GetMaterialAttr(
             }
         }
     }
+    /////////////////
+    // ARNOLD SECTION
+    /////////////////
 
+    // TODO: we should share code between functions!
+    auto arnoldSurfaceSet = false;
+    static const TfToken _aiSurface("ai:surface");
+    // look for surface
+    if (UsdRelationship surfaceRel = materialPrim.GetRelationship(_aiSurface)) {
+        if (!PxrUsdKatana_AreRelTargetsFromBaseMaterial(surfaceRel)) {
+            SdfPathVector targetPaths;
+            surfaceRel.GetForwardedTargets(&targetPaths);
+            if (targetPaths.size() > 1) {
+                FnLogWarn("Multiple surface sources detected on "
+                          "material:" << materialPrim.GetPath());
+            }
+            if (targetPaths.size() > 0) {
+                const SdfPath targetPath = targetPaths[0];
+                if (UsdPrim surfacePrim =
+                    stage->GetPrimAtPath(targetPath)) {
+
+                    std::string handle = _CreateShadingNode(
+                        surfacePrim, currentTime,
+                        nodesBuilder, interfaceBuilder, "arnold", flatten);
+                    terminalsBuilder.set("arnoldSurface",
+                                         FnKat::StringAttribute(handle));
+                    terminalsBuilder.set("arnoldSurfacePort",
+                                         FnKat::StringAttribute("out"));
+                    arnoldSurfaceSet = true;
+                } else {
+                    FnLogWarn("Surface shader does not exist at:" << 
+                              targetPath.GetString());
+                }
+            }
+        }
+    }
+
+    if (!arnoldSurfaceSet) {
+        static const TfToken _aiVolume("ai:volume");
+        if (UsdRelationship volumeRel = materialPrim.GetRelationship(_aiVolume)) {
+            if (!PxrUsdKatana_AreRelTargetsFromBaseMaterial(volumeRel)) {
+                SdfPathVector targetPaths;
+                volumeRel.GetForwardedTargets(&targetPaths);
+                if (targetPaths.size() > 1) {
+                    FnLogWarn("Multiple surface sources detected on "
+                            "material:" << materialPrim.GetPath());
+                }
+                if (targetPaths.size() > 0) {
+                    const SdfPath targetPath = targetPaths[0];
+                    if (UsdPrim volumePrim = stage->GetPrimAtPath(targetPath)) {
+                        std::string handle = _CreateShadingNode(
+                            volumePrim, currentTime,
+                            nodesBuilder, interfaceBuilder, "arnold", flatten);
+                        terminalsBuilder.set("arnoldSurface",
+                                            FnKat::StringAttribute(handle));
+                        terminalsBuilder.set("arnoldSurfacePort",
+                                            FnKat::StringAttribute("out"));
+                    } else {
+                        FnLogWarn("Surface shader does not exist at:" << 
+                                targetPath.GetString());
+                    }
+                }
+            }
+        }
+    }
+
+    static const TfToken _aiDisplacement("ai:displacement");
+    // look for displacement
+    if (UsdRelationship displacementRel = materialPrim.GetRelationship(_aiDisplacement)) {
+        if (!PxrUsdKatana_AreRelTargetsFromBaseMaterial(displacementRel)) {
+            SdfPathVector targetPaths;
+            displacementRel.GetForwardedTargets(&targetPaths);
+        
+            if (targetPaths.size() > 1) {
+                FnLogWarn("Multiple displacement sources detected on "
+                          "material:" << materialPrim.GetPath());
+            }
+            if (targetPaths.size() > 0) {
+                const SdfPath targetPath = targetPaths[0];
+                if (UsdPrim displacementPrim =
+                    stage->GetPrimAtPath(targetPath)) {
+
+                    std::string handle = _CreateShadingNode(
+                        displacementPrim, currentTime,
+                        nodesBuilder, interfaceBuilder, "arnold", flatten);
+                    terminalsBuilder.set("arnoldDisplacement",
+                                         FnKat::StringAttribute(handle));
+                    terminalsBuilder.set("arnoldDisplacementPort",
+                                         FnKat::StringAttribute("out"));
+                } else {
+                    FnLogWarn("Displacement shader does not exist at:" << 
+                              targetPath.GetString());
+                }
+            }
+        }
+    }
 
     // with the current implementation of ris, there are
     // no patterns that are unbound or not connected directly

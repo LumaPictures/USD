@@ -194,7 +194,7 @@ private:
     static T* _instance;
     ARCH_PRAGMA_PUSH
     ARCH_PRAGMA_NEEDS_EXPORT_INTERFACE
-    static std::mutex* _mutex;
+    static std::mutex _mutex;
     ARCH_PRAGMA_POP
 };
 

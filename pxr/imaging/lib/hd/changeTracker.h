@@ -397,6 +397,10 @@ public:
     HD_API
     void MarkSprimDirty(SdfPath const& id, HdDirtyBits bits);
 
+    /// Set the dirty flags for all sprims to \p bits.
+    HD_API
+    void MarkAllSprimsDirty(HdDirtyBits bits);
+
     /// Set the dirty flags to \p newBits.
     HD_API
     void MarkSprimClean(SdfPath const& id, HdDirtyBits newBits=Clean);
@@ -422,6 +426,10 @@ public:
     /// Set the dirty flags to \p bits.
     HD_API
     void MarkBprimDirty(SdfPath const& id, HdDirtyBits bits);
+
+    /// Set the dirty flags for all bprims to \p bits.
+    HD_API
+    void MarkAllBprimsDirty(HdDirtyBits bits);
 
     /// Set the dirty flags to \p newBits.
     HD_API

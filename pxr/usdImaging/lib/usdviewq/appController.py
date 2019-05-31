@@ -766,6 +766,8 @@ class AppController(QtCore.QObject):
 
             self._ui.redrawOnScrub.toggled.connect(self._redrawOptionToggled)
 
+            self._ui.authoredStepsOnly.toggled.connect(self._authoredOptionToggled)
+
             if self._stageView:
                 self._ui.actionAuto_Compute_Clipping_Planes.triggered.connect(
                     self._toggleAutoComputeClippingPlanes)
@@ -1092,16 +1094,6 @@ class AppController(QtCore.QObject):
 
     def _openStage(self, usdFilePath, sessionFilePath, populationMaskPaths):
 
-        # We are iterating through the plugin registry to add anything
-        # containing shaders to the default search path.
-        resourcePaths = set()
-        from pxr import Plug
-        pr = Plug.Registry()
-        for t in pr.GetAllPlugins():
-            if t.metadata.get('ShaderResources') is not None:
-                resourcePaths.add(t.resourcePath)
-        Ar.DefaultResolver.SetDefaultSearchPath(sorted(list(resourcePaths)))
-
         def _GetFormattedError(reasons=[]):
             err = ("Error: Unable to open stage '{0}'\n".format(usdFilePath))
             if reasons:
@@ -1230,17 +1222,27 @@ class AppController(QtCore.QObject):
 
 
     def _UpdateTimeSamples(self, resetStageDataOnly=False):
-        if self.realStartTimeCode is not None and self.realEndTimeCode is not None:
-            if self.realStartTimeCode > self.realEndTimeCode:
-                sys.stderr.write('Warning: Invalid frame range (%s, %s)\n'
-                % (self.realStartTimeCode, self.realEndTimeCode))
-                self._timeSamples = []
+        def _setTimeSamplesFromRange():
+            if self.realStartTimeCode is not None and self.realEndTimeCode is not None:
+                if self.realStartTimeCode > self.realEndTimeCode:
+                    sys.stderr.write('Warning: Invalid frame range (%s, %s)\n'
+                    % (self.realStartTimeCode, self.realEndTimeCode))
+                    self._timeSamples = []
+                else:
+                    self._timeSamples = Drange(self.realStartTimeCode,
+                                            self.realEndTimeCode,
+                                            self.step)
             else:
-                self._timeSamples = Drange(self.realStartTimeCode,
-                                           self.realEndTimeCode,
-                                           self.step)
+                self._timeSamples = []
+
+        if self._dataModel.viewSettings.authoredStepsOnly:
+            samples = self._dataModel.authoredSamples
+            if len(samples) > 0:
+                self._timeSamples = samples
+            else:
+                _setTimeSamplesFromRange()
         else:
-            self._timeSamples = []
+            _setTimeSamplesFromRange()
 
         self._geomCounts = dict()
         self._hasTimeSamples = (len(self._timeSamples) > 0)
@@ -1748,6 +1750,10 @@ class AppController(QtCore.QObject):
         self._ui.frameSlider.setTracking(
             self._dataModel.viewSettings.redrawOnScrub)
 
+    def _authoredOptionToggled(self, checked):
+        self._dataModel.viewSettings.authoredStepsOnly = checked
+        self._UpdateTimeSamples(resetStageDataOnly=False)
+
     # Frame-by-frame/Playback functionality ===================================
 
     def _setPlaybackAvailability(self, enabled = True):
@@ -1771,6 +1777,7 @@ class AppController(QtCore.QObject):
         self._ui.redrawOnScrub.setEnabled(isEnabled)
         self._ui.stepSizeLabel.setEnabled(isEnabled)
         self._ui.stepSize.setEnabled(isEnabled)
+        self._ui.authoredStepsOnly.setEnabled(isEnabled)
 
 
     def _playClicked(self):
@@ -4570,6 +4577,7 @@ class AppController(QtCore.QObject):
         self._refreshRolloverPrimInfoMenu()
         self._refreshSelectionHighlightingMenu()
         self._refreshSelectionHighlightColorMenu()
+        self._refreshAuthoredStepsOnly()
 
     def _refreshRenderModeMenu(self):
         for action in self._renderModeActions:
@@ -4704,6 +4712,10 @@ class AppController(QtCore.QObject):
             action.setChecked(
                 str(action.text())
                 == self._dataModel.viewSettings.highlightColorName)
+
+    def _refreshAuthoredStepsOnly(self):
+        self._ui.authoredStepsOnly.setChecked(
+            self._dataModel.viewSettings.authoredStepsOnly)
 
     def _displayPurposeChanged(self):
         self._updatePropertyView()

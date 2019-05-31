@@ -2,6 +2,7 @@
     "Plugins": [
         {
             "Info": {
+                "ShaderResources": "shaders",
                 "Types": {
                     "UsdImagingGLDrawModeAdapter" : {
                         "bases": ["UsdImagingPrimAdapter"],

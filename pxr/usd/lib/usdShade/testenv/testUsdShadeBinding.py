@@ -51,8 +51,8 @@ class TestUsdShadeBinding(unittest.TestCase):
 
         cr = s.OverridePrim("/composed")
 
-        cr.GetReferences().AddReference(rl.identifier, "/stronger")
         cr.GetReferences().AddReference(rl.identifier, "/weaker")
+        cr.GetReferences().AddReference(rl.identifier, "/stronger")
 
         gpc = s.GetPrimAtPath("/composed/gprim")
         lb = UsdShade.MaterialBindingAPI(gpc).GetDirectBindingRel()

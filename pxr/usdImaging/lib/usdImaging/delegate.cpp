@@ -1650,14 +1650,14 @@ UsdImagingDelegate::GetExtent(SdfPath const& id)
     HD_TRACE_FUNCTION();
     SdfPath cachePath = ConvertIndexPathToCachePath(id);
     GfRange3d extent;
-    if (_valueCache.ExtractExtent(cachePath, &extent)) {
+    if (_valueCache.FindExtent(cachePath, &extent)) {
         return extent;
     }
     // Slow path, we should not hit this.
     TF_DEBUG(HD_SAFE_MODE).Msg("WARNING: Slow extent fetch for %s\n", 
                                id.GetText());
     _UpdateSingleValue(cachePath, HdChangeTracker::DirtyExtent);
-    TF_VERIFY(_valueCache.ExtractExtent(cachePath, &extent));
+    TF_VERIFY(_valueCache.FindExtent(cachePath, &extent));
     return extent;
 }
 
@@ -2301,7 +2301,7 @@ UsdImagingDelegate::GetTransform(SdfPath const& id)
 
     SdfPath cachePath = ConvertIndexPathToCachePath(id);
     GfMatrix4d ctm(1.0);
-    if (_valueCache.ExtractTransform(cachePath, &ctm)) {
+    if (_valueCache.FindTransform(cachePath, &ctm)) {
         return ctm;
     }
     // Slow path, we should not hit this.
@@ -2309,7 +2309,7 @@ UsdImagingDelegate::GetTransform(SdfPath const& id)
                                id.GetText());
 
     _UpdateSingleValue(cachePath, HdChangeTracker::DirtyTransform);
-    TF_VERIFY(_valueCache.ExtractTransform(cachePath, &ctm));
+    TF_VERIFY(_valueCache.FindTransform(cachePath, &ctm));
     return ctm;
 }
 

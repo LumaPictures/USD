@@ -220,6 +220,22 @@ try
         }
     }
 
+    if (argData.isFlagSet("shadingMode")) {
+        MString stringVal;
+        argData.getFlagArgument("shadingMode", 0, stringVal);
+        TfToken shadingMode(stringVal.asChar());
+
+        if (!shadingMode.IsEmpty() &&
+            UsdMayaShadingModeRegistry::GetInstance().GetExporter(shadingMode) == nullptr &&
+            shadingMode != UsdMayaShadingModeTokens->none) {
+            MGlobal::displayError(TfStringPrintf(
+                    "No shadingMode '%s' found. "
+                    "Setting shadingMode='none'", 
+                    shadingMode.GetText()).c_str());
+            return MS::kFailure;
+        }
+    }
+
     // Read all of the dictionary args first.
     const VtDictionary userArgs = UsdMayaUtil::GetDictionaryFromArgDatabase(
             argData, UsdMayaJobExportArgs::GetDefaultDictionary());

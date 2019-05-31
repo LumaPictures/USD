@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1145</width>
+    <width>1351</width>
     <height>1002</height>
    </rect>
   </property>
@@ -1014,6 +1014,29 @@
             <property name="sizeHint" stdset="0">
              <size>
               <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="authoredStepsOnly">
+            <property name="text">
+             <string>Authored Steps Only</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="horizontalSpacer_2">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeType">
+             <enum>QSizePolicy::Fixed</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>20</width>
               <height>20</height>
              </size>
             </property>
@@ -2578,6 +2601,17 @@
    </property>
    <property name="text">
     <string>Adjust Default Material...</string>
+   </property>
+  </action>
+  <action name="actionDisplay_Image_Planes">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Display Image Planes</string>
    </property>
   </action>
   <action name="actionCameraReticles_Inside">

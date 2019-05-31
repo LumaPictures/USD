@@ -46,6 +46,7 @@ class RootDataModel(QtCore.QObject):
         QtCore.QObject.__init__(self)
 
         self._stage = None
+        self._authoredSamples = None
         self._printTiming = printTiming
 
         self._currentFrame = Usd.TimeCode.Default()
@@ -74,6 +75,7 @@ class RootDataModel(QtCore.QObject):
             raise ValueError("Expected USD Stage, got: {}".format(repr(value)))
 
         if value is not self._stage:
+            self._authoredSamples = None
 
             if self._pcListener:
                 self._pcListener.Revoke()
@@ -113,6 +115,17 @@ class RootDataModel(QtCore.QObject):
                     propertyChange = ChangeNotice.INFOCHANGES
 
         self.signalPrimsChanged.emit(primChange, propertyChange)
+
+    @property
+    def authoredSamples(self):
+        if self._authoredSamples is None:
+            if self._stage is None:
+                return []
+            else:
+                self._authoredSamples = self._stage.GetTimeSamplesFromPrims()
+                return self._authoredSamples
+        else:
+            return self._authoredSamples
 
     @property
     def currentFrame(self):

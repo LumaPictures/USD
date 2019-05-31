@@ -23,7 +23,8 @@
                             "UsdRiPxrEnvDayLight",
                             "UsdShadeMaterial",
                             "UsdSkelRoot",
-                            "UsdSkelSkeleton"
+                            "UsdSkelSkeleton",
+                            "UsdGeomImagePlane"
                         ]
                     },
                     "PrimWriter": {
@@ -31,6 +32,7 @@
                         "providesTranslator": [
                             "camera",
                             "file",
+                            "imagePlane",
                             "instancer",
                             "joint",
                             "locator",
