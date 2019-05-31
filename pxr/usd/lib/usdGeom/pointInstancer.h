@@ -1199,7 +1199,7 @@ UsdGeomPointInstancer::ApplyMaskToArray(std::vector<bool> const &mask,
         return false;
     }
     size_t maskSize = mask.size();
-    if (maskSize == 0 || dataArray->size() == elementSize){
+    if (maskSize == 0 || dataArray->size() == (size_t)elementSize){
         return true;
     }
     else if ((maskSize * elementSize) != dataArray->size()){
@@ -1215,7 +1215,7 @@ UsdGeomPointInstancer::ApplyMaskToArray(std::vector<bool> const &mask,
     for (size_t i = 0; i < maskSize; ++i) {
         // XXX Could add a fast-path for elementSize == 1 ?
         if (mask[i]) {
-            for (size_t j = 0; j < elementSize; ++j) {
+            for (int j = 0; j < elementSize; ++j) {
                 *currData = beginData[i + j];
                 ++currData;
             }
