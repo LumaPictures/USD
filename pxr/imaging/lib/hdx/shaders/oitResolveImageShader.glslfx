@@ -74,6 +74,7 @@ void insertNode(float depth, float trans, inout StepNodes nodes) {
 
 vec4 imageShader(vec2 uv)
 {
+#if defined(HD_HAS_hdxOitDataBuffer)
     int screenWidth = HdGet_oitWidth();
     int screenHeight = HdGet_oitHeight();
     int numSamples = HdGet_oitSamples();
@@ -116,7 +117,7 @@ vec4 imageShader(vec2 uv)
     }
 
     return vec4(color, 1.0);
-#else
+#else  // OIT_ENABLE_APPROXIMATION
     int numDepths = 0;
 
     // XXX renderPass.WriteOitLayersToBuffer does not clamp the number of
@@ -156,5 +157,9 @@ vec4 imageShader(vec2 uv)
     }
 
     return colorAccum;
-#endif
+#endif  // OIT_ENABLE_APPROXIMATION
+
+#else  // HD_HAS_hdxOitDataBuffer
+    return vec4(0);
+#endif   // HD_HAS_hdxOitDataBuffer
 }
