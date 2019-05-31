@@ -816,7 +816,41 @@ function(pxr_katana_nodetypes NODE_TYPES)
     )
 endfunction() # pxr_katana_nodetypes
 
-function(pxr_toplevel_prologue)
+function(pxr_setup_third_party_python_init)
+# If we are only building a third party module
+# we need to setup the __init__.py in a way the
+# python modules can be merged with the existing pxr modules.
+    if (NOT PXR_BUILD_USD AND PXR_ENABLE_PYTHON_SUPPORT)
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/third_party_init.py"
+"try:
+    __import__('pkg_resources').declare_namespace(__name__)
+except:
+    from pkgutil import extend_path
+    __path__ = extend_path(__path__, __name__)")
+
+    install(
+        FILES "${CMAKE_CURRENT_BINARY_DIR}/third_party_init.py"
+        DESTINATION "lib/python/pxr"
+        RENAME "__init__.py"
+    )
+    endif ()
+endfunction() # pxr_setup_third_party_python_init
+
+function(pxr_setup_targets)
+    # Create a target for shared libraries.  We currently use this only
+    # to test its existence.
+    if(BUILD_SHARED_LIBS OR TARGET usd_ms)
+        add_custom_target(shared_libs)
+    endif()
+
+    # Create a target for targets that require Python.  Each should add
+    # itself as a dependency to the "python" target.
+    if(TARGET shared_libs AND PXR_ENABLE_PYTHON_SUPPORT)
+        add_custom_target(python ALL)
+    endif()
+endfunction() # pxr_setup_targets
+
+function(pxr_toplevel_core_prologue)
     # Generate a namespace declaration header, pxr.h, at the top level of
     # pxr at configuration time.
     configure_file(${CMAKE_SOURCE_DIR}/pxr/pxr.h.in
@@ -907,21 +941,9 @@ function(pxr_toplevel_prologue)
             endif()
         endif()
     endif()
+endfunction() # pxr_toplevel_core_prologue
 
-    # Create a target for shared libraries.  We currently use this only
-    # to test its existence.
-    if(BUILD_SHARED_LIBS OR TARGET usd_ms)
-        add_custom_target(shared_libs)
-    endif()
-
-    # Create a target for targets that require Python.  Each should add
-    # itself as a dependency to the "python" target.
-    if(TARGET shared_libs AND PXR_ENABLE_PYTHON_SUPPORT)
-        add_custom_target(python ALL)
-    endif()
-endfunction() # pxr_toplevel_prologue
-
-function(pxr_toplevel_epilogue)
+function(pxr_toplevel_core_epilogue)
     # If we're building a shared monolithic library then link it against
     # usd_m.
     if(TARGET usd_ms AND NOT PXR_MONOLITHIC_IMPORT)

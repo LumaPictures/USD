@@ -26,6 +26,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 UsdGeomTokensType::UsdGeomTokensType() :
+    accelerations("accelerations", TfToken::Immortal),
     all("all", TfToken::Immortal),
     angularVelocities("angularVelocities", TfToken::Immortal),
     axis("axis", TfToken::Immortal),
@@ -93,6 +94,7 @@ UsdGeomTokensType::UsdGeomTokensType() :
     loop("loop", TfToken::Immortal),
     metersPerUnit("metersPerUnit", TfToken::Immortal),
     modelApplyDrawMode("model:applyDrawMode", TfToken::Immortal),
+    modelCardDisplayFacing("model:cardDisplayFacing", TfToken::Immortal),
     modelCardGeometry("model:cardGeometry", TfToken::Immortal),
     modelCardTextureXNeg("model:cardTextureXNeg", TfToken::Immortal),
     modelCardTextureXPos("model:cardTextureXPos", TfToken::Immortal),
@@ -177,6 +179,7 @@ UsdGeomTokensType::UsdGeomTokensType() :
     y("Y", TfToken::Immortal),
     z("Z", TfToken::Immortal),
     allTokens({
+        accelerations,
         all,
         angularVelocities,
         axis,
@@ -244,6 +247,7 @@ UsdGeomTokensType::UsdGeomTokensType() :
         loop,
         metersPerUnit,
         modelApplyDrawMode,
+        modelCardDisplayFacing,
         modelCardGeometry,
         modelCardTextureXNeg,
         modelCardTextureXPos,

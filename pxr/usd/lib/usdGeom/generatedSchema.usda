@@ -3587,6 +3587,14 @@ class PointInstancer "PointInstancer" (
     """
 )
 {
+    vector3f[] accelerations (
+        doc = """If provided, per-instance 'acceleration' will be used to
+       compute positions between samples for the 'positions' attribute,
+       rather than interpolating between neighboring 'positions' samples.
+       Velocity is measured in position units per second, as per most
+       simulation software. To convert to position units per UsdTimeCode,
+       divide by UsdStage::GetTimeCodesPerSecond()."""
+    )
     vector3f[] angularVelocities (
         doc = """If authored, per-instance angular velocity vector to be used for
       interoplating orientations.  Angular velocities should be considered
@@ -4013,6 +4021,10 @@ class "GeomModelAPI" (
         doc = """If true, and this prim or parent prims have model:drawMode
                  set, apply an alternate imaging mode to this prim. See
                  \\ref UsdGeomModelAPI_drawMode."""
+    )
+    uniform bool model:cardDisplayFacing (
+        doc = """If true, in cards imaging mode only the camera facing
+                  quad will be displayed."""
     )
     uniform token model:cardGeometry (
         allowedTokens = ["cross", "box", "fromTexture"]

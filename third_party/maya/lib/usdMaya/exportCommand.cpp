@@ -27,6 +27,7 @@
 #include "usdMaya/util.h"
 #include "usdMaya/writeJob.h"
 #include "usdMaya/writeUtil.h"
+#include "usdMaya/jobArgs.h"
 
 #include "pxr/usd/usdGeom/tokens.h"
 
@@ -158,6 +159,9 @@ MSyntax UsdMayaExportCommand::createSyntax()
     syntax.addFlag("-v",
                    UsdMayaJobExportArgsTokens->verbose.GetText(),
                    MSyntax::kNoArg);
+    syntax.addFlag("-rt" ,
+                   UsdMayaJobExportArgsTokens->root.GetText(),
+                   MSyntax::kString);
 
     // These are additional flags under our control.
     syntax.addFlag("-fr", "-frameRange", MSyntax::kDouble, MSyntax::kDouble);
@@ -199,6 +203,21 @@ try
     // Check that all flags were valid
     if (status != MS::kSuccess) {
         return status;
+    }
+
+    if (argData.isFlagSet("root")) {
+        MString stringVal;
+        argData.getFlagArgument("root", 0, stringVal);
+        std::string rootPath = stringVal.asChar();
+
+        if (!rootPath.empty()) {
+            MDagPath rootDagPath;
+            UsdMayaUtil::GetDagPathByName(rootPath, rootDagPath);
+            if (!rootDagPath.isValid()) {
+                MGlobal::displayError(MString("Invalid dag path provided for root: ") + stringVal);
+                return MS::kFailure;
+            }
+        }
     }
 
     // Read all of the dictionary args first.

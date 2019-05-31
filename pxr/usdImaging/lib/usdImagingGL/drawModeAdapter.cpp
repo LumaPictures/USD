@@ -53,6 +53,7 @@ TF_DEFINE_PRIVATE_TOKENS(
 
     (cardsUv)
     (cardsTexAssign)
+    (cardDisplayFacing)
 
     (textureXPos)
     (textureYPos)
@@ -586,12 +587,27 @@ UsdImagingGLDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
                 // drawing.
                 _SanityCheckFaceSizes(cachePath, extent, axes_mask);
             }
+            UsdAttribute cardDisplayFacingAttr =
+                prim.GetAttribute(UsdGeomTokens->modelCardDisplayFacing);
+            bool cardDisplayFacingValue = false;
+            if (cardDisplayFacingAttr &&
+                cardDisplayFacingAttr.Get(&cardDisplayFacingValue) &&
+                cardDisplayFacingValue) {
+                VtValue& cardDisplayFacing =
+                    valueCache->GetPrimvar(
+                        cachePath, _tokens->cardDisplayFacing);
+                cardDisplayFacing = VtValue(1);
+                _MergePrimvar(
+                    &primvars, _tokens->cardDisplayFacing,
+                    HdInterpolationConstant);
+            }
 
             // Merge "cardsUv" and "cardsTexAssign" primvars
             _MergePrimvar(&primvars, _tokens->cardsUv,
                           HdInterpolationFaceVarying);
             _MergePrimvar(&primvars, _tokens->cardsTexAssign,
                           HdInterpolationUniform);
+
 
             // XXX: backdoor into the material system.
             valueCache->GetPrimvar(cachePath, _tokens->displayRoughness) =

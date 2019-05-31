@@ -432,12 +432,12 @@ _KTypeAndSizeFromUsdVec2(TfToken const &roleName,
 {
     if (roleName == SdfValueRoleNames->Point) {
         *inputTypeAttr = FnKat::StringAttribute("point2");
-    } else if (roleName == SdfValueRoleNames->Vector) {
+    } else if (roleName == SdfValueRoleNames->Vector ||
+               roleName == SdfValueRoleNames->TextureCoordinate) {
         *inputTypeAttr = FnKat::StringAttribute("vector2");
     } else if (roleName == SdfValueRoleNames->Normal) {
         *inputTypeAttr = FnKat::StringAttribute("normal2");
-    } else if (roleName == SdfValueRoleNames->TextureCoordinate ||
-               roleName.IsEmpty()) {
+    } else if (roleName.IsEmpty()) {
         *inputTypeAttr = FnKat::StringAttribute(typeStr);
         *elementSizeAttr = FnKat::IntAttribute(2);
     } else {
@@ -454,7 +454,8 @@ _KTypeAndSizeFromUsdVec3(TfToken const &roleName,
 {
     if (roleName == SdfValueRoleNames->Point) {
         *inputTypeAttr = FnKat::StringAttribute("point3");
-    } else if (roleName == SdfValueRoleNames->Vector) {
+    } else if (roleName == SdfValueRoleNames->Vector ||
+               roleName == SdfValueRoleNames->TextureCoordinate) {
         *inputTypeAttr = FnKat::StringAttribute("vector3");
     } else if (roleName == SdfValueRoleNames->Normal) {
         *inputTypeAttr = FnKat::StringAttribute("normal3");
@@ -505,7 +506,9 @@ _KTypeAndSizeFromUsdVec2(TfToken const &roleName,
                          FnKat::Attribute *inputTypeAttr, 
                          FnKat::Attribute *elementSizeAttr)
 {
-    if (roleName.IsEmpty()) {
+    if (roleName == SdfValueRoleNames->TextureCoordinate) {
+        *inputTypeAttr = FnKat::StringAttribute("vector2");
+    } else if(roleName.IsEmpty()) {
         // Deserves explanation: there is no type in prman
         // (or apparently, katana) that represents 
         // "a 2-vector with no additional behavior/meaning.
@@ -955,7 +958,7 @@ PxrUsdKatanaUtils::ConvertUsdPathToKatLocation(
                 return std::string();
             }
         }
-    } 
+    }
 
     // The rootPath is expected to be an absolute path or empty string.
     //
@@ -1641,7 +1644,7 @@ PxrUsdKatanaUtils::ConvertBoundsToAttribute(
         }
 
         if ( isinf(min[0]) || isinf(min[1]) || isinf(min[2]) ||
-            isinf(max[0]) || isinf(max[1]) || isinf(max[2]) ) {
+             isinf(max[0]) || isinf(max[1]) || isinf(max[2]) ) {
             *hasInfiniteBounds = true;
         }
 

@@ -1559,6 +1559,9 @@
    <property name="text">
     <string>Reopen Stage</string>
    </property>
+   <property name="shortcut">
+    <string>Alt+R</string>
+   </property>
   </action>
   <action name="actionDump_RIB">
    <property name="text">

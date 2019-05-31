@@ -475,6 +475,51 @@ bool PxrUsdTranslators_MeshWriter::_createRGBAPrimVar(
     return true;
 }
 
+void PxrUsdTranslators_MeshWriter::_writeMotionVectors(
+    UsdGeomMesh& primSchema,
+    const UsdTimeCode& usdTime,
+    MFnMesh& mesh,
+    const std::string& colorSetName) {
+    const MString colorSetNameMS(colorSetName.c_str());
+    VtArray<GfVec3f> motionVectors;
+    motionVectors.resize(static_cast<size_t>(mesh.numVertices()));
+
+    // We need to average the color out here, because we need per vertex velocity.
+    MObject meshObject = mesh.object();
+    MIntArray faces;
+
+    for (MItMeshVertex itVertex(meshObject); !itVertex.isDone(); itVertex.next()) {
+        faces.clear();
+        itVertex.getConnectedFaces(faces);
+
+        const auto flen = faces.length();
+        if (flen > 0) {
+            const auto scale = 1.0f / static_cast<float>(flen);
+            const auto id = itVertex.index();
+
+            auto& v = motionVectors[id];
+            v[0] = 0.0f;
+            v[1] = 0.0f;
+            v[2] = 0.0f;
+
+            for (auto f = decltype(flen){0}; f < flen; ++f) {
+                MColor col;
+                if (itVertex.getColor(col, faces[f], &colorSetNameMS)) {
+                    v[0] += col[0];
+                    v[1] += col[1];
+                    v[2] += col[2];
+                }
+            }
+
+            v[0] *= scale;
+            v[1] *= scale;
+            v[2] *= scale;
+        }
+    }
+
+    _SetAttribute(primSchema.GetVelocitiesAttr(), motionVectors, usdTime);
+}
+
 bool PxrUsdTranslators_MeshWriter::_createUVPrimVar(
         UsdGeomGprim &primSchema,
         const TfToken& name,

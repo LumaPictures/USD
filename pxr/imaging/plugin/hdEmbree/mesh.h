@@ -32,8 +32,13 @@
 
 #include "pxr/imaging/hdEmbree/meshSamplers.h"
 
+#if EMBREE_VERSION_MAJOR == 3
+#include <embree3/rtcore.h>
+#include <embree3/rtcore_ray.h>
+#else
 #include <embree2/rtcore.h>
 #include <embree2/rtcore_ray.h>
+#endif
 
 PXR_NAMESPACE_OPEN_SCOPE
 

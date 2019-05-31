@@ -992,7 +992,13 @@ function(_pxr_python_module NAME)
     # All Python modules require support code from tf.  Linking with the
     # monolithic library will (deliberately) not pick up the dependency
     # on tf.
-    add_dependencies(${LIBRARY_NAME} tf)
+    # But we can't do this if the core is not built.
+    if (PXR_BUILD_USD)
+        add_dependencies(${LIBRARY_NAME} tf)
+    else ()
+        _pxr_target_link_libraries(${LIBRARY_NAME}
+            tf)
+    endif ()
 
     # Include headers from the build directory.
     get_filename_component(
@@ -1052,6 +1058,8 @@ function(_pxr_library NAME)
     set(multiValueArgs
         PUBLIC_HEADERS
         PRIVATE_HEADERS
+        PRIVATE_DEFINITIONS
+        PUBLIC_DEFINITIONS
         CPPFILES
         LIBRARIES
         INCLUDE_DIRS
@@ -1227,6 +1235,7 @@ function(_pxr_library NAME)
         PUBLIC
             ${pythonEnabled}
             ${apiPublic}
+            ${args_PUBLIC_DEFINITIONS}
         PRIVATE
             MFB_PACKAGE_NAME=${PXR_PACKAGE}
             MFB_ALT_PACKAGE_NAME=${PXR_PACKAGE}
@@ -1236,6 +1245,7 @@ function(_pxr_library NAME)
             ${pxrInstallLocation}
             ${pythonModulesEnabled}
             ${apiPrivate}
+            ${args_PRIVATE_DEFINITIONS}
     )
 
     # Copy headers to the build directory and include from there and from

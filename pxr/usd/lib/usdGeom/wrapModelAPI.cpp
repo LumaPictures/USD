@@ -118,6 +118,13 @@ _CreateModelCardTextureZNegAttr(UsdGeomModelAPI &self,
     return self.CreateModelCardTextureZNegAttr(
         UsdPythonToSdfType(defaultVal, SdfValueTypeNames->Asset), writeSparsely);
 }
+        
+static UsdAttribute
+_CreateModelCardDisplayFacingAttr(UsdGeomModelAPI &self,
+                                      object defaultVal, bool writeSparsely) {
+    return self.CreateModelCardDisplayFacingAttr(
+        UsdPythonToSdfType(defaultVal, SdfValueTypeNames->Bool), writeSparsely);
+}
 
 } // anonymous namespace
 
@@ -219,6 +226,13 @@ void wrapUsdGeomModelAPI()
              &This::GetModelCardTextureZNegAttr)
         .def("CreateModelCardTextureZNegAttr",
              &_CreateModelCardTextureZNegAttr,
+             (arg("defaultValue")=object(),
+              arg("writeSparsely")=false))
+        
+        .def("GetModelCardDisplayFacingAttr",
+             &This::GetModelCardDisplayFacingAttr)
+        .def("CreateModelCardDisplayFacingAttr",
+             &_CreateModelCardDisplayFacingAttr,
              (arg("defaultValue")=object(),
               arg("writeSparsely")=false))
 

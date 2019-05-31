@@ -37,6 +37,7 @@ pxr_shared_library(${PXR_PACKAGE}
         ${HOUDINI_LIB_NAMES}
 
     INCLUDE_DIRS
+        ${Boost_INCLUDE_DIRS}
         ${HOUDINI_INCLUDE_DIRS}
 
     PUBLIC_CLASSES
@@ -54,6 +55,7 @@ pxr_shared_library(${PXR_PACKAGE}
         purpose
         refiner
         scopeWrapper
+        shadingModeRegistry
         shaderWrapper
         stageCache
         stageEdit
@@ -103,6 +105,7 @@ pxr_shared_library(${PXR_PACKAGE}
 
     CPPFILES
         plugin.cpp
+        ribShadingExporter.cpp
 
     PYMODULE_FILES
         __init__.py

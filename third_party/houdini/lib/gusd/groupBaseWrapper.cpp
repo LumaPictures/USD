@@ -36,6 +36,8 @@
 #include <GT/GT_Refine.h>
 
 
+#include <iostream>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 // drand48 and srand48 defined in SYS_Math.h as of 13.5.153. and conflicts with imath.

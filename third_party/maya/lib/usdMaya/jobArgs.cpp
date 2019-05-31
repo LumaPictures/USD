@@ -357,7 +357,9 @@ UsdMayaJobExportArgs::UsdMayaJobExportArgs(
             _String(userArgs, UsdMayaJobExportArgsTokens->pythonPostCallback)),
 
         dagPaths(dagPaths),
-        timeSamples(timeSamples)
+        timeSamples(timeSamples),
+        exportRootPath(
+            _String(userArgs, UsdMayaJobExportArgsTokens->root))
 {
 }
 
@@ -377,6 +379,7 @@ operator <<(std::ostream& out, const UsdMayaJobExportArgs& exportArgs)
         << "exportMeshUVs: " << TfStringify(exportArgs.exportMeshUVs) << std::endl
         << "exportNurbsExplicitUV: " << TfStringify(exportArgs.exportNurbsExplicitUV) << std::endl
         << "exportRefsAsInstanceable: " << TfStringify(exportArgs.exportRefsAsInstanceable) << std::endl
+        << "exportRootPath: " << exportArgs.exportRootPath << std::endl
         << "exportSkels: " << TfStringify(exportArgs.exportSkels) << std::endl
         << "exportSkin: " << TfStringify(exportArgs.exportSkin) << std::endl
         << "exportVisibility: " << TfStringify(exportArgs.exportVisibility) << std::endl
@@ -482,6 +485,7 @@ UsdMayaJobExportArgs::GetDefaultDictionary()
         d[UsdMayaJobExportArgsTokens->renderableOnly] = false;
         d[UsdMayaJobExportArgsTokens->renderLayerMode] =
                 UsdMayaJobExportArgsTokens->defaultLayer.GetString();
+        d[UsdMayaJobExportArgsTokens->root] = std::string();
         d[UsdMayaJobExportArgsTokens->shadingMode] =
                 UsdMayaShadingModeTokens->displayColor.GetString();
         d[UsdMayaJobExportArgsTokens->stripNamespaces] = false;
@@ -559,6 +563,15 @@ UsdMayaJobImportArgs::UsdMayaJobImportArgs(
                 UsdMayaJobImportArgsTokens->shadingMode,
                 UsdMayaShadingModeTokens->none,
                 UsdMayaShadingModeRegistry::ListImporters())),
+        instanceMode(
+            _Token(userArgs,
+                UsdMayaJobImportArgsTokens->instanceMode,
+                UsdMayaJobImportArgsTokens->asTransform,
+                {
+                    UsdMayaJobImportArgsTokens->asTransform,
+                    UsdMayaJobImportArgsTokens->flatten,
+                    UsdMayaJobImportArgsTokens->buildSources
+                })),
         useAsAnimationCache(
             _Boolean(userArgs,
                 UsdMayaJobImportArgsTokens->useAsAnimationCache)),
@@ -599,6 +612,8 @@ const VtDictionary& UsdMayaJobImportArgs::GetDefaultDictionary()
                 });
         d[UsdMayaJobImportArgsTokens->shadingMode] =
                 UsdMayaShadingModeTokens->displayColor.GetString();
+        d[UsdMayaJobImportArgsTokens->instanceMode] =
+                UsdMayaJobImportArgsTokens->asTransform.GetString();
         d[UsdMayaJobImportArgsTokens->useAsAnimationCache] = false;
 
         // plugInfo.json site defaults.
@@ -618,6 +633,7 @@ operator <<(std::ostream& out, const UsdMayaJobImportArgs& importArgs)
 {
     out << "shadingMode: " << importArgs.shadingMode << std::endl
         << "assemblyRep: " << importArgs.assemblyRep << std::endl
+        << "instanceMode: " << importArgs.instanceMode << std::endl
         << "timeInterval: " << importArgs.timeInterval << std::endl
         << "useAsAnimationCache: " << TfStringify(importArgs.useAsAnimationCache) << std::endl
         << "importWithProxyShapes: " << TfStringify(importArgs.importWithProxyShapes) << std::endl;

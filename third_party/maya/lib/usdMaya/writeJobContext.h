@@ -230,6 +230,9 @@ private:
     std::map<std::string, UsdMayaPrimWriterRegistry::WriterFactoryFn>
             mWriterFactoryCache;
 
+    // Cache the conversion from string to SdfPath here
+    SdfPath _exportRootSdfPath;
+
     // UsdMaya_InstancedNodeWriter is in a separate file, but functions as
     // an internal helper for UsdMayaWriteJobContext.
     friend class UsdMaya_InstancedNodeWriter;

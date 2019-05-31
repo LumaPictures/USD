@@ -20,6 +20,9 @@ pxr_plugin(${PXR_PACKAGE}
         katanaPluginApi
         usdKatana
 
+    INCLUDE_DIRS
+        ${GLEW_INCLUDE_DIR}
+
     CPPFILES
         debugCodes.cpp
         usdVMP.cpp
