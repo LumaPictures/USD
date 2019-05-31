@@ -161,17 +161,6 @@ HdxOitRenderTask::_PrepareOitBuffers(
                   "OIT Task only works with HdSt")) {
         return;
     }
-    VtValue oitLayerCount = renderDelegate
-        ->GetRenderSetting(HdStRenderSettingsTokens->oitLayerCount);
-    if (!TF_VERIFY(oitLayerCount.IsHolding<int>(),
-        "OIT Layer count is not an integer!")) {
-        return;
-    }
-    const int layerCount = std::max(1, oitLayerCount.UncheckedGet<int>());
-    if (_layerCount != layerCount) {
-        _rebuildOitBuffers = true;
-        _layerCount = layerCount;
-    }
 
     HdResourceRegistrySharedPtr const& resourceRegistry = 
         renderIndex->GetResourceRegistry();
@@ -184,6 +173,18 @@ HdxOitRenderTask::_PrepareOitBuffers(
     int sizeNew = viewport[2] * viewport[3];
     int sizeOld = _viewport[2] * _viewport[3];
     bool rebuildOitBuffers = (sizeNew > sizeOld || sizeOld-sizeNew > 256*256);
+
+    VtValue oitLayerCount = renderDelegate
+        ->GetRenderSetting(HdStRenderSettingsTokens->oitLayerCount);
+    if (!TF_VERIFY(oitLayerCount.IsHolding<int>(),
+        "OIT Layer count is not an integer!")) {
+        return;
+    }
+    const int layerCount = std::max(1, oitLayerCount.UncheckedGet<int>());
+    if (_layerCount != layerCount) {
+        rebuildOitBuffers = true;
+        _layerCount = layerCount;
+    }
 
     if (rebuildOitBuffers) {
         // If glew version too old we emit a warning since OIT will not work.
