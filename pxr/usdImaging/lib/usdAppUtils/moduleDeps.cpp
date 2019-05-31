@@ -41,7 +41,8 @@ TF_REGISTRY_FUNCTION(TfScriptModuleLoader) {
         TfToken("sdf"),
         TfToken("tf"),
         TfToken("usd"),
-        TfToken("usdGeom")
+        TfToken("usdGeom"),
+        TfToken("usdImagingGL")
     };
     TfScriptModuleLoader::GetInstance().
         RegisterLibrary(TfToken("usdAppUtils"), TfToken("pxr.UsdAppUtils"), reqs);
