@@ -34,7 +34,6 @@
 #include "pxr/usd/pcp/layerStackRegistry.h"
 #include "pxr/usd/pcp/node_Iterator.h"
 #include "pxr/usd/pcp/pathTranslation.h"
-#include "pxr/usd/pcp/payloadDecorator.h"
 #include "pxr/usd/pcp/primIndex.h"
 #include "pxr/usd/pcp/propertyIndex.h"
 #include "pxr/usd/pcp/statistics.h"
@@ -111,16 +110,14 @@ private:
 
 PcpCache::PcpCache(
     const PcpLayerStackIdentifier & layerStackIdentifier,
-    const std::string& targetSchema,
-    bool usd,
-    const PcpPayloadDecoratorRefPtr& payloadDecorator) :
+    const std::string& fileFormatTarget,
+    bool usd) :
     _rootLayer(layerStackIdentifier.rootLayer),
     _sessionLayer(layerStackIdentifier.sessionLayer),
     _pathResolverContext(layerStackIdentifier.pathResolverContext),
     _usd(usd),
-    _targetSchema(targetSchema),
-    _payloadDecorator(payloadDecorator),
-    _layerStackCache(Pcp_LayerStackRegistry::New(_targetSchema, _usd)),
+    _fileFormatTarget(fileFormatTarget),
+    _layerStackCache(Pcp_LayerStackRegistry::New(_fileFormatTarget, _usd)),
     _primDependencies(new Pcp_Dependencies())
 {
     // Do nothing
@@ -147,7 +144,6 @@ PcpCache::~PcpCache()
 
     wd.Run([this]() { _rootLayer.Reset(); });
     wd.Run([this]() { _sessionLayer.Reset(); });
-    wd.Run([this]() { _payloadDecorator.Reset(); });
     wd.Run([this]() { TfReset(_includedPayloads); });
     wd.Run([this]() { TfReset(_variantFallbackMap); });
     wd.Run([this]() { _primIndexCache.ClearInParallel(); });
@@ -205,15 +201,9 @@ PcpCache::IsUsd() const
 }
 
 const std::string& 
-PcpCache::GetTargetSchema() const
+PcpCache::GetFileFormatTarget() const
 {
-    return _targetSchema;
-}
-
-PcpPayloadDecorator* 
-PcpCache::GetPayloadDecorator() const
-{
-    return boost::get_pointer(_payloadDecorator);
+    return _fileFormatTarget;
 }
 
 PcpVariantFallbackMap
@@ -392,11 +382,10 @@ PcpCache::GetPrimIndexInputs()
 {
     return PcpPrimIndexInputs()
         .Cache(this)
-        .PayloadDecorator(GetPayloadDecorator())
         .VariantFallbacks(&_variantFallbackMap)
         .IncludedPayloads(&_includedPayloads)
         .Cull(TfGetEnvSetting(PCP_CULLING))
-        .TargetSchema(_targetSchema);
+        .FileFormatTarget(_fileFormatTarget);
 }
 
 PcpLayerStackRefPtr
