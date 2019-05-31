@@ -37,7 +37,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 enum class UsdMayaShadingNodeType {
-    None,
+    NonShading,
     Light,
     PostProcess,
     Rendering,
@@ -122,7 +122,7 @@ struct UsdMayaTranslatorUtil
             MStatus* status,
             MObject* mayaNodeObj);
 
-    /// \brief Helper to create shadingNodes.  Wrapper around mel "shadingNode".
+    /// \brief Helper to create shadingNodes. Wrapper around mel "shadingNode".
     ///
     /// This does several things beyond just creating the node, including but
     /// not limited to:
@@ -139,10 +139,10 @@ struct UsdMayaTranslatorUtil
     CreateShaderNode(
             const MString& nodeName,
             const MString& nodeTypeName,
-            UsdMayaShadingNodeType shadingNodeType,
+            const UsdMayaShadingNodeType shadingNodeType,
             MStatus* status,
             MObject* shaderObj,
-            MObject parentNode=MObject::kNullObj);
+            const MObject parentNode=MObject::kNullObj);
 
     /// Gets an API schema of the requested type for the given \p usdPrim.
     ///
