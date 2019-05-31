@@ -152,6 +152,9 @@ public:
 
     virtual SdfPath GetInstancer(SdfPath const &cachePath) override;
 
+    virtual std::vector<VtArray<TfToken>>
+    GetInstanceCategories(UsdPrim const& prim) override;
+
     virtual size_t
     SampleInstancerTransform(UsdPrim const& instancerPrim,
                              SdfPath const& instancerPath,
@@ -160,6 +163,12 @@ public:
                              size_t maxSampleCount,
                              float *times,
                              GfMatrix4d *samples) override;
+
+    virtual size_t
+    SampleTransform(UsdPrim const& prim, SdfPath const& cachePath,
+                    const std::vector<float>& configuredSampleTimes,
+                    size_t maxNumSamples, float *sampleTimes,
+                    GfMatrix4d *sampleValues) override;
 
     virtual size_t
     SamplePrimvar(UsdPrim const& usdPrim,
@@ -236,7 +245,7 @@ private:
                       bool *isLeafInstancer);
 
     // For a usd path, collects the instancers to resync.
-    void _ResyncPath(SdfPath const& usdPath,
+    void _ResyncPath(SdfPath const& cachePath,
                      UsdImagingIndexProxy* index,
                      bool reload);
     // Removes and optionally reloads all instancer data, both locally and
@@ -409,7 +418,7 @@ private:
         std::mutex mutex;
     };
 
-    // Map from instancer path to instancer data.
+    // Map from instancer cache path to instancer data.
     // Note: this map is modified in multithreaded code paths and must be
     // locked.
     typedef boost::unordered_map<SdfPath, _InstancerData, SdfPath::Hash> 
