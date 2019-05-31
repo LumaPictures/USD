@@ -106,6 +106,14 @@ UsdImagingBasisCurvesAdapter::TrackVariability(UsdPrim const& prim,
                /*isInherited*/false,
                &widthsExists);
     if (!widthsExists) {
+        UsdGeomPrimvar pv = _GetInheritedPrimvar(prim, HdTokens->widths);
+        if (pv && pv.ValueMightBeTimeVarying()) {
+            *timeVaryingBits |= HdChangeTracker::DirtyWidths;
+            HD_PERF_COUNTER_INCR(UsdImagingTokens->usdVaryingWidths);
+            widthsExists = true;
+        }
+    }
+    if (!widthsExists) {
         _IsVarying(prim, UsdGeomTokens->widths,
                 HdChangeTracker::DirtyWidths,
                 UsdImagingTokens->usdVaryingWidths,
@@ -123,6 +131,14 @@ UsdImagingBasisCurvesAdapter::TrackVariability(UsdPrim const& prim,
                timeVaryingBits,
                /*isInherited*/false,
                &normalsExists);
+    if (!normalsExists) {
+        UsdGeomPrimvar pv = _GetInheritedPrimvar(prim, HdTokens->normals);
+        if (pv && pv.ValueMightBeTimeVarying()) {
+            *timeVaryingBits |= HdChangeTracker::DirtyNormals;
+            HD_PERF_COUNTER_INCR(UsdImagingTokens->usdVaryingNormals);
+            normalsExists = true;
+        }
+    }
     if (!normalsExists) {
         _IsVarying(prim, UsdGeomTokens->normals,
                 HdChangeTracker::DirtyNormals,
@@ -163,6 +179,10 @@ UsdImagingBasisCurvesAdapter::UpdateForTime(UsdPrim const& prim,
         UsdGeomPrimvarsAPI primvarsApi(prim);
         UsdGeomPrimvar pv = primvarsApi.GetPrimvar(
             UsdImagingTokens->primvarsWidths);
+        if (!pv) {
+            // If it's not found locally, see if it's inherited
+            pv = _GetInheritedPrimvar(prim, HdTokens->widths);
+        }
         if (pv) {
             _ComputeAndMergePrimvar(prim, cachePath, pv, time, valueCache);
         } else {
@@ -186,6 +206,10 @@ UsdImagingBasisCurvesAdapter::UpdateForTime(UsdPrim const& prim,
         UsdGeomPrimvarsAPI primvarsApi(prim);
         UsdGeomPrimvar pv = primvarsApi.GetPrimvar(
             UsdImagingTokens->primvarsNormals);
+        if (!pv) {
+            // If it's not found locally, see if it's inherited
+            pv = _GetInheritedPrimvar(prim, HdTokens->normals);
+        }
         if (pv) {
             _ComputeAndMergePrimvar(prim, cachePath, pv, time, valueCache);
         } else {
