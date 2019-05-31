@@ -155,6 +155,12 @@ public:
                              GfMatrix4d *samples) override;
 
     virtual size_t
+    SampleTransform(UsdPrim const& prim, SdfPath const& cachePath,
+                    const std::vector<float>& configuredSampleTimes,
+                    size_t maxNumSamples, float *sampleTimes,
+                    GfMatrix4d *sampleValues) override;
+
+    virtual size_t
     SamplePrimvar(UsdPrim const& usdPrim,
                   SdfPath const& cachePath,
                   TfToken const& key,
@@ -356,7 +362,7 @@ private:
     // to keep everything bundled up under the instancer path.
     struct _InstancerData {
         _InstancerData() {}
-        SdfPath parentInstancerPath;
+        SdfPath parentInstancerCachePath;
         _ProtoRPrimMap protoRprimMap;
         _UsdToCacheMap usdToCacheMap;
         std::vector<_PrototypeSharedPtr> prototypes;
