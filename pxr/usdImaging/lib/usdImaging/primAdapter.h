@@ -261,6 +261,11 @@ public:
     USDIMAGING_API
     virtual SdfPath GetInstancer(SdfPath const &instancePath);
 
+    /// Return an array of the categories used by each instance.
+    USDIMAGING_API
+    virtual std::vector<VtArray<TfToken>>
+    GetInstanceCategories(UsdPrim const& prim);
+
     /// Sample the instancer transform for the given prim.
     /// \see HdSceneDelegate::SampleInstancerTransform()
     USDIMAGING_API
@@ -396,9 +401,9 @@ public:
     USDIMAGING_API
     SdfPath GetMaterialUsdPath(UsdPrim const& prim) const; 
 
-    /// Gets the instancer ID for the given prim and instancerContext.
+    /// Gets the instancer cachePath for the given prim and instancerContext.
     USDIMAGING_API
-    SdfPath GetInstancerBinding(UsdPrim const& prim,
+    SdfPath GetInstancerCachePath(UsdPrim const& prim,
                             UsdImagingInstancerContext const* instancerContext);
 
     /// Returns the depending rprim paths which don't exist in descendants.
@@ -552,6 +557,10 @@ protected:
     USDIMAGING_API
     UsdImaging_CoordSysBindingStrategy::value_type
     _GetCoordSysBindings(UsdPrim const& prim) const;
+
+    USDIMAGING_API
+    UsdImaging_InheritedPrimvarStrategy::value_type
+    _GetInheritedPrimvars(UsdPrim const& prim) const;
 
     USDIMAGING_API
     bool _DoesDelegateSupportCoordSys() const;
