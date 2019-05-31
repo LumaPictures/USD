@@ -89,7 +89,7 @@ bool HydraLayer::customPick(unsigned int x, unsigned int y,
                           float* singlePointDepth)
 {
     // Perform the picking
-    HdxIntersector::HitVector hits;
+    HdxPickHitVector hits;
     if (!m_hydraKatana->pick(getViewport(), x, y, w, h, deepPicking, hits))
     {
         return true;
