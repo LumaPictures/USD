@@ -133,7 +133,6 @@ void HydraKatana::setup()
     // Render Tags
     m_renderTags.push_back(HdTokens->geometry);
     m_renderTags.push_back(HdTokens->proxy);
-    m_renderTaskParams.renderTags = m_renderTags;
     // NOTE: in order to render in full res use this instead of HdTokens->proxy:
     // m_renderTags.push_back(HdTokens->render);
 
@@ -185,20 +184,21 @@ void HydraKatana::draw(ViewportWrapperPtr viewport)
 
     // Set Task Params
     m_taskController->SetRenderParams(m_renderTaskParams);
+    m_taskController->SetRenderTags(m_renderTags);
 
     // Engine Selection State
     VtValue selectionValue(m_selectionTracker);
     m_engine.SetTaskContextData(HdxTokens->selectionState, selectionValue);
 
     // Render
-    auto tasks = m_taskController->GetTasks();
+    auto tasks = m_taskController->GetRenderingTasks();
     m_engine.Execute(m_renderIndex, &tasks);
 }
 
 
 bool HydraKatana::pick(ViewportWrapperPtr viewport,
     unsigned int x, unsigned int y, unsigned int w, unsigned int h,
-    bool deepPicking, HdxIntersector::HitVector& hits)
+    bool deepPicking, HdxPickHitVector& hits)
 {
     if (!isReadyToRender()) { return false; }
 
@@ -206,12 +206,12 @@ bool HydraKatana::pick(ViewportWrapperPtr viewport,
     GlfGLContext::MakeCurrent(GlfGLContext::GetCurrentGLContext());
 
     // Define the hit mode
-    HdxIntersector::HitMode hitMode = HdxIntersector::HitMode::HitFirst;
-    TfToken intersectionMode = HdxIntersectionModeTokens->nearestToCenter;
+    TfToken hitMode = HdxPickTokens->hitFirst;
+    TfToken resolveMode = HdxPickTokens->resolveNearestToCenter;
     if (deepPicking)
     {
-        hitMode = HdxIntersector::HitMode::HitAll;
-        intersectionMode = HdxIntersectionModeTokens->all;
+        hitMode = HdxPickTokens->hitFirst;
+        resolveMode = HdxPickTokens->resolveAll;
     }
 
     // Get the Viewport dimensions in pixels
@@ -226,28 +226,35 @@ bool HydraKatana::pick(ViewportWrapperPtr viewport,
     GfMatrix4d projMatrix = toGfMatrixd(projectionMat.getValue());
     GfMatrix4d viewMatrix = toGfMatrixd(viewport->getViewMatrix());
 
+    // This will set some HdxPickTaskParams, such as cullStyle
+    m_taskController->SetRenderParams(m_renderTaskParams);
+
     // Intersector parameters
-    HdxIntersector::Params params;
-    params.hitMode = hitMode;
-    params.viewMatrix = viewMatrix;
-    params.projectionMatrix = projMatrix;
-    params.cullStyle = m_renderTaskParams.cullStyle;
-    params.renderTags = m_renderTags;
+    HdxPickTaskContextParams pickParams;
+    pickParams.hitMode = hitMode;
+    pickParams.resolveMode = resolveMode;
+    pickParams.viewMatrix = viewMatrix;
+    pickParams.projectionMatrix = projMatrix;
+    // is this needed? won't we effectively get it from the projection matrix?
+    //pickParams.clipPlanes = ?;
+    pickParams.outHits = &hits;
 
     // Prim Collection
     HdRprimCollection collection(HdTokens->geometry,
             HdReprSelector(HdReprTokens->smoothHull));
     collection.SetRootPath(SdfPath::AbsoluteRootPath());
     //collection.SetExcludePaths(excludedPaths);
+    pickParams.collection = collection;
 
-    // Get the hit objects
-    bool result = m_taskController->TestIntersection(
-        &m_engine, collection, params, intersectionMode, &hits);
+    VtValue vtPickParams(pickParams);
+    m_engine.SetTaskContextData(HdxPickTokens->pickParams, vtPickParams);
+    auto pickingTasks = m_taskController->GetPickingTasks();
+    m_engine.Execute(m_renderIndex, &pickingTasks);
 
     // Hydra resizes the viewport to 128x128. We had to reset it back.
     glViewport(0, 0, viewportWidth, viewportHeight);
 
-    return result;
+    return hits.size() > 0;
 }
 
 void HydraKatana::select(const SdfPathVector& paths, bool replace)

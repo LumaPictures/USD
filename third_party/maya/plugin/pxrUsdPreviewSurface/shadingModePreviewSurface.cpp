@@ -221,7 +221,7 @@ _CreateAndPopulateShaderObject(
     MObject shaderObj;
     MFnDependencyNode depFn;
 
-    UsdMayaShadingNodeType shadingNodeType = UsdMayaShadingNodeType::None;
+    UsdMayaShadingNodeType shadingNodeType = UsdMayaShadingNodeType::NonShading;
     if (mayaTypeName == _tokens->lambert
             || mayaTypeName == PxrMayaUsdPreviewSurfaceTokens->MayaTypeName) {
         shadingNodeType = UsdMayaShadingNodeType::Shader;
