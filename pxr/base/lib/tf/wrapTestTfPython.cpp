@@ -24,6 +24,11 @@
 
 #include "pxr/pxr.h"
 
+#include "pxr/base/arch/pragmas.h"
+
+ARCH_PRAGMA_PUSH
+ARCH_PRAGMA_PLACEMENT_NEW  // because of pyFunction.h and boost::function
+
 #include "pxr/base/tf/declarePtrs.h"
 #include "pxr/base/tf/enum.h"
 #include "pxr/base/tf/error.h"
@@ -55,6 +60,7 @@
 
 #include <boost/smart_ptr.hpp>
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -342,26 +348,26 @@ static void registerInvalidEnum(object &obj) {
 ////////////////////////////////
 // Function callback stuff.
 
-static void callback(boost::function<void ()> const &f) {
+static void callback(std::function<void ()> const &f) {
     f();
 }
 
-static string stringCallback(boost::function<string ()> const &f) {
+static string stringCallback(std::function<string ()> const &f) {
     return f();
 }
 
-static string stringStringCallback(boost::function<string (string)> const &f) {
+static string stringStringCallback(std::function<string (string)> const &f) {
     return f("c++ is calling...");
 }
 
-static string callUnboundInstance(boost::function<string (string)> const &f,
+static string callUnboundInstance(std::function<string (string)> const &f,
                                   string const &str) {
     return f(str);
 }
 
-static TfStaticData<boost::function<string ()> > _testCallback;
+static TfStaticData<std::function<string ()> > _testCallback;
 
-static void setTestCallback(boost::function<string ()> const &func) {
+static void setTestCallback(std::function<string ()> const &func) {
     *_testCallback = func;
 }
 
@@ -574,3 +580,5 @@ TF_REFPTR_CONST_VOLATILE_GET(Tf_TestBase)
 TF_REFPTR_CONST_VOLATILE_GET(Tf_TestDerived)
 TF_REFPTR_CONST_VOLATILE_GET(polymorphic_Tf_TestBase<class Tf_TestBase>)
 TF_REFPTR_CONST_VOLATILE_GET(polymorphic_Tf_TestDerived<class Tf_TestDerived>)
+
+ARCH_PRAGMA_POP

@@ -23,6 +23,8 @@
 //
 #include "pxr/imaging/glf/glew.h"
 
+#include "pxr/base/tf/envSetting.h"
+
 #include "pxr/imaging/hdx/package.h"
 #include "pxr/imaging/hdx/oitRenderTask.h"
 #include "pxr/imaging/hdx/oitResolveTask.h"
@@ -45,8 +47,10 @@
 #include "pxr/imaging/hdSt/renderDelegate.h"
 #include "pxr/imaging/hdSt/tokens.h"
 
-
 PXR_NAMESPACE_OPEN_SCOPE
+
+TF_DEFINE_ENV_SETTING(HDX_ENABLE_OIT, true, 
+                      "Enable order independent translucency");
 
 typedef std::vector<HdBufferSourceSharedPtr> HdBufferSourceSharedPtrVector;
 
@@ -56,7 +60,6 @@ HdxOitRenderTask::HdxOitRenderTask(HdSceneDelegate* delegate, SdfPath const& id)
     : HdxRenderTask(delegate, id)
     , _oitRenderPassShader()
     , _viewport(0)
-    , _rebuildOitBuffers(true)
 {
     _oitRenderPassShader.reset(
         new HdStRenderPassShader(HdxPackageRenderPassOitShader()));
@@ -75,18 +78,6 @@ HdxOitRenderTask::Sync(
     HD_TRACE_FUNCTION();
 
     HdxRenderTask::Sync(delegate, ctx, dirtyBits);
-
-    VtValue valueVt = delegate->Get(GetId(), HdTokens->params);
-    if (valueVt.IsHolding<HdxRenderTaskParams>()) {
-        HdxRenderTaskParams params = 
-            valueVt.UncheckedGet<HdxRenderTaskParams>();
-
-        // OIT buffers are currently sized based on viewport.
-        if (_viewport != params.viewport) {
-            _rebuildOitBuffers = true;
-            _viewport = params.viewport;
-        }
-    }
 }
 
 void
@@ -162,6 +153,9 @@ HdxOitRenderTask::_PrepareOitBuffers(
     HdTaskContext* ctx, 
     HdRenderIndex* renderIndex)
 {
+    // XXX OIT can be globally disabled to preserve GPU memory
+    if (!bool(TfGetEnvSetting(HDX_ENABLE_OIT))) return;
+
     HdRenderDelegate* renderDelegate = renderIndex->GetRenderDelegate();
     if (!TF_VERIFY(dynamic_cast<HdStRenderDelegate*>(renderDelegate),
                   "OIT Task only works with HdSt")) {
@@ -182,11 +176,16 @@ HdxOitRenderTask::_PrepareOitBuffers(
     HdResourceRegistrySharedPtr const& resourceRegistry = 
         renderIndex->GetResourceRegistry();
 
-    // XXX Rebuilding the buffers is a slow operation that impacts viewport
-    //     resizing. We could consider making buffers that are large enough
-    //     for e.g. a 2k viewport and never resize these buffers.
+    // XXX Rebuilding the buffers is a slow operation that slows viewport
+    //     resizing. We only shrink in steps of 256^2 to reduce the impact.
+    GfVec4i viewport;
+    glGetIntegerv(GL_VIEWPORT, &viewport[0]);
+    
+    int sizeNew = viewport[2] * viewport[3];
+    int sizeOld = _viewport[2] * _viewport[3];
+    bool rebuildOitBuffers = (sizeNew > sizeOld || sizeOld-sizeNew > 256*256);
 
-    if (_rebuildOitBuffers) {
+    if (rebuildOitBuffers) {
         // If glew version too old we emit a warning since OIT will not work.
         if (!glClearNamedBufferData) {
             TF_WARN("glClearNamedBufferData missing for OIT (old glew?)");
@@ -197,6 +196,8 @@ HdxOitRenderTask::_PrepareOitBuffers(
         _depthBar.reset();
         _indexBar.reset();
         _uniformBar.reset();
+
+        _viewport = viewport;
     }
 
     //
@@ -272,9 +273,12 @@ HdxOitRenderTask::_PrepareOitBuffers(
     //
     if (!_uniformBar) {
         HdBufferSpecVector specs;
-        specs.push_back(HdBufferSpec(HdxTokens->oitWidth, HdTupleType {HdTypeInt32, 1}));
-        specs.push_back(HdBufferSpec(HdxTokens->oitHeight, HdTupleType {HdTypeInt32, 1}));
-        specs.push_back(HdBufferSpec(HdxTokens->oitSamples, HdTupleType {HdTypeInt32, 1}));
+        specs.push_back(
+            HdBufferSpec(HdxTokens->oitWidth, HdTupleType {HdTypeInt32, 1}));
+        specs.push_back(
+            HdBufferSpec(HdxTokens->oitHeight, HdTupleType {HdTypeInt32, 1}));
+        specs.push_back(
+            HdBufferSpec(HdxTokens->oitSamples, HdTupleType {HdTypeInt32, 1}));
         _uniformBar = resourceRegistry->AllocateUniformBufferArrayRange(
                                             /*role*/HdxTokens->oitUniforms,
                                             specs,
@@ -298,7 +302,7 @@ HdxOitRenderTask::_PrepareOitBuffers(
     //
     // Binding Requests
     //
-    if (_rebuildOitBuffers) {
+    if (rebuildOitBuffers) {
         _oitRenderPassShader->AddBufferBinding(
             HdBindingRequest(HdBinding::SSBO,
                              HdxTokens->oitCounterBufferBar, _counterBar,
@@ -320,9 +324,6 @@ HdxOitRenderTask::_PrepareOitBuffers(
                              HdxTokens->oitUniformBar, _uniformBar,
                              /*interleave*/true));
     }
-
-    // Buffers rebuilt and binding requests updated
-    _rebuildOitBuffers = false;
 }
 
 void 
@@ -330,6 +331,7 @@ HdxOitRenderTask::_ClearOitGpuBuffers(HdTaskContext* ctx)
 {
     // Exit if glew version used by app is too old
     if (!glClearNamedBufferData) return;
+    if (!_counterBar) return;
 
     //
     // Counter Buffer
