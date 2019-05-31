@@ -320,6 +320,59 @@ PxrUsdKatanaUsdInPrivateData::PxrUsdKatanaUsdInPrivateData(
         }
     }
 
+    // Velocity scale.
+    //
+    overrideFound = false;
+    for (size_t i = 0; i < pathsToCheck.size(); ++i)
+    {
+        FnKat::FloatAttribute velocityScaleAttr =
+                sessionAttr.getChildByName(
+                    "overrides."+pathsToCheck[i]+".velocityScale");
+        if (velocityScaleAttr.isValid())
+        {
+            _velocityScale = velocityScaleAttr.getValue();
+            overrideFound = true;
+            break;
+        }
+    }
+    if (!overrideFound)
+    {
+        if (parentData)
+        {
+            _velocityScale = parentData->GetVelocityScale();
+        }
+        else
+        {
+            _velocityScale = 1.0;
+        }
+    }
+
+    // Enable velocity blur.
+    //
+    overrideFound = false;
+    for (size_t i = 0; i < pathsToCheck.size(); ++i)
+    {
+        FnKat::IntAttribute disableVelocityBlurAttr =
+                sessionAttr.getChildByName(
+                    "overrides."+pathsToCheck[i]+".disableVelocityBlur");
+        if (disableVelocityBlurAttr.isValid())
+        {
+            _disableVelocityBlur = disableVelocityBlurAttr.getValue() == 1;
+            overrideFound = true;
+            break;
+        }
+    }
+    if (!overrideFound)
+    {
+        if (parentData)
+        {
+            _disableVelocityBlur = parentData->GetDisableVelocityBlur();
+        }
+        else
+        {
+            _disableVelocityBlur = false;
+        }
+    }
 
     if (parentData)
     {

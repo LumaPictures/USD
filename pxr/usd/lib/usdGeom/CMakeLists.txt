@@ -149,6 +149,14 @@ pxr_build_test(testUsdGeomIsA
         testenv/testUsdGeomIsA.cpp
 )
 
+pxr_build_test(testUsdGeomPointBased
+    LIBRARIES
+        usd
+        usdGeom
+    CPPFILES
+        testenv/testUsdGeomPointBased.cpp
+)
+
 pxr_build_test(testUsdGeomHasAPI
     LIBRARIES
         usd
@@ -281,6 +289,11 @@ pxr_register_test(testUsdGeomPrimvar
 pxr_register_test(testUsdGeomPointInstancer
     PYTHON
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdGeomPointInstancer"
+    EXPECTED_RETURN_CODE 0
+)
+
+pxr_register_test(testUsdGeomPointBased
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdGeomPointBased"
     EXPECTED_RETURN_CODE 0
 )
 

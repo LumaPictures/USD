@@ -601,8 +601,12 @@ nb.setParametersTemplateAttr(FnAttribute.GroupBuilder()
     .set('overrides.currentTime', '')
     .set('overrides.shutterOpen', '')
     .set('overrides.shutterClose', '')
+    .set('overrides.velocityScale', '')
+    .set('overrides.disableVelocityBlur', '')
     .build(),
         forceArrayNames=('locations',))
+
+
 
 nb.setHintsForParameter('locations', {
     'widget': 'scenegraphLocationArray',
@@ -632,6 +636,8 @@ def buildOpChain(self, interface):
         currentTime = overrides.getChild('currentTime').getValue(frameTime)
         shutterOpen = overrides.getChild('shutterOpen').getValue(frameTime)
         shutterClose = overrides.getChild('shutterClose').getValue(frameTime)
+        velocityScale = overrides.getChild('velocityScale').getValue(frameTime)
+        disableVelocityBlur = overrides.getChild('disableVelocityBlur').getValue(frameTime)
 
         if motionSampleTimes:
             floatTimes = [float(t) for t in motionSampleTimes.split(' ')]
@@ -645,6 +651,12 @@ def buildOpChain(self, interface):
 
         if shutterClose:
             gb1.set('shutterClose', FnAttribute.FloatAttribute(float(shutterClose)))
+
+        if velocityScale:
+            gb1.set('velocityScale', FnAttribute.FloatAttribute(float(velocityScale)))
+
+        if disableVelocityBlur:
+            gb1.set('disableVelocityBlur', FnAttribute.IntAttribute(int(disableVelocityBlur)))
 
         overridesAttr = gb1.build()
 
