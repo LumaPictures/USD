@@ -108,6 +108,11 @@ public:
                                     UsdImagingIndexProxy* index) override;
 
     USDIMAGING_API
+    virtual void MarkRenderTagDirty(UsdPrim const& prim,
+                                    SdfPath const& cachePath,
+                                    UsdImagingIndexProxy* index) override;
+
+    USDIMAGING_API
     virtual void MarkTransformDirty(UsdPrim const& prim,
                                     SdfPath const& cachePath,
                                     UsdImagingIndexProxy* index) override;
@@ -153,15 +158,16 @@ public:
     // Helper function: add a given type of rprim, potentially with instancer
     // name mangling, and add any bound shader.
     USDIMAGING_API
-    static SdfPath _AddRprim(TfToken const& primType,
+    SdfPath _AddRprim(TfToken const& primType,
                       UsdPrim const& usdPrim,
                       UsdImagingIndexProxy* index,
-                      SdfPath const& materialId,
+                      SdfPath const& materialUsdPath,
                       UsdImagingInstancerContext const* instancerContext);
 
-    // Helper function: apply gprim name mangling.
+    // Helper function: map USD path to UsdImaging cache path,
+    // applying any name-encoding required by the instancerContext.
     USDIMAGING_API
-    static SdfPath _ResolveCachePath(SdfPath const& cachePath,
+    static SdfPath _ResolveCachePath(SdfPath const& usdPath,
             UsdImagingInstancerContext const* instancerContext);
 
 protected:
@@ -175,6 +181,11 @@ protected:
     USDIMAGING_API
     virtual bool _IsBuiltinPrimvar(TfToken const& primvarName) const;
 
+    // Utility for derived classes to try to find an inherited primvar.
+    USDIMAGING_API
+    UsdGeomPrimvar _GetInheritedPrimvar(UsdPrim const& prim,
+                                        TfToken const& primvarName) const;
+
 private:
 
     /// Reads the extent from the given prim. If the extent is not authored,
@@ -183,10 +194,6 @@ private:
 
     /// Returns the doubleSided state for a given prim.
     bool _GetDoubleSided(UsdPrim const& prim) const;
-
-    /// Returns the UsdGeomImagable "purpose" for this prim, including any
-    /// inherited purpose. Inherited values are strongest.
-    TfToken _GetPurpose(UsdPrim const & prim, UsdTimeCode time) const;
 };
 
 

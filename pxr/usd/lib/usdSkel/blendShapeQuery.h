@@ -69,6 +69,9 @@ public:
     /// Returns the inbetween shape corresponding to sub-shape \p i, if any.
     USDSKEL_API UsdSkelInbetweenShape GetInbetween(size_t subShapeIndex) const;
 
+    /// Returns the blend shape index corresponding to the \p i'th sub-shape.
+    USDSKEL_API size_t GetBlendShapeIndex(size_t subShapeIndex) const;
+
     size_t GetNumBlendShapes() const { return _blendShapes.size(); }
     
     size_t GetNumSubShapes() const { return _subShapes.size(); }
@@ -104,6 +107,12 @@ public:
                            VtUIntArray* blendShapeIndices,
                            VtUIntArray* subShapeIndices) const;
 
+
+    /// Compute a flattened array of weights for all sub-shapes.
+    USDSKEL_API bool
+    ComputeFlattenedSubShapeWeights(const TfSpan<const float>& weights,
+                                    VtFloatArray* subShapeWeights) const;
+
     /// Deform \p points using the resolved sub-shapes given by
     /// \p subShapeWeights, \p blendShapeIndices and \p subShapeIndices.
     /// The \p blendShapePointIndices and \p blendShapePointOffsets
@@ -118,6 +127,22 @@ public:
         const std::vector<VtUIntArray>& blendShapePointIndices,
         const std::vector<VtVec3fArray>& subShapePointOffsets,
         TfSpan<GfVec3f> points) const;
+
+
+    /// Compute a packed shape table combining all sub-shapes.
+    /// This is intended to help encode blend shapes in a GPU-friendly form.
+    /// The resulting \p offsets array holds contiguous runs of
+    /// offsets for every point. The array holds all of the offsets of
+    /// every blend shape for point 0, followed by the offset of every
+    /// blend shape for point 1, and so forth.
+    /// Offsets are stored as a GfVec4f. The first three components of each
+    /// offset holds the actual offset value, while the last value holds
+    /// the sub-shape index, as a float. The sub-shape index can be used
+    /// to lookup a corresponding weight value in the 'subShapeWeights'
+    /// array returned by ComputeSubShapeWeights.
+    USDSKEL_API bool
+    ComputePackedShapeTable(VtVec4fArray* offsets,
+                            VtVec2iArray* ranges) const;
     
     USDSKEL_API
     std::string GetDescription() const;

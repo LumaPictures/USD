@@ -75,7 +75,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 ((SdfFieldKeys->InheritPaths,            SdfPathListOp))                 \
 ((SdfFieldKeys->Instanceable,            bool))                          \
 ((SdfFieldKeys->Kind,                    TfToken))                       \
-((SdfFieldKeys->MapperArgValue,          VtValue))                       \
 ((SdfFieldKeys->Owner,                   std::string))                   \
 ((SdfFieldKeys->PrimOrder,               std::vector<TfToken>))          \
 ((SdfFieldKeys->NoLoadHint,              bool))                          \
@@ -89,7 +88,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 ((SdfFieldKeys->TargetPaths,             SdfPathListOp))                 \
 ((SdfFieldKeys->TimeSamples,             SdfTimeSampleMap))              \
 ((SdfFieldKeys->Relocates,               SdfRelocatesMap))               \
-((SdfFieldKeys->Script,                  std::string))                   \
 ((SdfFieldKeys->Specializes,             SdfPathListOp))                 \
 ((SdfFieldKeys->Specifier,               SdfSpecifier))                  \
 ((SdfFieldKeys->StartFrame,              double))                        \

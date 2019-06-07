@@ -342,11 +342,11 @@ public:
 
     HD_API
     virtual VtIntArray GetInstanceIndices(SdfPath const& instancerId,
-                                          SdfPath const& prototypeId);
+                                          SdfPath const& prototypeId) override;
 
     HD_API
-    virtual GfMatrix4d GetInstancerTransform(SdfPath const& instancerId,
-                                             SdfPath const& prototypeId);
+    virtual GfMatrix4d GetInstancerTransform(SdfPath const& instancerId)
+        override;
 
     HD_API
     virtual SdfPath GetMaterialId(SdfPath const& rprimId);
@@ -359,6 +359,9 @@ public:
     HD_API
     virtual VtValue GetMaterialParamValue(SdfPath const &materialId, 
                                           TfToken const &paramName);
+    HD_API
+    virtual VtValue GetCameraParamValue(SdfPath const &cameraId, 
+                                        TfToken const &paramName);
     HD_API
     virtual HdTextureResource::ID GetTextureResourceID(SdfPath const& textureId);
     HD_API
