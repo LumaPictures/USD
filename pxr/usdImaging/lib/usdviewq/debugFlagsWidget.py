@@ -25,11 +25,6 @@ from qt import QtCore, QtGui, QtWidgets
 
 from pxr import Tf
 
-try:
-    QStringListModel = QtCore.QStringListModel
-except AttributeError:
-    QStringListModel = QtGui.QStringListModel
-
 
 # Returns a list of debug flags whose names are prefixed by debugFlagPrefix
 # followed by an '_'.
@@ -83,7 +78,7 @@ class DebugFlagsWidget(QtWidgets.QWidget):
         allDebugPrefixes = [ x[:x.find('_')] if x.find('_') > 0 else x
                 for x in allDebugFlags]
         self._allDebugFlagPrefixes = list(sorted(set(allDebugPrefixes)))
-        listModel = QStringListModel(self._allDebugFlagPrefixes)
+        listModel = QtCore.QStringListModel(self._allDebugFlagPrefixes)
         listView.setModel(listModel)
 
     def _populateDebugFlagsTableView(self, debugFlagPrefix):
