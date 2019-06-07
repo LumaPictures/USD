@@ -1,0 +1,6 @@
+From: Paul Molodowitch <paulm@lumapictures.com>
+Subject: [usdview] fix for Reset View with later versions of PySide
+
+Needed on later versions of PySide2 - somewhere between PySide 5.6
+and PySide 5.11, behavior changed for python functions with optional args
+when connected to signals with optional args
