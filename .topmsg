@@ -1,0 +1,2 @@
+From: Paul Molodowitch <paulm@lumapictures.com>
+Subject: Fixup a few leftover warnings when building with gcc-6 / c++14
