@@ -1,0 +1,6 @@
+From: Paul Molodowitch <paulm@lumapictures.com>
+Subject: [usdview] fix for debug flags widget with new PySide
+
+It was apparently a bug that QStringListModel was available on
+QtGui instead of QtCore (https://bugreports.qt.io/browse/PYSIDE-614),
+so this was changed in later versions of PySide
