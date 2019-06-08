@@ -1,0 +1,12 @@
+From: Paul Molodowitch <paulm@lumapictures.com>
+Subject: prevent error when loading usdMaya usd-plugins
+
+the maya usd-plugins are mostly there just to provide metadata (so the
+associated maya plugins can be found and loaded); however, as currently
+configured, if you try to Load() them, they error.  This creates ugly
+error messages in, ie, AL_USDMaya, which pre-emptively tries to load all
+usd plugins.
+
+This is because they are configured as python plugins, but there is no
+associated python module. Setting them to resource plugins removes the
+error.
