@@ -1,0 +1,7 @@
+From: Paul Molodowitch <paulm@lumapictures.com>
+Subject: fix for OpenImageIO >= 1.9.1
+
+the non-ROI get_pixels overloads were removed in this version, and USD was
+still using it, despite the fact that it was deprecated.
+
+This adds a version switch, so that the ROI version is used if available
