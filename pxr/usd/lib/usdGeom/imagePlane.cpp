@@ -560,13 +560,19 @@ UsdGeomImagePlane::CalculateGeometry(
         if (pathString.empty()){
             pathString = params.fileName.GetAssetPath();
         }
-        auto* in = OIIO::ImageInput::open(pathString);
+        auto in = OIIO::ImageInput::open(pathString);
         if (in) {
             in->close();
             const auto& spec = in->spec();
             imageSize[0] = static_cast<float>(spec.width);
             imageSize[1] = static_cast<float>(spec.height);
+
+            // Starting in version 1.9.3, ImageInput::open
+            // returns a unique_ptr, which doesn't need to be
+            // explicitly destroyed...
+#if OIIO_VERSION < 10903
             OIIO::ImageInput::destroy(in);
+#endif
         }
     }
     const auto imageRatio = imageSize[0] / imageSize[1];
