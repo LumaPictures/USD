@@ -233,7 +233,7 @@ void
 GusdGT_VtArray<T>::swap(ArrayType& o)
 {
     _array.swap(o);
-    _size = _array.size();
+    _size = _array.GetSize();
     _UpdateDataPointer(false);
 }
 
