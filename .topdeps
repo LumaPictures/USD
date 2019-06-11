@@ -1,6 +1,5 @@
 tg/simple_features/maya_user_attribute_writer_plugins
 tg/simple_features/houdini_shader_output_registry
-tg/simple_features/houdini_st_uv_translation
 tg/bugfixes/katana_testsuite_precision
 tg/simple_features/export_root
 tg/simple_features/katana_nurbs_curves
