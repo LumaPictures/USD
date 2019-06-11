@@ -36,9 +36,7 @@ PXR_NAMESPACE_OPEN_SCOPE
     (Alpha)                                     \
     (Cd)                                        \
     (displayColor)                              \
-    (displayOpacity)                            \
-    (st)                                        \
-    (uv)
+    (displayOpacity)
 
 TF_DECLARE_PUBLIC_TOKENS(GusdTokens, GUSD_TOKENS);
 

@@ -23,8 +23,6 @@
 //
 #include "primWrapper.h"
 
-#include "UT_Gf.h"
-#include "UT_Version.h"
 #include "context.h"
 #include "GT_VtArray.h"
 #include "GU_USD.h"
@@ -664,27 +662,6 @@ GusdPrimWrapper::updatePrimvarFromGTPrim(
         UT_StringHolder name = attrname;
 #endif
 
-        // Write Houdini's `uv` attribute to the `st` primvar.
-        // TODO: Should we worry about double/half data?
-        if (name == GusdTokens->uv &&
-                attrData->getTupleSize() >= 2 &&
-                attrData->getStorage() == GT_STORE_REAL32 &&
-                (owner == GT_OWNER_POINT || owner == GT_OWNER_VERTEX))
-        {
-            VtArray<GfVec2f> tempArray;
-            tempArray.resize(static_cast<size_t>(attrData->entries()));
-            auto destPtr = reinterpret_cast<fpreal32*>(tempArray.data());
-            for (GT_Offset i = 0; i < attrData->entries(); i++, destPtr += 2) {
-                attrData->import(i, destPtr, 2);
-            }
-
-            auto stDataPtr = UT_IntrusivePtr<GusdGT_VtArray<GfVec2f>>(
-                    new GusdGT_VtArray<GfVec2f>(GT_TYPE_NONE));
-            stDataPtr->swap(tempArray);
-            attrData = stDataPtr;
-            name = TfToken(GusdTokens->st);
-        }
-
         updatePrimvarFromGTPrim( 
                     TfToken( name.toStdString() ),
                     owner, 
@@ -991,15 +968,10 @@ GusdPrimWrapper::loadPrimvars(
 
     std::vector<UsdGeomPrimvar> authoredPrimvars;
     bool hasCdPrimvar = false;
-    bool hasStPrimvar = false;
-    bool hasUvPrimvar = false;
-
-    const UT_String st(GusdTokens->st);
-    const UT_String uv(GusdTokens->uv);
-
-    UsdGeomImageable prim = getUsdPrim();
 
     {
+        UsdGeomImageable prim = getUsdPrim();
+
         UsdGeomPrimvar colorPrimvar = prim.GetPrimvar(GusdTokens->Cd);
         if (colorPrimvar && colorPrimvar.GetAttr().HasAuthoredValue()) {
             hasCdPrimvar = true;
@@ -1022,10 +994,11 @@ GusdPrimWrapper::loadPrimvars(
         } else if (!primvarPattern.isEmpty()) {
             authoredPrimvars = prim.GetAuthoredPrimvars();
         }
-    }
+    }    
 
-    auto applyGtData = [&] (const UsdGeomPrimvar& primvar, const UT_String& name,
-                            GT_DataArrayHandle gtData)
+    // Is it better to sort the attributes and build the attributes all at once.
+
+    for( const UsdGeomPrimvar &primvar : authoredPrimvars )
     {
         DBG(cerr << "loadPrimvar " << primvar.GetPrimvarName() << "\t" << primvar.GetTypeName() << "\t" << primvar.GetInterpolation() << endl);
 
@@ -1123,107 +1096,6 @@ GusdPrimWrapper::loadPrimvars(
             if( constant ) {
                 *constant = (*constant)->addAttribute( attrname.c_str(), gtData, true );
             }
-        }
-    };
-
-    auto loadPrimvar = [&] (const UsdGeomPrimvar& primvar, const UT_String& name)
-    {
-        GT_DataArrayHandle gtData = convertPrimvarData( primvar, time );
-        if( !gtData )
-        {
-            TF_WARN( "Failed to convert primvar %s:%s %s.",
-                        primPath.c_str(),
-                        primvar.GetPrimvarName().GetText(),
-                        primvar.GetTypeName().GetAsToken().GetText() );
-            return;
-        }
-
-        applyGtData(primvar, name, gtData);
-    };
-
-
-    // Is it better to sort the attributes and build the attributes all at once.
-
-    for( const UsdGeomPrimvar &primvar : authoredPrimvars )
-    {
-        DBG(cerr << "loadPrimvar " << primvar.GetPrimvarName() << "\t" << primvar.GetTypeName() << "\t" << primvar.GetInterpolation() << endl);
-
-        UT_String name(primvar.GetPrimvarName());
-
-        // One special case we always handle here is to change
-        // the name of the USD "displayColor" primvar to "Cd",
-        // as long as there is not already a "Cd" primvar.
-        if (!hasCdPrimvar && 
-            primvar.GetName() == UsdGeomTokens->primvarsDisplayColor) {
-            name = Cd;
-        }
-
-        // If the name of this primvar doesn't
-        // match the primvarPattern, skip it.
-        if (!name.multiMatch(primvarPattern)) {
-            continue;
-        }
-
-        // If we may be converting 'st' to Houdini's 'uv' attribute, we'll need
-        // to handle it separately.
-        if (!hasUvPrimvar && name == st) {
-            hasStPrimvar = true;
-            continue;
-        }
-        else if (name == uv) {
-            hasUvPrimvar = true;
-        }
-
-        loadPrimvar(primvar, name);
-    }
-
-    if (hasStPrimvar) {
-        const UsdGeomPrimvar& stPrimvar = prim.GetPrimvar(GusdTokens->st);
-        if (hasUvPrimvar) {
-            // 'uv' has already been read, so just read 'st' normally.
-            loadPrimvar(stPrimvar, st);
-        }
-        else if (stPrimvar.GetTypeName() == SdfValueTypeNames->Float2Array ||
-                 stPrimvar.GetTypeName() == SdfValueTypeNames->TexCoord2fArray) {
-            // Need to read 'st' into 'uv' (and possibly do a type conversion)
-            DBG(cerr << "Remapping st to uv with type conversion" << endl);
-
-            // If 'st' is indexed, it might be nice to do the flattening and
-            // type conversion at the same time to cut down on copying, but
-            // that would currently require an awkward mishmash of custom
-            // and duplicated code. Currently just keeping it simple.
-            VtArray<GfVec2f> flatStValue;
-            stPrimvar.ComputeFlattened(&flatStValue, time);
-            VtArray<GfVec3f> destValue;
-            destValue.resize(flatStValue.size());
-
-            {
-                const GfVec2f* srcPtr = flatStValue.data();
-                const GfVec2f* srcEnd = srcPtr + flatStValue.size();
-                GfVec3f* destPtr = destValue.data();
-                while (srcPtr < srcEnd) {
-                    memcpy(destPtr, srcPtr++, sizeof(float) * 2);
-                    (*destPtr++)[2] = 0.f;
-                }
-            }
-
-            auto gtData = UT_IntrusivePtr<GusdGT_VtArray<GfVec3f>>(
-#if (GUSD_VER_CMP_2(>=, 16, 5))
-                    new GusdGT_VtArray<GfVec3f>(GT_TYPE_TEXTURE));
-#else
-                    new GusdGT_VtArray<GfVec3f>(GT_TYPE_NONE));
-#endif
-            gtData->swap(destValue);
-            applyGtData(stPrimvar, uv, gtData);
-        }
-        else {
-            // TODO: Are we OK just allowing any other type through as-is?
-            TF_WARN("Applying primvar 'st' to 'uv' attribute for prim %s, but "
-                    "'st' is not one of the expected types: (%s, %s).",
-                     primPath.c_str(),
-                     SdfValueTypeNames->Float2Array.GetAsToken().GetText(),
-                     SdfValueTypeNames->TexCoord2fArray.GetAsToken().GetText());
-            loadPrimvar(stPrimvar, uv);
         }
     }
 }
