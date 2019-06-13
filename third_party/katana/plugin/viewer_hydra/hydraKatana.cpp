@@ -26,6 +26,7 @@
 
 #include "pxr/base/tf/debug.h"
 #include "pxr/base/tf/getenv.h"
+#include "pxr/imaging/glf/contextCaps.h"
 #include "pxr/imaging/glf/diagnostic.h"
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/glf/glContext.h"
@@ -101,6 +102,8 @@ void HydraKatana::setup()
             "OpenGL context required, using reference renderer");
         return;
     }
+
+    GlfContextCaps::InitInstance();
 
     if (!HdStRenderDelegate::IsSupported())
     {
