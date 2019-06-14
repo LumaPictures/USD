@@ -23,7 +23,6 @@ tg/simple_features/maya_export_usdlux
 tg/simple_features/katana_external_instancer_prototypes
 tg/simple_features/acceleration_for_pointinstancer
 tg/simple_features/oit_improvements
-tg/simple_features/usdview_newer_pyside_fixes
 tg/simple_features/cpp14_warning_fixes
 tg/simple_features/usdMaya_plugin_type_resource_not_python
 tg/simple_features/oiio_1.9.1
