@@ -1369,6 +1369,7 @@ subgroup.add_argument("--no-embree", dest="build_embree", action="store_false",
                       help="Do not build Embree sample imaging plugin (default)")
 group.add_argument("--embree-location", type=str,
                    help="Directory where Embree is installed.")
+subgroup = group.add_mutually_exclusive_group()
 subgroup.add_argument("--prman", dest="build_prman", action="store_true",
                       default=False,
                       help="Build Pixar's RenderMan imaging plugin")
@@ -1912,3 +1913,7 @@ if context.buildKatana:
 if context.buildHoudini:
     Print("See documentation at http://openusd.org/docs/Houdini-USD-Plugins.html "
           "for setting up the Houdini plugin.\n")
+
+if context.buildPrman:
+    Print("See documentation at http://openusd.org/docs/RenderMan-USD-Imaging-Plugin.html "
+          "for setting up the RenderMan plugin.\n")
