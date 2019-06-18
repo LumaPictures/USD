@@ -357,48 +357,6 @@ HdxOitRenderTask::_ClearOitGpuBuffers(HdTaskContext* ctx)
                              GL_RED_INTEGER,
                              GL_INT,
                              &clearCounter);
-
-    //
-    // Index Buffer
-    //
-    HdStBufferArrayRangeGLSharedPtr stIndexBar =
-        boost::dynamic_pointer_cast<HdStBufferArrayRangeGL> (_indexBar);
-    HdStBufferResourceGLSharedPtr stIndexResource = 
-        stIndexBar->GetResource(HdxTokens->hdxOitIndexBuffer);
-    const GLint clearIndex = -1;
-    _glClearNamedBufferData()(stIndexResource->GetId(),
-                              GL_R32I,
-                              GL_RED_INTEGER,
-                              GL_INT,
-                              &clearIndex);
-
-    //
-    // Data Buffer
-    //
-    HdStBufferArrayRangeGLSharedPtr stDataBar =
-        boost::dynamic_pointer_cast<HdStBufferArrayRangeGL> (_dataBar);
-    HdStBufferResourceGLSharedPtr stDataResource = 
-        stDataBar->GetResource(HdxTokens->hdxOitDataBuffer);
-    const GLfloat clearData = 0.0f;
-    _glClearNamedBufferData()(stDataResource->GetId(),
-                              GL_RGBA32F,
-                              GL_RED,
-                              GL_FLOAT,
-                              &clearData);
-
-    //
-    // Depth Buffer
-    //
-    HdStBufferArrayRangeGLSharedPtr stDepthBar =
-        boost::dynamic_pointer_cast<HdStBufferArrayRangeGL> (_depthBar);
-    HdStBufferResourceGLSharedPtr stDepthResource = 
-        stDepthBar->GetResource(HdxTokens->hdxOitDepthBuffer);
-    const GLfloat clearDepth = 0.0f;
-    _glClearNamedBufferData()(stDepthResource->GetId(),
-                              GL_R32F,
-                              GL_RED,
-                              GL_FLOAT,
-                              &clearDepth);
 }
 
 
