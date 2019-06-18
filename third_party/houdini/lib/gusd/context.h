@@ -121,7 +121,6 @@ public:
 
     // Whether to make references to a USD prims instanceable.
     bool makeRefsInstanceable;
-
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
