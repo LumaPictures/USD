@@ -49,6 +49,14 @@ PXR_NAMESPACE_OPEN_SCOPE
 TF_DEFINE_ENV_SETTING(HDX_ENABLE_OIT, true, 
                       "Enable order independent translucency");
 
+namespace {
+
+decltype(glClearNamedBufferData) _glClearNamedBufferData() {
+    return glClearNamedBufferData ? glClearNamedBufferData : glClearNamedBufferDataEXT;
+}
+
+}
+
 typedef std::vector<HdBufferSourceSharedPtr> HdBufferSourceSharedPtrVector;
 
 // -------------------------------------------------------------------------- //
@@ -169,7 +177,7 @@ HdxOitRenderTask::_PrepareOitBuffers(
 
     if (rebuildOitBuffers) {
         // If glew version too old we emit a warning since OIT will not work.
-        if (!glClearNamedBufferData) {
+        if (!_glClearNamedBufferData()) {
             TF_WARN("glClearNamedBufferData missing for OIT (old glew?)");
         }
 
@@ -349,7 +357,7 @@ void
 HdxOitRenderTask::_ClearOitGpuBuffers(HdTaskContext* ctx)
 {
     // Exit if glew version used by app is too old
-    if (!glClearNamedBufferData) return;
+    if (!_glClearNamedBufferData()) return;
     if (!_counterBar) return;
 
     //
@@ -361,11 +369,11 @@ HdxOitRenderTask::_ClearOitGpuBuffers(HdTaskContext* ctx)
         stCounterBar->GetResource(HdxTokens->hdxOitCounterBuffer);
 
     const GLint clearCounter = -1;
-    glClearNamedBufferData(stCounterResource->GetId(),
-                            GL_R32I,
-                            GL_RED_INTEGER,
-                            GL_INT,
-                            &clearCounter);
+    _glClearNamedBufferData()(stCounterResource->GetId(),
+                             GL_R32I,
+                             GL_RED_INTEGER,
+                             GL_INT,
+                             &clearCounter);
 
     //
     // Index Buffer
@@ -375,11 +383,11 @@ HdxOitRenderTask::_ClearOitGpuBuffers(HdTaskContext* ctx)
     HdStBufferResourceGLSharedPtr stIndexResource = 
         stIndexBar->GetResource(HdxTokens->hdxOitIndexBuffer);
     const GLint clearIndex = -1;
-    glClearNamedBufferData(stIndexResource->GetId(),
-                            GL_R32I,
-                            GL_RED_INTEGER,
-                            GL_INT,
-                            &clearIndex);
+    _glClearNamedBufferData()(stIndexResource->GetId(),
+                              GL_R32I,
+                              GL_RED_INTEGER,
+                              GL_INT,
+                              &clearIndex);
 
     //
     // Data Buffer
@@ -389,11 +397,11 @@ HdxOitRenderTask::_ClearOitGpuBuffers(HdTaskContext* ctx)
     HdStBufferResourceGLSharedPtr stDataResource = 
         stDataBar->GetResource(HdxTokens->hdxOitDataBuffer);
     const GLfloat clearData = 0.0f;
-    glClearNamedBufferData(stDataResource->GetId(),
-                            GL_RGBA32F,
-                            GL_RED,
-                            GL_FLOAT,
-                            &clearData);
+    _glClearNamedBufferData()(stDataResource->GetId(),
+                              GL_RGBA32F,
+                              GL_RED,
+                              GL_FLOAT,
+                              &clearData);
 
     //
     // Depth Buffer
@@ -403,11 +411,11 @@ HdxOitRenderTask::_ClearOitGpuBuffers(HdTaskContext* ctx)
     HdStBufferResourceGLSharedPtr stDepthResource = 
         stDepthBar->GetResource(HdxTokens->hdxOitDepthBuffer);
     const GLfloat clearDepth = 0.0f;
-    glClearNamedBufferData(stDepthResource->GetId(),
-                            GL_R32F,
-                            GL_RED,
-                            GL_FLOAT,
-                            &clearDepth);
+    _glClearNamedBufferData()(stDepthResource->GetId(),
+                              GL_R32F,
+                              GL_RED,
+                              GL_FLOAT,
+                              &clearDepth);
 }
 
 
