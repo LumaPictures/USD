@@ -434,6 +434,20 @@ HdChangeTracker::MarkSprimDirty(SdfPath const& id, HdDirtyBits bits)
 }
 
 void
+HdChangeTracker::MarkAllSprimsDirty(HdDirtyBits bits)
+{
+    if (ARCH_UNLIKELY(bits == HdChangeTracker::Clean)) {
+        TF_CODING_ERROR("MarkAllSprimsDirty called with bits == clean!");
+        return;
+    }
+
+    for (_IDStateMap::iterator it  = _sprimState.begin();
+                               it != _sprimState.end(); ++it) {
+        it->second |= bits;
+    }
+}
+
+void
 HdChangeTracker::MarkSprimClean(SdfPath const& id, HdDirtyBits newBits)
 {
     _IDStateMap::iterator it = _sprimState.find(id);
@@ -487,6 +501,20 @@ HdChangeTracker::MarkBprimDirty(SdfPath const& id, HdDirtyBits bits)
         return;
     it->second = it->second | bits;
     ++_sceneStateVersion;
+}
+
+void
+HdChangeTracker::MarkAllBprimsDirty(HdDirtyBits bits)
+{
+    if (ARCH_UNLIKELY(bits == HdChangeTracker::Clean)) {
+        TF_CODING_ERROR("MarkAllBprimsDirty called with bits == clean!");
+        return;
+    }
+
+    for (_IDStateMap::iterator it  = _bprimState.begin();
+                               it != _bprimState.end(); ++it) {
+        it->second |= bits;
+    }
 }
 
 void
