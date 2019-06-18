@@ -521,6 +521,8 @@ void wrapUsdStage()
 
         .def("GetFramesPerSecond", &UsdStage::GetFramesPerSecond)
         .def("SetFramesPerSecond", &UsdStage::SetFramesPerSecond)
+        .def("GetTimeSamplesFromPrims", &UsdStage::GetTimeSamplesFromPrims,
+             return_value_policy<TfPySequenceToList>())
 
         .def("GetColorConfiguration", &UsdStage::GetColorConfiguration)
         .def("SetColorConfiguration", &UsdStage::SetColorConfiguration)
