@@ -1,0 +1,6 @@
+From: Paul Molodowitch <paulm@luma-pictures.com>
+Subject: [usdImaging] temp fix for crash when calling UsdImagingDelegate::GetTransform twice
+
+see:
+https://github.com/LumaPictures/maya-to-hydra-alproxy/issues/2
+https://groups.google.com/forum/#!topic/usd-interest/tIEp5UyDpxs
