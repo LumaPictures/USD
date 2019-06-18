@@ -101,6 +101,14 @@ public:
         return _shutterClose;
     }
 
+    const double GetVelocityScale() const {
+        return _velocityScale;
+    }
+
+    const bool GetDisableVelocityBlur() const {
+        return _disableVelocityBlur;
+    }
+
     /// \brief Return true if motion blur is backward.
     ///
     /// PxrUsdIn supports both forward and backward motion blur. Motion
@@ -164,13 +172,13 @@ private:
     double _currentTime;
     double _shutterOpen;
     double _shutterClose;
+    double _velocityScale;
 
     std::vector<double> _motionSampleTimesOverride;
     std::vector<double> _motionSampleTimesFallback;
     
     
     mutable FnAttribute::GroupBuilder * _extGb;
-
 
 
     typedef std::shared_ptr<UsdShadeMaterialBindingAPI::CollectionQueryCache>
@@ -182,6 +190,7 @@ private:
     _BindingsCachePtr _bindingsCache;
 
 
+    bool _disableVelocityBlur;
 };
 
 

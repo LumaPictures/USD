@@ -237,7 +237,37 @@ PxrUsdKatanaReadMesh(
     //
 
     // position
-    attrs.set("geometry.point.P", PxrUsdKatanaGeomGetPAttr(mesh, data));
+    attrs.set("geometry.point.P", [&] () -> FnKat::Attribute {
+        const auto& motionSampleTimes = data.GetMotionSampleTimes(mesh.GetPointsAttr());
+
+        const auto numMotionSampleTimes = motionSampleTimes.size();
+        if (numMotionSampleTimes < 2 || !data.GetDisableVelocityBlur()) {
+            return PxrUsdKatanaGeomGetPAttr(mesh, data);
+        }
+
+        const auto currentTime = data.GetCurrentTime();
+
+        std::vector<UsdTimeCode> sampleTimes; sampleTimes.reserve(numMotionSampleTimes);
+        for (const auto& it : motionSampleTimes) {
+            sampleTimes.push_back(currentTime + it);
+        }
+
+        std::vector<VtVec3fArray> positionSamples(numMotionSampleTimes);
+
+        const auto numPosSamples =
+                mesh.ComputePositionsAtTimes(
+                    &positionSamples, sampleTimes, currentTime,
+                    static_cast<float>(data.GetVelocityScale()));
+
+        FnKat::FloatBuilder posBuilder(3);
+
+        for (auto i = decltype(numMotionSampleTimes){0}; i < numPosSamples; ++i) {
+            auto& sample = posBuilder.get(motionSampleTimes[i]);
+            PxrUsdKatanaUtils::ConvertArrayToVector(positionSamples[i], &sample);
+        }
+
+        return posBuilder.build();
+    } ());
 
     /// Only use custom normals if the object is a polymesh.
     if (!isSubd){
