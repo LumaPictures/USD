@@ -1,0 +1,5 @@
+From: Paul Molodowitch <pm@stanfordalumni.org>
+Subject: add PXR_SYMLINK_HEADER_FILES cmake option
+
+Handy for some IDEs which "find" the symlinked versions by default;
+also removes confusion about which to edit. Defaults to off.
