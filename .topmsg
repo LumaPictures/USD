@@ -1,0 +1,2 @@
+From: Pal Mezei <palm@lumapictures.com>
+Subject: [usdMaya] Don't print maya errors when shader base colors can't be calculated.
