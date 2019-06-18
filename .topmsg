@@ -1,0 +1,6 @@
+From: Pal Mezei <palm@lumapictures.com>
+Subject: [USD] Avoiding a deadlock when loading the maya plugin in userSetup.py.
+
+This happens because of the non static / constexpr initialization of the singleton mutex needs std::call_once, which collides with something else.
+
+Signed-off-by: Pal Mezei <palm@lumapictures.com>
