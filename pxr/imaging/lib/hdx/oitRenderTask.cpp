@@ -345,10 +345,10 @@ HdxOitRenderTask::_ClearOitGpuBuffers(HdTaskContext* ctx)
 
     const GLint clearCounter = -1;
     _glClearNamedBufferData()(stCounterResource->GetId(),
-                             GL_R32I,
-                             GL_RED_INTEGER,
-                             GL_INT,
-                             &clearCounter);
+                              GL_R32I,
+                              GL_RED_INTEGER,
+                              GL_INT,
+                              &clearCounter);
 }
 
 
