@@ -1238,6 +1238,10 @@ function(_pxr_library NAME)
             ${apiPrivate}
     )
 
+    if (PXR_PLUGS_LOADING_FALLBACK)
+        target_compile_definitions(${NAME} PRIVATE "PXR_PLUGS_LOADING_FALLBACK")
+    endif ()
+
     # Copy headers to the build directory and include from there and from
     # external packages.
     _copy_headers(${NAME}
