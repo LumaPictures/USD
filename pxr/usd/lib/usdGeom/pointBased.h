@@ -258,6 +258,35 @@ public:
     USDGEOM_API
     static bool ComputeExtent(const VtVec3fArray& points, VtVec3fArray* extent);
 
+    /// Compute the interpolated positions at \p sampleTimes based on velocity and points.
+    ///
+    /// This will return the number of output samples if the interpolation was successful, otherwise 0
+    /// in case of
+    /// - \p baseTime is the default time.
+    /// - Missing points.
+    ///
+    /// The function will fall back to traditional interpolation
+    /// - If velocities are not present.
+    /// - Velocities do not exists at the same sample as points.
+    /// - Array length is different for velocities and points.
+    ///
+    /// In the case of fallback to traditional interpolation, the function will try to
+    /// confirm that the point array lengths are consistent across multiple samples.
+    /// Otherwise, the function will go as long as it can find a consistent length for the points.
+    ///
+    /// \param positions     - Out parameter for the positions.
+    /// \param sampleTimes   - UsdTimeCodes at which we want to evaluate the positions.
+    /// \param baseTime      - UsdTimeCode from which we want to interpolate positions.
+    /// \param velocityScale - Float to scale the velocities.
+    /// \return              - The number of successfully calculated samples.
+    USDGEOM_API
+    size_t ComputePositionsAtTimes(
+        std::vector<VtVec3fArray>* positions,
+        const std::vector<UsdTimeCode>& sampleTimes,
+        UsdTimeCode baseTime,
+        float velocityScale = 1.0f,
+        VtVec3fArray* velocities = nullptr) const;
+
     /// \overload
     /// Computes the extent as if the matrix \p transform was first applied.
     USDGEOM_API

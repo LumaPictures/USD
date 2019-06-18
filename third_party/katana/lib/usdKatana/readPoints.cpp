@@ -30,6 +30,7 @@
 
 #include "pxr/usd/usdGeom/points.h"
 
+#include <tuple>
 #include <FnAPI/FnAPI.h>
 
 #if KATANA_VERSION_MAJOR >= 3
@@ -83,12 +84,57 @@ PxrUsdKatanaReadPoints(
     // Construct the 'geometry' attribute.
     //
 
-    // position
-    attrs.set("geometry.point.P", PxrUsdKatanaGeomGetPAttr(points, data));
+    // We are using the interpolation methods, and optionally the new velocity
+    // out from there
+    auto posVel = [&]() -> std::tuple<FnKat::Attribute, FnKat::Attribute> { 
+        // Because of the logic used to gather these (in PxrUsdInOp::InitUsdInArgs),
+        // we can use the size of this vector as a simple test for whether motion
+        // blur is enabled, without needing access to the cook interface.
+        const auto& motionSampleTimes = data.GetMotionSampleTimes(points.GetPointsAttr());
+
+        const auto numMotionSampleTimes = motionSampleTimes.size();
+        if (numMotionSampleTimes < 2)
+        {
+            return std::make_tuple(
+                PxrUsdKatanaGeomGetPAttr(points, data),
+                PxrUsdKatanaGeomGetVelocityAttr(points, data)
+            );
+        }
+
+        const auto currentTime = data.GetCurrentTime();
+        
+        std::vector<UsdTimeCode> sampleTimes; sampleTimes.reserve(numMotionSampleTimes);
+        for (const auto& it : motionSampleTimes)
+        {
+            sampleTimes.push_back(currentTime + it);
+        }
+
+        std::vector<VtVec3fArray> positionSamples(numMotionSampleTimes);
+        VtVec3fArray velocitySample;
+
+        const auto numPosSamples =
+            points.ComputePositionsAtTimes(&positionSamples, sampleTimes, currentTime, 1.0f, &velocitySample);
+
+        FnKat::FloatBuilder posBuilder(3);
+
+        for (auto i = decltype(numMotionSampleTimes){0}; i < numPosSamples; ++i)
+        {
+            auto& sample = posBuilder.get(motionSampleTimes[i]);
+            PxrUsdKatanaUtils::ConvertArrayToVector(positionSamples[i], &sample);
+        }
+
+        FnKat::FloatBuilder velBuilder(3);
+        auto& sample = velBuilder.get(motionSampleTimes[0]);
+        PxrUsdKatanaUtils::ConvertArrayToVector(velocitySample, &sample);
+
+        return std::make_tuple(posBuilder.build(), velBuilder.build());
+    } ();
+
+    // position (with velocity-based motion samples if applicable)
+    attrs.set("geometry.point.P", std::get<0>(posVel));
 
     // velocity
-    FnKat::Attribute velocitiesAttr =
-        PxrUsdKatanaGeomGetVelocityAttr(points, data);
+    auto& velocitiesAttr = std::get<1>(posVel);
     if (velocitiesAttr.isValid())
     {
         attrs.set("geometry.point.v", velocitiesAttr);

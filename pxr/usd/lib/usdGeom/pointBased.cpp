@@ -296,4 +296,87 @@ TF_REGISTRY_FUNCTION(UsdGeomBoundable)
         _ComputeExtentForPointBased);
 }
 
+size_t
+UsdGeomPointBased::ComputePositionsAtTimes(
+    std::vector<VtVec3fArray>* positions,
+    const std::vector<UsdTimeCode>& sampleTimes,
+    UsdTimeCode baseTime,
+    float velocityScale,
+    VtVec3fArray* velocities) const {
+    if (positions == nullptr) { return 0; }
+    constexpr double epsilonTest = 1e-5;
+    const auto sampleCount = sampleTimes.size();
+    if (sampleCount == 0 || positions->size() < sampleCount || baseTime.IsDefault()) {
+        return 0;
+    }
+
+    const auto pointsAttr = GetPointsAttr();
+    if (!pointsAttr.HasValue()) {
+        return 0;
+    }
+
+    auto sampleWithoutVelocity = [&]() -> size_t {
+        auto& first = positions->operator[](0);
+        if (!pointsAttr.Get(&first, sampleTimes[0])) { return 0; }
+        size_t validSamples = 1;
+        for (auto a = decltype(sampleCount){1}; a < sampleCount; ++a) {
+            auto& curr = positions->operator[](a);
+            if (!pointsAttr.Get(&curr, sampleTimes[a]) ||
+                curr.size() != first.size()) { break; }
+            ++validSamples;
+        }
+
+        return validSamples;
+    };
+
+    bool hasValue = false;
+    double pointsLowerTimeSample = 0.0;
+    double pointsUpperTimeSample = 0.0;
+    if (!pointsAttr.GetBracketingTimeSamples(baseTime.GetValue(), &pointsLowerTimeSample,
+                                             &pointsUpperTimeSample, &hasValue) || !hasValue) {
+        return sampleWithoutVelocity();
+    }
+
+    VtVec3fArray points;
+    VtVec3fArray _velocities;
+    auto& velocity = velocities == nullptr ? _velocities : *velocities;
+
+    // We need to check if there is a queriable velocity at the given point,
+    // To avoid handling hihger frequency velocity samples, and other corner cases
+    // we require both ends to match.
+    bool velocityExists = false;
+    const auto velocitiesAttr = GetVelocitiesAttr();
+    double velocitiesLowerTimeSample = 0.0;
+    double velocitiesUpperTimeSample = 0.0;
+    if (velocitiesAttr.HasValue() &&
+        velocitiesAttr.GetBracketingTimeSamples(baseTime.GetValue(),
+                                                &velocitiesLowerTimeSample, &velocitiesUpperTimeSample, &hasValue)
+        && hasValue && GfIsClose(velocitiesLowerTimeSample, pointsLowerTimeSample, epsilonTest) &&
+        GfIsClose(velocitiesUpperTimeSample, pointsUpperTimeSample, epsilonTest)) {
+        if (pointsAttr.Get(&points, pointsLowerTimeSample) &&
+            velocitiesAttr.Get(&velocity, pointsLowerTimeSample) &&
+            points.size() == velocity.size()) {
+            velocityExists = true;
+        }
+    }
+
+    if (velocityExists) {
+        const auto pointCount = points.size();
+        if (pointCount == 0) { return sampleCount; }
+        const auto timeCodesPerSecond = GetPrim().GetStage()->GetTimeCodesPerSecond();
+        for (auto a = decltype(sampleCount){0}; a < sampleCount; ++a) {
+            auto& curr = positions->operator[](a);
+            curr.resize(pointCount);
+            const auto currentMultiplier = static_cast<float>((sampleTimes[a].GetValue() - pointsLowerTimeSample)
+                                                              / timeCodesPerSecond) * velocityScale;
+            for (auto i = decltype(pointCount){0}; i < pointCount; ++i) {
+                curr[i] = points[i] + velocity[i] * currentMultiplier;
+            }
+        }
+        return sampleCount;
+    } else {
+        return sampleWithoutVelocity();
+    }
+}
+
 PXR_NAMESPACE_CLOSE_SCOPE
