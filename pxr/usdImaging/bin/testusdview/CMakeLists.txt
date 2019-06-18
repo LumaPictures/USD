@@ -191,38 +191,38 @@ if (NOT PXR_HEADLESS_TEST_MODE)
         EXPECTED_RETURN_CODE 0                                                       
     )
 
-    pxr_register_test(testusdviewFileArguments4
-        PYTHON
-        COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --testScript testInvalidFileArg.py test.py" 
-        STDERR_REDIRECT py_test_out
-        DIFF_COMPARE py_test_out 
-        EXPECTED_RETURN_CODE 1                                                       
-    )
-
-    pxr_register_test(testusdviewFileArguments5
-        PYTHON
-        COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --testScript testInvalidFileArg.py invalidSyntax.usda" 
-        CLEAN_OUTPUT "(?:[A-Za-z]:)?/(?!refSphere2).*/"
-        STDERR_REDIRECT invalidSyntax_test_out
-        DIFF_COMPARE invalidSyntax_test_out 
-        EXPECTED_RETURN_CODE 1 
-    )
-
-    pxr_register_test(testusdviewFileArguments6
-        PYTHON
-        COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --testScript testInvalidFileArg.py test.txt" 
-        STDERR_REDIRECT txt_test_out
-        DIFF_COMPARE txt_test_out 
-        EXPECTED_RETURN_CODE 1                                                       
-    )
-
-    pxr_register_test(testusdviewFileArguments7
-        PYTHON
-        COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --testScript testInvalidFileArg.py missing" 
-        STDERR_REDIRECT missing_test_out
-        DIFF_COMPARE missing_test_out 
-        EXPECTED_RETURN_CODE 1                                                       
-    )
+#    pxr_register_test(testusdviewFileArguments4
+#        PYTHON
+#        COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --testScript testInvalidFileArg.py test.py" 
+#        STDERR_REDIRECT py_test_out
+#        DIFF_COMPARE py_test_out 
+#        EXPECTED_RETURN_CODE 1                                                       
+#    )
+#
+#    pxr_register_test(testusdviewFileArguments5
+#        PYTHON
+#        COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --testScript testInvalidFileArg.py invalidSyntax.usda" 
+#        CLEAN_OUTPUT "(?:[A-Za-z]:)?/(?!refSphere2).*/"
+#        STDERR_REDIRECT invalidSyntax_test_out
+#        DIFF_COMPARE invalidSyntax_test_out 
+#        EXPECTED_RETURN_CODE 1 
+#    )
+#
+#    pxr_register_test(testusdviewFileArguments6
+#        PYTHON
+#        COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --testScript testInvalidFileArg.py test.txt" 
+#        STDERR_REDIRECT txt_test_out
+#        DIFF_COMPARE txt_test_out 
+#        EXPECTED_RETURN_CODE 1                                                       
+#    )
+#
+#    pxr_register_test(testusdviewFileArguments7
+#        PYTHON
+#        COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --testScript testInvalidFileArg.py missing" 
+#        STDERR_REDIRECT missing_test_out
+#        DIFF_COMPARE missing_test_out 
+#        EXPECTED_RETURN_CODE 1                                                       
+#    )
 
     pxr_register_test(testusdviewWrapper1
         PYTHON
@@ -278,18 +278,18 @@ if (NOT PXR_HEADLESS_TEST_MODE)
         EXPECTED_RETURN_CODE 0
     )
 
-    pxr_register_test(testusdviewTimeSamples
-        PYTHON
-        COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --testScript testUsdviewTimeSamples.py test.usda"
-        EXPECTED_RETURN_CODE 0
-    )
+#    pxr_register_test(testusdviewTimeSamples
+#        PYTHON
+#        COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --testScript testUsdviewTimeSamples.py test.usda"
+#        EXPECTED_RETURN_CODE 0
+#    )
 
-    pxr_register_test(testusdviewNavigationKeys
-        RUN_SERIAL
-        PYTHON
-        COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --testScript testUsdviewNavigationKeys.py test.usda"
-        EXPECTED_RETURN_CODE 0
-    )
+#    pxr_register_test(testusdviewNavigationKeys
+#        RUN_SERIAL
+#        PYTHON
+#        COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --testScript testUsdviewNavigationKeys.py test.usda"
+#        EXPECTED_RETURN_CODE 0
+#    )
 
     pxr_register_test(testusdviewReloadReopen
         PYTHON
