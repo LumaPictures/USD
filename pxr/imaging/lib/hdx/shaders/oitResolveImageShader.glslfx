@@ -41,35 +41,6 @@
 
 #define OSR OIT_STEP_FUNCTION_RESOLUTION
 
-struct StepNodes {
-    int count;
-    float depth[OSR];
-    float trans[OSR];
-};
-
-void insertNode(float depth, float trans, inout StepNodes nodes) {
-    // No compression for now.
-    // Should we linearize depth? It might be better to put bigger importance
-    // on front fragments, when compressing.
-    int insertIndex = 0;
-    while (insertIndex < min(OSR, nodes.count) &&
-           depth > nodes.depth[insertIndex]) {
-        insertIndex += 1;
-    }
-    if (insertIndex == OSR) {
-        return;
-    }
-
-    for (int id = min(nodes.count, OSR) - 1; id > insertIndex; id -= 1) {
-        nodes.depth[id] = nodes.depth[id - 1];
-        nodes.trans[id] = nodes.trans[id - 1] * trans;
-    }
-
-    nodes.depth[insertIndex] = depth;
-    nodes.depth[insertIndex] = trans;
-    nodes.count += 1;
-}
-
 #endif
 
 vec4 imageShader(vec2 uv)
@@ -87,36 +58,71 @@ vec4 imageShader(vec2 uv)
         return vec4(0.0, 0.0, 0.0, 0.0);
     }
 
-    StepNodes nodes;
+    /*int layerCount = 0;
+    vec4 layerColor[OIT_LAYER_COUNT];
+    float layerDepth[OIT_LAYER_COUNT];
+    for (int id = nodeIndex; id != -1; id = hdxOitIndexBuffer[id]) {
+        layerColor = hdxOitDataBuffer[id];
+        layerDepth = hdxOitDepthBuffer[id];
+        layerCount += 1;
+    }*/
+
+    float nodeDepth[OSR];
+    float nodeTrans[OSR];
     for (int id = 0; id < OSR; id += 1) {
-        nodes.depth[id] = 1.0e30;
-        nodes.trans[id] = 1.0;
+        nodeDepth[id] = 1.0e30;
+        nodeTrans[id] = 1.0;
     }
-    nodes.count = 0;
+    int nodeCount = 0;
 
     for (int id = nodeIndex; id != -1; id = hdxOitIndexBuffer[id]) {
-        float currentDepth = hdxOitDepthBuffer[id];
-        float currentTrans = 1.0 - hdxOitDataBuffer[id].w;
-        insertNode(currentDepth, currentTrans, nodes);
+        float depth = hdxOitDepthBuffer[id];
+        float trans = 1.0 - hdxOitDataBuffer[id].w;
+        int insertIndex = 0;
+        while (insertIndex < min(OSR, nodeCount) &&
+               depth > nodeDepth[insertIndex]) {
+            insertIndex += 1;
+        }
+        if (insertIndex == OSR) {
+            continue;
+        }
+
+        for (int id = min(nodeCount, OSR) - 1; id > insertIndex; id -= 1) {
+            nodeDepth[id] = nodeDepth[id - 1];
+            nodeTrans[id] = nodeTrans[id - 1] * trans;
+        }
+
+        nodeDepth[insertIndex] = depth;
+        nodeTrans[insertIndex] = trans;
+        nodeCount += 1;
     }
 
-    vec3 color = vec3(0.0, 0.0, 0.0);
+    vec4 colorAccum = vec4(0.0, 0.0, 0.0, 0.0);
     for (int id = nodeIndex; id != -1; id = hdxOitIndexBuffer[id]) {
         float currentDepth = hdxOitDepthBuffer[id];
         vec4 currentSample = hdxOitDataBuffer[id];
-        float currentTrans = 1.0 - currentSample.w;
 
         int closestIndex = 0;
-        while (closestIndex < min(OSR, nodes.count) &&
-               currentDepth > nodes.depth[closestIndex]) {
+        while (closestIndex < min(OSR, nodeCount) &&
+               currentDepth > nodeDepth[closestIndex]) {
             closestIndex += 1;
         }
-        if (closestIndex != OSR) {
-            color += currentSample.xyz * currentTrans * nodes.trans[closestIndex];
+
+        if (closestIndex == 0) {
+            colorAccum.xyz += currentSample.xyz * currentSample.w;
+            colorAccum.a += currentSample.w;
+        } else if (closestIndex < OSR) {
+            colorAccum.xyz += currentSample.xyz * currentSample.w * nodeTrans[closestIndex];
+            colorAccum.a += currentSample.w * nodeTrans[closestIndex];
+        }
+
+        colorAccum.a = clamp(colorAccum.a, 0.0, 1.0);
+        if (colorAccum.a >= 0.999) {
+            break;
         }
     }
 
-    return vec4(color, 1.0);
+    return colorAccum;
 #else  // OIT_ENABLE_APPROXIMATION
     int numDepths = 0;
 
@@ -145,8 +151,9 @@ vec4 imageShader(vec2 uv)
     int depth = 0;
     vec4 colorAccum = vec4(0,0,0,0);
     while (depth < numDepths) {
-        float ca = sortedColor[depth].a * (1 - colorAccum.a);
-        vec3 cb = sortedColor[depth].rgb;
+        vec4 cs = sortedColor[depth];
+        float ca = cs.a * (1 - colorAccum.a);
+        vec3 cb = cs.rgb;
         colorAccum.rgb = colorAccum.rgb + cb * ca;
         colorAccum.a = colorAccum.a + ca;
 
