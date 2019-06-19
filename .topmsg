@@ -1,0 +1,6 @@
+From: Paul Molodowitch <paulm@lumapictures.com>
+Subject: FindRenderman.cmake: export RENDERMAN_BINARY_DIR, use it to find oslc
+
+the building of the renderman-22 plugin made use of the RENDERMAN_LOCATION
+var, which is not guaranteed to be set by FindRenderman.cmake; instead,
+directly export RENDERMAN_BINARY_DIR, and use that to find oslc
