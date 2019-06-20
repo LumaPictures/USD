@@ -165,6 +165,7 @@ HdxTaskController::~HdxTaskController()
         _colorCorrectionTaskId,
         _pickTaskId,
         _pickFromRenderBufferTaskId,
+        _ambientOcclusionTaskId,
     };
     for (size_t i = 0; i < sizeof(tasks)/sizeof(tasks[0]); ++i) {
         if (!tasks[i].IsEmpty()) {
@@ -472,6 +473,22 @@ HdxTaskController::_CreatePickFromRenderBufferTask()
     _delegate.SetParameter(_pickFromRenderBufferTaskId, HdTokens->params,
         taskParams);
 }
+
+void
+HdxTaskController::_CreateAmbientOcclusionTask()
+{
+    _ambientOcclusionTaskId = GetControllerId().AppendChild(
+        _tokens->ambientOcclusionTask);
+
+    HdxAmbientOcclusionTaskParams taskParams;
+
+    GetRenderIndex()->InsertTask<HdxAmbientOcclusionTask>(
+        &_delegate, _ambientOcclusionTaskId);
+
+    _delegate.SetParameter(_ambientOcclusionTaskId, HdTokens->params,
+                           taskParams);
+}
+
 
 bool
 HdxTaskController::_ShadowsEnabled() const
