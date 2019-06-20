@@ -27,3 +27,4 @@ tg/simple_features/cpp14_warning_fixes
 tg/simple_features/usdMaya_plugin_type_resource_not_python
 tg/simple_features/oiio_1.9.1
 tg/simple_features/FindRenderman
+tg/simple_features/ambient_occlusion
