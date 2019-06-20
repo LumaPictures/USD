@@ -165,25 +165,26 @@ HdxOitRenderTask::_PrepareOitBuffers(
     HdResourceRegistrySharedPtr const& resourceRegistry = 
         renderIndex->GetResourceRegistry();
 
-    // XXX Rebuilding the buffers is a slow operation that slows viewport
-    //     resizing. We only shrink in steps of 256^2 to reduce the impact.
+
     GfVec4i viewport;
     glGetIntegerv(GL_VIEWPORT, &viewport[0]);
-    
-    int sizeNew = viewport[2] * viewport[3];
-    int sizeOld = _viewport[2] * _viewport[3];
-    bool rebuildOitBuffers = (sizeNew > sizeOld || sizeOld-sizeNew > 256*256);
 
-    VtValue oitLayerCount = renderDelegate
-        ->GetRenderSetting(HdStRenderSettingsTokens->oitLayerCount);
-    if (!TF_VERIFY(oitLayerCount.IsHolding<int>(),
-        "OIT Layer count is not an integer!")) {
+    bool rebuildOitBuffers = false;
+    if (viewport != _viewport) {
+        rebuildOitBuffers = true;
+        _viewport = viewport;
+    }
+
+    VtValue oitNumSamples = renderDelegate
+        ->GetRenderSetting(HdStRenderSettingsTokens->oitNumSamples);
+    if (!TF_VERIFY(oitNumSamples.IsHolding<int>(),
+        "OIT Number of Samples is not an integer!")) {
         return;
     }
-    const int layerCount = std::max(1, oitLayerCount.UncheckedGet<int>());
-    if (_layerCount != layerCount) {
+    const int numSamples = std::max(1, oitNumSamples.UncheckedGet<int>());
+    if (_numSamples != numSamples) {
         rebuildOitBuffers = true;
-        _layerCount = layerCount;
+        _numSamples = numSamples;
     }
 
     if (rebuildOitBuffers) {
@@ -198,8 +199,6 @@ HdxOitRenderTask::_PrepareOitBuffers(
         _indexBar.reset();
         _uniformBar.reset();
         renderIndex->GetChangeTracker().SetGarbageCollectionNeeded();
-
-        _viewport = viewport;
     }
 
     //
@@ -231,7 +230,7 @@ HdxOitRenderTask::_PrepareOitBuffers(
                                             /*role*/HdxTokens->oitIndices,
                                             specs,
                                             HdBufferArrayUsageHint());
-        _indexBar->Resize(_viewport[2] * _viewport[3] * _layerCount);
+        _indexBar->Resize(_viewport[2] * _viewport[3] * _numSamples);
     }
 
     (*ctx)[HdxTokens->oitIndexBufferBar] = _indexBar;
@@ -248,7 +247,7 @@ HdxOitRenderTask::_PrepareOitBuffers(
                                             /*role*/HdxTokens->oitData,
                                             specs,
                                             HdBufferArrayUsageHint());
-        _dataBar->Resize(_viewport[2] * _viewport[3] * _layerCount);
+        _dataBar->Resize(_viewport[2] * _viewport[3] * _numSamples);
     }
 
     (*ctx)[HdxTokens->oitDataBufferBar] = _dataBar;
@@ -265,7 +264,7 @@ HdxOitRenderTask::_PrepareOitBuffers(
                                             /*role*/HdxTokens->oitDepth,
                                             specs,
                                             HdBufferArrayUsageHint());
-        _depthBar->Resize(_viewport[2] * _viewport[3] * _layerCount);
+        _depthBar->Resize(_viewport[2] * _viewport[3] * _numSamples);
     }
 
     (*ctx)[HdxTokens->oitDepthBufferBar] = _depthBar;
@@ -280,7 +279,8 @@ HdxOitRenderTask::_PrepareOitBuffers(
         specs.push_back(
             HdBufferSpec(HdxTokens->oitHeight, HdTupleType {HdTypeInt32, 1}));
         specs.push_back(
-            HdBufferSpec(HdxTokens->oitSamples, HdTupleType {HdTypeInt32, 1}));
+            HdBufferSpec(HdxTokens->oitNumSamples,
+                         HdTupleType {HdTypeInt32, 1}));
         _uniformBar = resourceRegistry->AllocateUniformBufferArrayRange(
                                             /*role*/HdxTokens->oitUniforms,
                                             specs,
@@ -294,8 +294,8 @@ HdxOitRenderTask::_PrepareOitBuffers(
                 new HdVtBufferSource(HdxTokens->oitHeight,
                                     VtValue((int)_viewport[3]))));
         uniformSources.push_back(HdBufferSourceSharedPtr(
-                new HdVtBufferSource(HdxTokens->oitSamples,
-                                    VtValue(_layerCount))));
+                new HdVtBufferSource(HdxTokens->oitNumSamples,
+                                     VtValue(_numSamples))));
         resourceRegistry->AddSources(_uniformBar, uniformSources);
     }
 
