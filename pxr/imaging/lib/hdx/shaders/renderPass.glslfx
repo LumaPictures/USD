@@ -40,7 +40,7 @@ void RenderOutput(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
         return;
     int screenWidth = HdGet_oitWidth();
     int screenHeight = HdGet_oitHeight();
-    int numSamples = HdGet_oitSamples();
+    int numSamples = HdGet_oitNumSamples();
     int bufferSize = screenWidth * screenHeight * numSamples;
     int writeIndex = atomicAdd(hdxOitCounterBuffer[0], 1) + 1;
 

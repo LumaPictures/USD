@@ -48,20 +48,14 @@ namespace {
 
 class HdxOitResolveRenderPassShader : public HdStRenderPassShader {
 public:
-    HdxOitResolveRenderPassShader(int layerCount,
-                                  int stepFunctionResolution,
-                                  bool enableApproximation) :
+    HdxOitResolveRenderPassShader(int numSamples) :
         HdStRenderPassShader(HdxPackageOitResolveImageShader()),
-        _layerCount(layerCount),
-        _stepFunctionResolution(stepFunctionResolution),
-        _enableApproximation(enableApproximation)
+        _numSamples(numSamples)
     {
         // The hash of this shader is constant, no custom bindings and the
         // input parameters are constant.
         _hash = HdStRenderPassShader::ComputeHash();
-        boost::hash_combine(_hash, layerCount);
-        boost::hash_combine(_hash, stepFunctionResolution);
-        boost::hash_combine(_hash, enableApproximation);
+        boost::hash_combine(_hash, numSamples);
     }
 
     std::string GetSource(const TfToken& shaderStageKey) const override
@@ -69,15 +63,9 @@ public:
         const auto src = HdStRenderPassShader::GetSource(shaderStageKey);
 
         std::stringstream defines;
-        defines << "#define OIT_LAYER_COUNT "
-                << _layerCount
-                << "\n"
-                << "#define OIT_STEP_FUNCTION_RESOLUTION "
-                << _stepFunctionResolution
+        defines << "#define OIT_NUM_SAMPLES "
+                << _numSamples
                 << "\n";
-        if (_enableApproximation) {
-            defines << "#define OIT_ENABLE_APPROXIMATION\n";
-        }
 
         return defines.str() + src;
     }
@@ -92,10 +80,8 @@ private:
     HdxOitResolveRenderPassShader(const HdxOitResolveRenderPassShader&)             = delete;
     HdxOitResolveRenderPassShader& operator=(const  HdxOitResolveRenderPassShader&) = delete;
 
-    const int _layerCount;
-    const int _stepFunctionResolution;
+    const int _numSamples;
     ID _hash;
-    const bool _enableApproximation;
 };
 
 }
@@ -130,36 +116,16 @@ HdxOitResolveTask::Prepare(HdTaskContext* ctx,
                    "OIT Task only works with HdSt")) {
         return;
     }
-    VtValue oitLayerCount = renderDelegate
-        ->GetRenderSetting(HdStRenderSettingsTokens->oitLayerCount);
-    if (!TF_VERIFY(oitLayerCount.IsHolding<int>(),
+    VtValue oitNumSamples = renderDelegate
+        ->GetRenderSetting(HdStRenderSettingsTokens->oitNumSamples);
+    if (!TF_VERIFY(oitNumSamples.IsHolding<int>(),
         "OIT Layer count is not an integer!")) {
         return;
     }
-    const int layerCount = oitLayerCount.UncheckedGet<int>();
-    VtValue oitStepFunctionResolution = renderDelegate
-        ->GetRenderSetting(HdStRenderSettingsTokens->oitStepFunctionResolution);
-    if (!TF_VERIFY(oitStepFunctionResolution.IsHolding<int>(),
-                   "OIT Step Function Resolution is not an integer!")) {
-        return;
-    }
-    const int stepFunctionResolution =
-        oitStepFunctionResolution.UncheckedGet<int>();
-    VtValue oitEnableApproximation = renderDelegate
-        ->GetRenderSetting(HdStRenderSettingsTokens->oitEnableApproximation);
-    if (!TF_VERIFY(oitEnableApproximation.IsHolding<bool>(),
-                   "OIT Enable Approximation is not a boolean!")) {
-        return;
-    }
-    const bool enableApproximation =
-        oitEnableApproximation.UncheckedGet<bool>();
+    const int numSamples = oitNumSamples.UncheckedGet<int>();
     bool rebuildShader = false;
-    if (layerCount != _layerCount ||
-        stepFunctionResolution != _stepFunctionResolution ||
-        enableApproximation != _enableApproximation) {
-        _layerCount = layerCount;
-        _stepFunctionResolution = stepFunctionResolution;
-        _enableApproximation = enableApproximation;
+    if (numSamples != _numSamples) {
+        _numSamples = numSamples;
         rebuildShader = true;
     }
 
@@ -184,14 +150,14 @@ HdxOitResolveTask::Prepare(HdTaskContext* ctx,
             HdBlendFactor::HdBlendFactorOne);
 
         _renderPassShader.reset(new HdxOitResolveRenderPassShader(
-            _layerCount, _stepFunctionResolution, _enableApproximation));
+            _numSamples));
 
         HdStRenderPassState* stRenderPassState =
             dynamic_cast<HdStRenderPassState*>(_renderPassState.get());
         stRenderPassState->SetRenderPassShader(_renderPassShader);
     } else if (rebuildShader) {
         _renderPassShader.reset(new HdxOitResolveRenderPassShader(
-            _layerCount, _stepFunctionResolution, _enableApproximation));
+            _numSamples));
         HdStRenderPassState* stRenderPassState =
             dynamic_cast<HdStRenderPassState*>(_renderPassState.get());
         stRenderPassState->SetRenderPassShader(_renderPassShader);
