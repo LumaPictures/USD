@@ -42,8 +42,7 @@ vec4 imageShader(vec2 uv)
 #if defined(HD_HAS_hdxOitDataBuffer)
     int screenWidth = HdGet_oitWidth();
     int screenHeight = HdGet_oitHeight();
-    int numSamples = HdGet_oitNumSamples();
-    int bufferSize = screenWidth * screenHeight * numSamples;
+    int bufferSize = screenWidth * screenHeight * OIT_NUM_SAMPLES;
 
     int screenIndex = int(gl_FragCoord.x) + int(gl_FragCoord.y) * screenWidth;
     int nodeIndex = hdxOitCounterBuffer[screenIndex+1];
@@ -66,23 +65,21 @@ vec4 imageShader(vec2 uv)
         numDepths += 1;
     }
 
-    float td;
-    vec4 tc;
-    for (int i = 0; i < numDepths - 1; i += 1) {
-        int swap = i;
-        for (int j = i + 1; j < numDepths; j += 1) {
-            if (sortedDepth[swap] > sortedDepth[j]) {
-                swap = j;
+    for (int depth = 0; depth < numDepths - 1; depth += 1) {
+        int swap = depth;
+        for (int i = depth + 1; i < numDepths; i += 1) {
+            if (sortedDepth[swap] > sortedDepth[i]) {
+                swap = i;
             }
         }
-        td = sortedDepth[swap];
-        tc = sortedColor[swap];
+        float td = sortedDepth[swap];
+        vec4 tc = sortedColor[swap];
 
-        sortedDepth[swap] = sortedDepth[i];
-        sortedColor[swap] = sortedColor[i];
+        sortedDepth[swap] = sortedDepth[depth];
+        sortedColor[swap] = sortedColor[depth];
 
-        sortedDepth[i] = td;
-        sortedColor[i] = tc;
+        sortedDepth[depth] = td;
+        sortedColor[depth] = tc;
     }
 #else
     // Insert sorting
@@ -100,19 +97,14 @@ vec4 imageShader(vec2 uv)
         nodeIndex = hdxOitIndexBuffer[nodeIndex]; 
     }
 #endif
-    int depth = 0;
-    vec4 colorAccum = vec4(0,0,0,0);
-    while (depth < numDepths) {
-        vec4 cs = sortedColor[depth];
-        float ca = cs.a * (1 - colorAccum.a);
-        vec3 cb = cs.rgb;
-        colorAccum.rgb = colorAccum.rgb + cb * ca;
-        colorAccum.a = colorAccum.a + ca;
+    vec4 colorAccum = vec4(0, 0, 0, 0);
+    for (int depth = 0; depth < numDepths; depth += 1) {
+        float alpha = sortedColor[depth].a * (1 - colorAccum.a);
+        colorAccum.rgb = colorAccum.rgb + sortedColor[depth].rgb * alpha;
+        colorAccum.a = colorAccum.a + alpha;
 
         colorAccum = clamp(colorAccum, vec4(0), vec4(1));
         if (colorAccum.a >= 0.99) break;
-
-        depth += 1; 
     }
 
     return colorAccum;
