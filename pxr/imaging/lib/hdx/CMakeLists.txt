@@ -35,6 +35,7 @@ pxr_library(hdx
         ${optionalIncludeDirs}
 
     PUBLIC_CLASSES
+        ambientOcclusionTask
         colorizeTask
         colorizeSelectionTask
         colorCorrectionTask
