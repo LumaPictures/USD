@@ -88,7 +88,7 @@ private:
     HdBufferArrayRangeSharedPtr _depthBar;
     HdBufferArrayRangeSharedPtr _indexBar;
     HdBufferArrayRangeSharedPtr _uniformBar;
-    int _layerCount = -1;
+    int _numSamples = -1;
 };
 
 
