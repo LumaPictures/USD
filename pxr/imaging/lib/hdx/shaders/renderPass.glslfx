@@ -27,37 +27,11 @@
 --- This is what an import might look like.
 --- #import $TOOLS/hdx/shaders/renderPass.glslfx
 
--- glsl HdxRenderPass.RenderColorShadowsOutput
-
-layout (location = 0) out vec4 colorOut;
-layout (location = 1) out vec4 normalOut;
-
-vec4 ApplyColorOverrides(vec4 color)
-{
-    return color;
-}
-
-vec4 ApplyColorOverridesPostLighting(vec4 color)
-{
-    return color;
-}
-
-void RenderColor(vec4 color)
-{
-    colorOut = color;
-}
-
-void RenderNormal(vec3 normal)
-{
-    normalOut = vec4(normal, 1.0);
-}
-
 --- --------------------------------------------------------------------------
 -- glsl HdxRenderPass.WriteOitLayersToBuffer
 
 layout (early_fragment_tests) in;
 layout (location = 0) out vec4 colorOut;
-layout (location = 1) out vec4 normalOut;
 
 void RenderOutput(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
 {
@@ -135,8 +109,4 @@ void RenderOutput(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
     pointIdOut = IntToVec4(pointId);
     
     neyeOut = IntToVec4(hd_vec4_2_10_10_10_set(vec4(Neye,0)));
-}
-
-void RenderNormal(vec3 normal)
-{
 }

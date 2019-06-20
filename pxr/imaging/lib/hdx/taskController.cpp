@@ -190,7 +190,45 @@ HdxTaskController::_CreateRenderGraph()
     // parameter of most tasks.
     _CreateCamera();
 
+    // XXX: The general assumption is that we have "stream" backends which are
+    // rasterization based and have their own rules, like multipass for
+    // transparency; and other backends are more single-pass.  As render
+    // delegate capabilities evolve, we'll need a more complicated switch
+    // than this...
+    if (_IsStreamRenderingBackend(GetRenderIndex())) {
+        // Rendering rendergraph
+        _CreateLightingTask();
+        _CreateShadowTask();
+        _renderTaskIds.push_back(_CreateRenderTask(
+            HdMaterialTagTokens->defaultMaterialTag));
+        _renderTaskIds.push_back(_CreateRenderTask(
+            HdxMaterialTagTokens->additive));
+        _renderTaskIds.push_back(_CreateRenderTask(
+            HdxMaterialTagTokens->translucent));
+        _CreateAmbientOcclusionTask();
+        _CreateOitResolveTask();
+        _CreateSelectionTask();
+        _CreateColorCorrectionTask();
+
+        // Picking rendergraph
+        _CreatePickTask();
+    } else {
+        _renderTaskIds.push_back(_CreateRenderTask(TfToken()));
+        if (_AovsSupported()) {
+            _CreateColorizeTask();
+            _CreateColorizeSelectionTask();
+
+            _CreatePickFromRenderBufferTask();
+
+            // Initialize the AOV system to render color. Note:
+            // SetRenderOutputs special-cases color to include support for
+            // depth-compositing and selection highlighting/picking.
+            SetRenderOutputs({HdAovTokens->color});
+        }
+        _CreateColorCorrectionTask();
+    }
 }
+
 
 void
 HdxTaskController::_CreateCamera()
@@ -406,7 +444,8 @@ HdxTaskController::_CreateColorCorrectionTask()
         taskParams);
 }
 
-
+void
+HdxTaskController::_CreatePickTask()
 {
     _pickTaskId = GetControllerId().AppendChild(
         _tokens->pickTask);
@@ -454,7 +493,6 @@ HdxTaskController::_SelectionEnabled() const
 {
     if (_renderTaskIds.empty())
         return false;
-
 
     const HdxRenderTaskParams& renderTaskParams =
         _delegate.GetParameter<HdxRenderTaskParams>(
@@ -525,6 +563,10 @@ HdxTaskController::GetRenderingTasks() const
 
     for (auto const& id : _renderTaskIds) {
         tasks.push_back(GetRenderIndex()->GetTask(id));
+    }
+
+    if (!_ambientOcclusionTaskId.IsEmpty()) {
+        tasks.push_back(GetRenderIndex()->GetTask(_ambientOcclusionTaskId));
     }
 
     if (!_oitResolveTaskId.IsEmpty()) {
