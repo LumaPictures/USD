@@ -37,13 +37,17 @@ pxr_library(hdx
     PUBLIC_CLASSES
         ambientOcclusionTask
         colorizeTask
+        colorizeSelectionTask
         colorCorrectionTask
         compositor
         drawTargetRenderPass
         drawTargetTask
         drawTargetResolveTask
-        intersector
+        oitRenderTask
+        oitResolveTask
         package
+        pickTask
+        pickFromRenderBufferTask
         progressiveTask
         rendererPlugin
         rendererPluginRegistry
@@ -78,12 +82,15 @@ pxr_library(hdx
         shaders/renderPass.glslfx
         shaders/renderPassShader.glslfx
         shaders/renderPassIdShader.glslfx
+        shaders/renderPassPickingShader.glslfx
         shaders/renderPassShadowShader.glslfx
         shaders/selection.glslfx
         shaders/simpleLightingShader.glslfx
+        shaders/renderPassOitShader.glslfx
+        shaders/oitResolveImageShader.glslfx
 )
 
-if (X11_FOUND OR APPLE)
+if (X11_FOUND)
 pxr_build_test(testHdxRenderTask
     LIBRARIES
         hdx
