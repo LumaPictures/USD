@@ -155,6 +155,7 @@ endif()
 
 if (PXR_BUILD_HOUDINI_PLUGIN)
     find_package(Houdini REQUIRED)
+    find_package(USDArnold REQUIRED)
 endif()
 
 if (PXR_BUILD_PRMAN_PLUGIN)
