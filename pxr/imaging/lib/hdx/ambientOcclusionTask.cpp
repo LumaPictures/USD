@@ -20,6 +20,12 @@ void HdxAmbientOcclusionTask::Sync(HdSceneDelegate* delegate,
 
 }
 
+void HdxAmbientOcclusionTask::Prepare(HdTaskContext* ctx,
+                                      HdRenderIndex* renderIndex)
+{
+
+}
+
 void HdxAmbientOcclusionTask::Execute(HdTaskContext* ctx)
 {
 
