@@ -28,6 +28,7 @@
 #include "pxr/imaging/hd/renderDelegate.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hdx/colorizeSelectionTask.h"
+#include "pxr/imaging/hdx/ambientOcclusionTask.h"
 #include "pxr/imaging/hdx/colorizeTask.h"
 #include "pxr/imaging/hdx/colorCorrectionTask.h"
 #include "pxr/imaging/hdx/oitRenderTask.h"
@@ -61,8 +62,10 @@ TF_DEFINE_PRIVATE_TOKENS(
     (colorCorrectionTask)
     (pickTask)
     (pickFromRenderBufferTask)
+    (ambientOcclusionTask)
 
     // global camera
+    
     (camera)
 
     // For the internal delegate...
@@ -202,6 +205,7 @@ HdxTaskController::_CreateRenderGraph()
             HdxMaterialTagTokens->additive));
         _renderTaskIds.push_back(_CreateRenderTask(
             HdxMaterialTagTokens->translucent));
+        _CreateAmbientOcclusionTask();
         _CreateOitResolveTask();
         _CreateSelectionTask();
         _CreateColorCorrectionTask();
@@ -224,6 +228,7 @@ HdxTaskController::_CreateRenderGraph()
         _CreateColorCorrectionTask();
     }
 }
+
 
 void
 HdxTaskController::_CreateCamera()
@@ -558,6 +563,10 @@ HdxTaskController::GetRenderingTasks() const
 
     for (auto const& id : _renderTaskIds) {
         tasks.push_back(GetRenderIndex()->GetTask(id));
+    }
+
+    if (!_ambientOcclusionTaskId.IsEmpty()) {
+        tasks.push_back(GetRenderIndex()->GetTask(_ambientOcclusionTaskId));
     }
 
     if (!_oitResolveTaskId.IsEmpty()) {
@@ -1031,6 +1040,22 @@ HdxTaskController::SetEnableShadows(bool enable)
         _delegate.SetParameter(_simpleLightTaskId, HdTokens->params, params);
         GetRenderIndex()->GetChangeTracker().MarkTaskDirty(
             _simpleLightTaskId, HdChangeTracker::DirtyParams);
+    }
+}
+
+void
+HdxTaskController::SetEnableAmbientOcclusion(bool enable)
+{
+    HdxAmbientOcclusionTaskParams params =
+        _delegate.GetParameter<HdxAmbientOcclusionTaskParams>(
+            _ambientOcclusionTaskId, HdTokens->params);
+
+    if (params.enable != enable) {
+        params.enable = enable;
+        _delegate.SetParameter(
+            _ambientOcclusionTaskId, HdTokens->params, params);
+        GetRenderIndex()->GetChangeTracker().MarkTaskDirty(
+            _ambientOcclusionTaskId, HdChangeTracker::DirtyParams);
     }
 }
 
