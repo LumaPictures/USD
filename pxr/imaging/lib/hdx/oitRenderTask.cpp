@@ -52,6 +52,16 @@ PXR_NAMESPACE_OPEN_SCOPE
 TF_DEFINE_ENV_SETTING(HDX_ENABLE_OIT, true, 
                       "Enable order independent translucency");
 
+namespace {
+
+decltype(glClearNamedBufferData) _GetGlClearNamedBufferData() {
+    return glClearNamedBufferData ?
+           glClearNamedBufferData :
+           glClearNamedBufferDataEXT;
+}
+
+}
+
 typedef std::vector<HdBufferSourceSharedPtr> HdBufferSourceSharedPtrVector;
 
 // -------------------------------------------------------------------------- //
@@ -189,7 +199,7 @@ HdxOitRenderTask::_PrepareOitBuffers(
 
     if (rebuildOitBuffers) {
         // If glew version too old we emit a warning since OIT will not work.
-        if (!glClearNamedBufferData) {
+        if (_GetGlClearNamedBufferData() == nullptr) {
             TF_WARN("glClearNamedBufferData missing for OIT (old glew?)");
         }
 
@@ -331,9 +341,9 @@ HdxOitRenderTask::_PrepareOitBuffers(
 void 
 HdxOitRenderTask::_ClearOitGpuBuffers(HdTaskContext* ctx)
 {
+    auto clearFunc = _GetGlClearNamedBufferData();
     // Exit if glew version used by app is too old
-    if (!_glClearNamedBufferData()) return;
-    if (!_counterBar) return;
+    if (clearFunc == nullptr || _counterBar == nullptr) return;
 
     //
     // Counter Buffer
@@ -344,11 +354,11 @@ HdxOitRenderTask::_ClearOitGpuBuffers(HdTaskContext* ctx)
         stCounterBar->GetResource(HdxTokens->hdxOitCounterBuffer);
 
     const GLint clearCounter = -1;
-    _glClearNamedBufferData()(stCounterResource->GetId(),
-                              GL_R32I,
-                              GL_RED_INTEGER,
-                              GL_INT,
-                              &clearCounter);
+    clearFunc(stCounterResource->GetId(),
+              GL_R32I,
+              GL_RED_INTEGER,
+              GL_INT,
+              &clearCounter);
 }
 
 
