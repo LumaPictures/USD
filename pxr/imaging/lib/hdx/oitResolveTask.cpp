@@ -119,7 +119,7 @@ HdxOitResolveTask::Prepare(HdTaskContext* ctx,
     VtValue oitNumSamples = renderDelegate
         ->GetRenderSetting(HdStRenderSettingsTokens->oitNumSamples);
     if (!TF_VERIFY(oitNumSamples.IsHolding<int>(),
-        "OIT Layer count is not an integer!")) {
+        "OIT Number of Samples is not an integer!")) {
         return;
     }
     const int numSamples = oitNumSamples.UncheckedGet<int>();
