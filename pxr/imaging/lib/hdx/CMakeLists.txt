@@ -77,6 +77,7 @@ pxr_library(hdx
 
     RESOURCE_FILES
         plugInfo.json
+        shaders/ambientOcclusionImageShader.glslfx
         shaders/colorCorrection.glslfx
         shaders/fullscreen.glslfx
         shaders/renderPass.glslfx

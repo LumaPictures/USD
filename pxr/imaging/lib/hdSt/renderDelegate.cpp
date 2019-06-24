@@ -57,6 +57,11 @@ PXR_NAMESPACE_OPEN_SCOPE
 TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_TINY_PRIM_CULLING, false,
                       "Enable tiny prim culling");
 
+TF_DEFINE_ENV_SETTING(HD_AMBIENT_OCCLUSION_NUM_SAMPLES, 8,
+                      "Number of ambient occlusion samples. Increase the value"
+                      "increases frame time, but improves ambient occlusion"
+                      "quality.");
+
 const TfTokenVector HdStRenderDelegate::SUPPORTED_RPRIM_TYPES =
 {
     HdPrimTypeTokens->mesh,
@@ -109,10 +114,13 @@ HdStRenderDelegate::_Initialize()
     }
 
     // Initialize the settings and settings descriptors.
-    _settingDescriptors.resize(1);
+    _settingDescriptors.resize(2);
     _settingDescriptors[0] = { "Enable Tiny Prim Culling",
         HdStRenderSettingsTokens->enableTinyPrimCulling,
         VtValue(bool(TfGetEnvSetting(HD_ENABLE_GPU_TINY_PRIM_CULLING))) };
+    _settingDescriptors[2] = { "Ambient Occlusion Number of Samples",
+        HdStRenderSettingsTokens->aoNumSamples,
+        VtValue(int(TfGetEnvSetting(HD_AMBIENT_OCCLUSION_NUM_SAMPLES))) };
     _PopulateDefaultSettings(_settingDescriptors);
 }
 
