@@ -14,10 +14,23 @@ struct HdxAmbientOcclusionTaskParams {
     bool enable = false;
 };
 
+typedef boost::shared_ptr<class HdRenderPassState>
+    HdRenderPassStateSharedPtr;
+typedef boost::shared_ptr<class HdRenderPass>
+    HdRenderPassSharedPtr;
+typedef boost::shared_ptr<class HdStRenderPassShader>
+    HdStRenderPassShaderSharedPtr;
+
 class HdxAmbientOcclusionTask : public HdTask {
 public:
     HDX_API
     HdxAmbientOcclusionTask(HdSceneDelegate* delegate, const SdfPath& id);
+
+    HdxAmbientOcclusionTask() = delete;
+    HdxAmbientOcclusionTask(const HdxAmbientOcclusionTask&) = delete;
+    HdxAmbientOcclusionTask(HdxAmbientOcclusionTask&&) = delete;
+    HdxAmbientOcclusionTask& operator=(const HdxAmbientOcclusionTask&) = delete;
+    HdxAmbientOcclusionTask& operator=(HdxAmbientOcclusionTask&&) = delete;
 
     HDX_API
     virtual ~HdxAmbientOcclusionTask();
@@ -36,6 +49,13 @@ public:
     /// Execute render pass task
     HDX_API
     void Execute(HdTaskContext* ctx) override;
+
+private:
+    HdRenderPassSharedPtr _renderPass;
+    HdRenderPassStateSharedPtr _renderPassState;
+    HdStRenderPassShaderSharedPtr _renderPassShader;
+
+    int _numSamples = -1;
 };
 
 HDX_API

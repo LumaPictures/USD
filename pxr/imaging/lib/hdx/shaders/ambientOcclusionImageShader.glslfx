@@ -1,5 +1,7 @@
+-- glslfx version 0.1
+
 //
-// Copyright 2016 Pixar
+// Copyright 2019 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,28 +23,22 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef HDX_PACKAGE_H
-#define HDX_PACKAGE_H
 
-#include "pxr/pxr.h"
-#include "pxr/imaging/hdx/version.h"
-#include "pxr/base/tf/token.h"
+-- configuration
+{
+    "techniques": {
+        "default": {
+            "fragmentShader": {
+                "source": [ "AmbientOcclusion.SSAO" ]
+            }
+        }
+    }
+}
 
-PXR_NAMESPACE_OPEN_SCOPE
+-- glsl AmbientOcclusion.SSAO
 
-
-TfToken HdxPackageFullscreenShader();
-TfToken HdxPackageRenderPassShader();
-TfToken HdxPackageRenderPassIdShader();
-TfToken HdxPackageRenderPassPickingShader();
-TfToken HdxPackageRenderPassShadowShader();
-TfToken HdxPackageSimpleLightingShader();
-TfToken HdxPackageColorCorrectionShader();
-TfToken HdxPackageRenderPassOitShader();
-TfToken HdxPackageOitResolveImageShader();
-TfToken HdxPackageAmbientOcclusionImageShader();
-
-
-PXR_NAMESPACE_CLOSE_SCOPE
-
-#endif
+vec4 imageShader(vec2 uv)
+{
+    // return vec4(0, 0, 0, clamp(AO_SAMPLES / 8.0, 0, 1));
+    return vec4(0);
+}
