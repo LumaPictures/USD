@@ -57,6 +57,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 #define HDST_RENDER_SETTINGS_TOKENS             \
     (enableTinyPrimCulling)                     \
+    (oitNumSamples)                             \
     (aoNumSamples)
 
 TF_DECLARE_PUBLIC_TOKENS(HdStGLSLProgramTokens, HDST_API,
