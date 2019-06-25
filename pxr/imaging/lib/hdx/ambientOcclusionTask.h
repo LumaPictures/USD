@@ -6,6 +6,8 @@
 
 #include "pxr/imaging/hd/task.h"
 
+#include <memory>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdSceneDelegate;
@@ -14,12 +16,12 @@ struct HdxAmbientOcclusionTaskParams {
     bool enable = false;
 };
 
-typedef boost::shared_ptr<class HdRenderPassState>
-    HdRenderPassStateSharedPtr;
-typedef boost::shared_ptr<class HdRenderPass>
-    HdRenderPassSharedPtr;
-typedef boost::shared_ptr<class HdStRenderPassShader>
-    HdStRenderPassShaderSharedPtr;
+using HdStRenderPassStateSharedPtr =
+    boost::shared_ptr<class HdStRenderPassState>;
+using HdStRenderPassShaderSharedPtr =
+    boost::shared_ptr<class HdStRenderPassShader>;
+using HdSt_ImageShaderRenderPassSharedPtr =
+    boost::shared_ptr<class HdSt_ImageShaderRenderPass>;
 
 class HdxAmbientOcclusionTask : public HdTask {
 public:
@@ -51,8 +53,8 @@ public:
     void Execute(HdTaskContext* ctx) override;
 
 private:
-    HdRenderPassSharedPtr _renderPass;
-    HdRenderPassStateSharedPtr _renderPassState;
+    HdSt_ImageShaderRenderPassSharedPtr _renderPass;
+    HdStRenderPassStateSharedPtr _renderPassState;
     HdStRenderPassShaderSharedPtr _renderPassShader;
 
     int _numSamples = -1;
