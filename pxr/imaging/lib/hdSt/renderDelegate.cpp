@@ -115,13 +115,13 @@ HdStRenderDelegate::_Initialize()
     }
 
     // Initialize the settings and settings descriptors.
-    _settingDescriptors.resize(2);
-    _settingDescriptors[0] = { "Enable Tiny Prim Culling",
+    _settingDescriptors.reserve(2);
+    _settingDescriptors.emplace_back("Enable Tiny Prim Culling",
         HdStRenderSettingsTokens->enableTinyPrimCulling,
-        VtValue(bool(TfGetEnvSetting(HD_ENABLE_GPU_TINY_PRIM_CULLING))) };
-    _settingDescriptors[1] = { "OIT Number of Samples",
+        VtValue(bool(TfGetEnvSetting(HD_ENABLE_GPU_TINY_PRIM_CULLING))));
+    _settingDescriptors.emplace_back("OIT Number of Samples",
         HdStRenderSettingsTokens->oitNumSamples,
-        VtValue(int(TfGetEnvSetting(HD_OIT_NUM_SAMPLES))) };
+        VtValue(int(TfGetEnvSetting(HD_OIT_NUM_SAMPLES))));
     _PopulateDefaultSettings(_settingDescriptors);
 }
 
