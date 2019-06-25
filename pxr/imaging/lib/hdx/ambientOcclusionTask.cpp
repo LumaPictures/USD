@@ -110,20 +110,20 @@ void HdxAmbientOcclusionTask::Sync(HdSceneDelegate* delegate,
 void HdxAmbientOcclusionTask::Prepare(HdTaskContext* ctx,
                                       HdRenderIndex* renderIndex)
 {
-    HdRenderDelegate* renderDelegate = renderIndex->GetRenderDelegate();
+    auto* renderDelegate = renderIndex->GetRenderDelegate();
     if (!TF_VERIFY(dynamic_cast<HdStRenderDelegate*>(renderDelegate),
                    "OIT Task only works with HdSt")) {
         return;
     }
 
-    VtValue aoNumSamples = renderDelegate
+    auto aoNumSamples = renderDelegate
         ->GetRenderSetting(HdStRenderSettingsTokens->aoNumSamples);
     if (!TF_VERIFY(aoNumSamples.IsHolding<int>(),
                    "Ambient Occlusion num samples is not an integer!")) {
         return;
     }
-    const int numSamples = aoNumSamples.UncheckedGet<int>();
-    bool rebuildShader = false;
+    const auto numSamples = std::max(1, aoNumSamples.UncheckedGet<int>());
+    auto rebuildShader = false;
     if (numSamples != _numSamples) {
         _numSamples = numSamples;
         rebuildShader = true;
@@ -132,14 +132,14 @@ void HdxAmbientOcclusionTask::Prepare(HdTaskContext* ctx,
     if (!_renderPass) {
         HdRprimCollection collection;
 
-        _renderPass = HdRenderPassSharedPtr(
+        _renderPass.reset(
             new HdSt_ImageShaderRenderPass(renderIndex, collection));
 
         // To avoid having to access the color buffer for manipuation, use
         // OpenGL's blending pipeline to multiply the color buffer with the
         // alpha value of our image shader, which is the inverse of the
         // ambient occlusion factor.
-        _renderPassState = boost::make_shared<HdStRenderPassState>();
+        _renderPassState.reset(new HdStRenderPassState());
         _renderPassState->SetEnableDepthMask(false);
         _renderPassState->SetColorMask(HdRenderPassState::ColorMaskRGBA);
         _renderPassState->SetBlendEnabled(true);
@@ -154,15 +154,11 @@ void HdxAmbientOcclusionTask::Prepare(HdTaskContext* ctx,
         _renderPassShader.reset(new HdxAmbientOcclusionRenderPassShader(
             8));
 
-        HdStRenderPassState* stRenderPassState =
-            static_cast<HdStRenderPassState*>(_renderPassState.get());
-        stRenderPassState->SetRenderPassShader(_renderPassShader);
+        _renderPassState->SetRenderPassShader(_renderPassShader);
     } else if(rebuildShader) {
         _renderPassShader.reset(new HdxAmbientOcclusionRenderPassShader(
             _numSamples));
-        HdStRenderPassState* stRenderPassState =
-            static_cast<HdStRenderPassState*>(_renderPassState.get());
-        stRenderPassState->SetRenderPassShader(_renderPassShader);
+        _renderPassState->SetRenderPassShader(_renderPassShader);
     }
 }
 
@@ -176,6 +172,11 @@ void HdxAmbientOcclusionTask::Execute(HdTaskContext* ctx)
     // HdStRenderPassState* stRenderPassState =
     //     static_cast<HdStRenderPassState*>(_renderPassState.get());
 
+    // GfVec4i viewport;
+    // glGetIntegerv(GL_VIEWPORT, viewport.data());
+    // GLuint depthTex = 0;
+    // glGenTextures(1, &depthTex);
+
     _renderPassState->Bind();
 
     glDisable(GL_DEPTH_TEST);
@@ -185,6 +186,8 @@ void HdxAmbientOcclusionTask::Execute(HdTaskContext* ctx)
     glEnable(GL_DEPTH_TEST);
 
     _renderPassState->Unbind();
+
+    // glDeleteTextures(1, &depthTex);
 }
 
 std::ostream& operator<<(
