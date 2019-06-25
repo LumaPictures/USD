@@ -122,7 +122,7 @@ HdxOitResolveTask::Prepare(HdTaskContext* ctx,
         "OIT Number of Samples is not an integer!")) {
         return;
     }
-    const int numSamples = oitNumSamples.UncheckedGet<int>();
+    const int numSamples = std::max(1, oitNumSamples.UncheckedGet<int>());
     bool rebuildShader = false;
     if (numSamples != _numSamples) {
         _numSamples = numSamples;
