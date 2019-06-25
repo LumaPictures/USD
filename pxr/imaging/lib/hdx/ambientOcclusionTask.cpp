@@ -116,6 +116,18 @@ void HdxAmbientOcclusionTask::Prepare(HdTaskContext* ctx,
         return;
     }
 
+    auto enableAo = renderDelegate
+        ->GetRenderSetting(HdStRenderSettingsTokens->enableAo);
+    if (!TF_VERIFY(enableAo.IsHolding<bool>(),
+                   "Enable Ambient Occlusion is not a bool!")) {
+        return;
+    }
+    if (!TF_VERIFY(enableAo.UncheckedGet<bool>(),
+                   "Enable Ambient Occlusion is false, "
+                   "yet the task is running.")) {
+        return;
+    }
+
     auto aoNumSamples = renderDelegate
         ->GetRenderSetting(HdStRenderSettingsTokens->aoNumSamples);
     if (!TF_VERIFY(aoNumSamples.IsHolding<int>(),

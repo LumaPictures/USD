@@ -43,6 +43,7 @@
 
 #include "pxr/imaging/hdSt/light.h"
 #include "pxr/imaging/hdSt/renderDelegate.h"
+#include "pxr/imaging/hdSt/tokens.h"
 
 #include "pxr/imaging/glf/simpleLight.h"
 #include "pxr/imaging/glf/simpleLightingContext.h"
@@ -583,7 +584,12 @@ HdxTaskController::GetRenderingTasks() const
     }
 
     if (!_ambientOcclusionTaskId.IsEmpty()) {
-        tasks.push_back(GetRenderIndex()->GetTask(_ambientOcclusionTaskId));
+        const auto enableAo = GetRenderIndex()
+            ->GetRenderDelegate()
+            ->GetRenderSetting(HdStRenderSettingsTokens->enableAo);
+        if (enableAo.IsHolding<bool>() && enableAo.UncheckedGet<bool>()) {
+            tasks.push_back(GetRenderIndex()->GetTask(_ambientOcclusionTaskId));
+        }
     }
 
     if (!_oitResolveTaskId.IsEmpty()) {
