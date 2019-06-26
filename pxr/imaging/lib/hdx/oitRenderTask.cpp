@@ -168,13 +168,6 @@ HdxOitRenderTask::Execute(HdTaskContext* ctx)
     }
 }
 
-static int 
-_RoundUp(int number, int roundTo)
-{
-    int remainder = number % roundTo;
-    return number + (roundTo - remainder);
-}
-
 static GfVec2i
 _GetScreenSize()
 {
