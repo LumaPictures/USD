@@ -201,7 +201,7 @@ public:
             return TfSpan<T>(_data + offset, _size - offset);
         } else {
             TF_DEV_AXIOM(count >= 0);
-            TF_DEV_AXIOM((index_type)(offset+count) <= _size);
+            TF_DEV_AXIOM(((index_type)offset+(index_type)count) <= _size);
             return TfSpan<T>(_data + offset, count);
         }
     }

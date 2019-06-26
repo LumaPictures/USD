@@ -40,50 +40,21 @@
 vec4 imageShader(vec2 uv)
 {
 #if defined(HD_HAS_hdxOitDataBuffer)
-    int screenWidth = HdGet_oitWidth();
-    int screenHeight = HdGet_oitHeight();
-    int bufferSize = screenWidth * screenHeight * OIT_NUM_SAMPLES;
+    int screenWidth = int(HdGet_oitScreenSize().y);
+    int bufferSize = HdGet_oitBufferSize();
+    int counterBufferSize = bufferSize + 1;
 
     int screenIndex = int(gl_FragCoord.x) + int(gl_FragCoord.y) * screenWidth;
+    if (screenIndex+1 >= counterBufferSize) {
+        return vec4(0);
+    }
+
     int nodeIndex = hdxOitCounterBuffer[screenIndex+1];
     int numDepths = 0;
 
     // XXX renderPass.WriteOitLayersToBuffer does not clamp the number of
     //     depth samples we store for a pixel. Here we process no more than
-    //     'OIT_NUM_SAMPLES' for a pixel. (If there are greater than
-    //     'OIT_NUM_SAMPLES' samples stored for this pixel some will
-    //     currently not contribute)
-    vec4 sortedColor[OIT_NUM_SAMPLES];
-    float sortedDepth[OIT_NUM_SAMPLES];
 
-#if 1
-    // Select sorting
-    while (nodeIndex != -1 && numDepths < OIT_NUM_SAMPLES) {
-        sortedDepth[numDepths] = hdxOitDepthBuffer[nodeIndex];
-        sortedColor[numDepths] = hdxOitDataBuffer[nodeIndex];
-        nodeIndex = hdxOitIndexBuffer[nodeIndex];
-        numDepths += 1;
-    }
-
-    for (int depth = 0; depth < numDepths - 1; depth += 1) {
-        int swap = depth;
-        for (int i = depth + 1; i < numDepths; i += 1) {
-            if (sortedDepth[swap] > sortedDepth[i]) {
-                swap = i;
-            }
-        }
-        float td = sortedDepth[swap];
-        vec4 tc = sortedColor[swap];
-
-        sortedDepth[swap] = sortedDepth[depth];
-        sortedColor[swap] = sortedColor[depth];
-
-        sortedDepth[depth] = td;
-        sortedColor[depth] = tc;
-    }
-#else
-    // Insert sorting
-    while (nodeIndex != -1 && numDepths < OIT_NUM_SAMPLES) {
         float currentDepth = hdxOitDepthBuffer[nodeIndex]; 
         int insertIndex = numDepths; 
         while (insertIndex > 0 && sortedDepth[insertIndex - 1] > currentDepth) {
@@ -103,10 +74,10 @@ vec4 imageShader(vec2 uv)
         colorAccum.rgb = colorAccum.rgb + sortedColor[depth].rgb * alpha;
         colorAccum.a = colorAccum.a + alpha;
 
-        colorAccum = clamp(colorAccum, vec4(0), vec4(1));
         if (colorAccum.a >= 0.99) break;
     }
 
+    colorAccum = clamp(colorAccum, vec4(0), vec4(1));
     return colorAccum;
 
 #else  // HD_HAS_hdxOitDataBuffer
