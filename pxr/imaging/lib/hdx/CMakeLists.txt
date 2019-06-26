@@ -88,6 +88,7 @@ pxr_library(hdx
         shaders/selection.glslfx
         shaders/simpleLightingShader.glslfx
         shaders/renderPassOitShader.glslfx
+        shaders/renderPassOitOpaqueShader.glslfx
         shaders/oitResolveImageShader.glslfx
 )
 
