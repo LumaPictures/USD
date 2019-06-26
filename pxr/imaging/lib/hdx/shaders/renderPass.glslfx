@@ -50,7 +50,7 @@ void RenderOutput(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
 {
 #if defined(HD_HAS_hdxOitDataBuffer)
     if (color.a < 1.0) {
-        int screenWidth = int(HdGet_oitScreenSize().y);
+        int screenWidth = int(HdGet_oitScreenSize().x);
         int bufferSize = HdGet_oitBufferSize();
         int counterBufferSize = bufferSize + 1;
 

@@ -40,7 +40,7 @@
 vec4 imageShader(vec2 uv)
 {
 #if defined(HD_HAS_hdxOitDataBuffer)
-    int screenWidth = int(HdGet_oitScreenSize().y);
+    int screenWidth = int(HdGet_oitScreenSize().x);
     int bufferSize = HdGet_oitBufferSize();
     int counterBufferSize = bufferSize + 1;
 
