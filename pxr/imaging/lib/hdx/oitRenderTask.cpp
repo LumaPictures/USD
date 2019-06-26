@@ -30,6 +30,7 @@
 #include "pxr/imaging/hdx/oitResolveTask.h"
 #include "pxr/imaging/hdx/tokens.h"
 #include "pxr/imaging/hdx/debugCodes.h"
+#include "pxr/imaging/hdx/utils.h"
 
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/renderDelegate.h"
@@ -168,67 +169,6 @@ HdxOitRenderTask::Execute(HdTaskContext* ctx)
     }
 }
 
-static GfVec2i
-_GetScreenSize()
-{
-    // XXX Ideally we want screenSize to be passed in via the app. 
-    // (see Presto Stagecontext/TaskGraph), but for now we query this from GL.
-    //
-    // Using GL_VIEWPORT here (or viewport from RenderParams) is in-correct!
-    //
-    // The gl_FragCoord we use in the OIT shaders is relative to the FRAMEBUFFER 
-    // size (screen size), not the gl_viewport size.
-    // We do various tricks with glViewport for Presto slate mode so we cannot
-    // rely on it to determine the 'screenWidth' we need in the gl shaders.
-    // 
-    // The CounterBuffer is especially fragile to this because in the glsl shdr
-    // we calculate a 'screenIndex' based on gl_fragCoord that indexes into
-    // the CounterBuffer. If we did not make enough room in the CounterBuffer
-    // we may be reading/writing an invalid index into the CounterBuffer.
-    //
-
-    GfVec2i s;
-
-    GLint attachType = 0;
-    glGetFramebufferAttachmentParameteriv(
-        GL_DRAW_FRAMEBUFFER, 
-        GL_COLOR_ATTACHMENT0,
-        GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE,
-        &attachType);
-
-    GLint attachId = 0;
-    glGetFramebufferAttachmentParameteriv(
-        GL_DRAW_FRAMEBUFFER, 
-        GL_COLOR_ATTACHMENT0,
-        GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME,
-        &attachId);
-
-    // XXX Fallback to gl viewport in case we do not find a non-default FBO for
-    // bakends that do not attach a custom FB. This is in-correct, but gl does
-    // not let us query size properties of default framebuffer. For this we
-    // need the screenSize to be passed in via app (see note above)
-    if (attachId<=0) {
-        GfVec4i viewport;
-        glGetIntegerv(GL_VIEWPORT, &viewport[0]);
-        s[0] = viewport[2];
-        s[1] = viewport[3];
-        return s;
-    }
-
-    if (attachType == GL_TEXTURE) {
-        glGetTextureLevelParameteriv(attachId, 0, GL_TEXTURE_WIDTH, &s[0]);
-        glGetTextureLevelParameteriv(attachId, 0, GL_TEXTURE_HEIGHT, &s[1]);
-    } else if (attachType == GL_RENDERBUFFER) {
-        glGetNamedRenderbufferParameteriv(attachId,GL_RENDERBUFFER_WIDTH,&s[0]);
-        glGetNamedRenderbufferParameteriv(attachId,GL_RENDERBUFFER_HEIGHT,&s[1]);
-    } else {
-        TF_CODING_ERROR("Unknown framebuffer attachment");
-        return s;
-    }
-
-    return s;
-}
-
 void
 HdxOitRenderTask::_PrepareOitBuffers(
     HdTaskContext* ctx, 
@@ -249,7 +189,7 @@ HdxOitRenderTask::_PrepareOitBuffers(
     HdResourceRegistrySharedPtr const& resourceRegistry = 
         renderIndex->GetResourceRegistry();
 
-    GfVec2i s = _GetScreenSize();
+    GfVec2i s = HdxUtils::GetScreenSize();
     bool screenChanged = s != _screenSize;
     _screenSize = s;
 
