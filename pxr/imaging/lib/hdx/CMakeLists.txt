@@ -61,6 +61,7 @@ pxr_library(hdx
         taskController
         tokens
         types
+        utils
 
     PUBLIC_HEADERS
         shadowMatrixComputation.h
