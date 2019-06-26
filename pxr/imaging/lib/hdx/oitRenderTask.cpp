@@ -68,11 +68,16 @@ typedef std::vector<HdBufferSourceSharedPtr> HdBufferSourceSharedPtrVector;
 
 HdxOitRenderTask::HdxOitRenderTask(HdSceneDelegate* delegate, SdfPath const& id)
     : HdxRenderTask(delegate, id)
-    , _oitRenderPassShader()
-    , _viewport(0)
+    , _oitTranslucentRenderPassShader()
+    , _oitOpaqueRenderPassShader()
+    , _bufferSize(0)
+    , _screenSize(1,1)
 {
-    _oitRenderPassShader.reset(
+    _oitTranslucentRenderPassShader.reset(
         new HdStRenderPassShader(HdxPackageRenderPassOitShader()));
+
+    _oitOpaqueRenderPassShader.reset(
+        new HdStRenderPassShader(HdxPackageRenderPassOitOpaqueShader()));
 }
 
 HdxOitRenderTask::~HdxOitRenderTask()
@@ -113,14 +118,11 @@ HdxOitRenderTask::Execute(HdTaskContext* ctx)
 
     HdStRenderPassState* extendedState =
         dynamic_cast<HdStRenderPassState*>(renderPassState.get());
-
-    // HdxRenderTask creates/syncs RenderPassState, but we want to override
-    // the shader used with the OIT shader that renders the pixels of each
-    // fragment into the OIT buffers (HdxOitResolveTask consumed this later)
-    if (extendedState) {
-        extendedState->SetOverrideShader(HdStShaderCodeSharedPtr());
-        extendedState->SetRenderPassShader(_oitRenderPassShader);
+    if (!TF_VERIFY(extendedState, "OIT only works with HdSt")) {
+        return;
     }
+
+    extendedState->SetOverrideShader(HdStShaderCodeSharedPtr());
 
     _ClearOitGpuBuffers(ctx);
 
@@ -136,13 +138,21 @@ HdxOitRenderTask::Execute(HdTaskContext* ctx)
     bool oldPointSmooth = glIsEnabled(GL_POINT_SMOOTH);
     glEnable(GL_POINT_SMOOTH);
 
+    //
+    // Opaque pixels pass
+    // These pixels are rendered to FB instead of OIT buffers
+    //
+    extendedState->SetRenderPassShader(_oitOpaqueRenderPassShader);
+    renderPassState->SetEnableDepthMask(true);
+    renderPassState->SetColorMask(HdRenderPassState::ColorMaskRGBA);
+    HdxRenderTask::Execute(ctx);
+
+    //
+    // Translucent pixels pass
+    //
+    extendedState->SetRenderPassShader(_oitTranslucentRenderPassShader);
     renderPassState->SetEnableDepthMask(false);
     renderPassState->SetColorMask(HdRenderPassState::ColorMaskNone);
-
-    //
-    // HdxRenderTask EXECUTE
-    //
-
     HdxRenderTask::Execute(ctx);
 
     //
@@ -158,6 +168,74 @@ HdxOitRenderTask::Execute(HdTaskContext* ctx)
     }
 }
 
+static int 
+_RoundUp(int number, int roundTo)
+{
+    int remainder = number % roundTo;
+    return number + (roundTo - remainder);
+}
+
+static GfVec2i
+_GetScreenSize()
+{
+    // XXX Ideally we want screenSize to be passed in via the app. 
+    // (see Presto Stagecontext/TaskGraph), but for now we query this from GL.
+    //
+    // Using GL_VIEWPORT here (or viewport from RenderParams) is in-correct!
+    //
+    // The gl_FragCoord we use in the OIT shaders is relative to the FRAMEBUFFER 
+    // size (screen size), not the gl_viewport size.
+    // We do various tricks with glViewport for Presto slate mode so we cannot
+    // rely on it to determine the 'screenWidth' we need in the gl shaders.
+    // 
+    // The CounterBuffer is especially fragile to this because in the glsl shdr
+    // we calculate a 'screenIndex' based on gl_fragCoord that indexes into
+    // the CounterBuffer. If we did not make enough room in the CounterBuffer
+    // we may be reading/writing an invalid index into the CounterBuffer.
+    //
+
+    GfVec2i s;
+
+    GLint attachType = 0;
+    glGetFramebufferAttachmentParameteriv(
+        GL_DRAW_FRAMEBUFFER, 
+        GL_COLOR_ATTACHMENT0,
+        GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE,
+        &attachType);
+
+    GLint attachId = 0;
+    glGetFramebufferAttachmentParameteriv(
+        GL_DRAW_FRAMEBUFFER, 
+        GL_COLOR_ATTACHMENT0,
+        GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME,
+        &attachId);
+
+    // XXX Fallback to gl viewport in case we do not find a non-default FBO for
+    // bakends that do not attach a custom FB. This is in-correct, but gl does
+    // not let us query size properties of default framebuffer. For this we
+    // need the screenSize to be passed in via app (see note above)
+    if (attachId<=0) {
+        GfVec4i viewport;
+        glGetIntegerv(GL_VIEWPORT, &viewport[0]);
+        s[0] = viewport[2];
+        s[1] = viewport[3];
+        return s;
+    }
+
+    if (attachType == GL_TEXTURE) {
+        glGetTextureLevelParameteriv(attachId, 0, GL_TEXTURE_WIDTH, &s[0]);
+        glGetTextureLevelParameteriv(attachId, 0, GL_TEXTURE_HEIGHT, &s[1]);
+    } else if (attachType == GL_RENDERBUFFER) {
+        glGetNamedRenderbufferParameteriv(attachId,GL_RENDERBUFFER_WIDTH,&s[0]);
+        glGetNamedRenderbufferParameteriv(attachId,GL_RENDERBUFFER_HEIGHT,&s[1]);
+    } else {
+        TF_CODING_ERROR("Unknown framebuffer attachment");
+        return s;
+    }
+
+    return s;
+}
+
 void
 HdxOitRenderTask::_PrepareOitBuffers(
     HdTaskContext* ctx, 
@@ -166,24 +244,18 @@ HdxOitRenderTask::_PrepareOitBuffers(
     // XXX OIT can be globally disabled to preserve GPU memory
     if (!bool(TfGetEnvSetting(HDX_ENABLE_OIT))) return;
 
-    HdRenderDelegate* renderDelegate = renderIndex->GetRenderDelegate();
-    if (!TF_VERIFY(dynamic_cast<HdStRenderDelegate*>(renderDelegate),
-                  "OIT Task only works with HdSt")) {
-        return;
-    }
+    // XXX Exit if opengl version too old
+    if (!glGetTextureLevelParameteriv) return;
 
     HdResourceRegistrySharedPtr const& resourceRegistry = 
         renderIndex->GetResourceRegistry();
 
+    GfVec2i s = _GetScreenSize();
+    bool screenChanged = s != _screenSize;
+    _screenSize = s;
 
-    GfVec4i viewport;
-    glGetIntegerv(GL_VIEWPORT, &viewport[0]);
-
-    bool rebuildOitBuffers = false;
-    if (viewport != _viewport) {
-        rebuildOitBuffers = true;
-        _viewport = viewport;
-    }
+    int newBufferSize = _screenSize[0] * _screenSize[1];
+    bool rebuildOitBuffers = (newBufferSize != _bufferSize);
 
     VtValue oitNumSamples = renderDelegate
         ->GetRenderSetting(HdStRenderSettingsTokens->oitNumSamples);
@@ -207,6 +279,11 @@ HdxOitRenderTask::_PrepareOitBuffers(
         _dataBar.reset();
         _depthBar.reset();
         _indexBar.reset();
+        _bufferSize = newBufferSize;
+        renderIndex->GetChangeTracker().SetGarbageCollectionNeeded();
+    }
+
+    if (screenChanged) {
         _uniformBar.reset();
         renderIndex->GetChangeTracker().SetGarbageCollectionNeeded();
     }
@@ -223,7 +300,7 @@ HdxOitRenderTask::_PrepareOitBuffers(
                                             /*role*/HdxTokens->oitCounter,
                                             specs,
                                             HdBufferArrayUsageHint());
-        _counterBar->Resize(_viewport[2] * _viewport[3] + 1);
+        _counterBar->Resize(newBufferSize + 1);
     }
 
     (*ctx)[HdxTokens->oitCounterBufferBar] = _counterBar;
@@ -240,7 +317,7 @@ HdxOitRenderTask::_PrepareOitBuffers(
                                             /*role*/HdxTokens->oitIndices,
                                             specs,
                                             HdBufferArrayUsageHint());
-        _indexBar->Resize(_viewport[2] * _viewport[3] * _numSamples);
+        _indexBar->Resize(newBufferSize * numSamples);
     }
 
     (*ctx)[HdxTokens->oitIndexBufferBar] = _indexBar;
@@ -257,7 +334,7 @@ HdxOitRenderTask::_PrepareOitBuffers(
                                             /*role*/HdxTokens->oitData,
                                             specs,
                                             HdBufferArrayUsageHint());
-        _dataBar->Resize(_viewport[2] * _viewport[3] * _numSamples);
+        _dataBar->Resize(newBufferSize * numSamples);
     }
 
     (*ctx)[HdxTokens->oitDataBufferBar] = _dataBar;
@@ -274,7 +351,7 @@ HdxOitRenderTask::_PrepareOitBuffers(
                                             /*role*/HdxTokens->oitDepth,
                                             specs,
                                             HdBufferArrayUsageHint());
-        _depthBar->Resize(_viewport[2] * _viewport[3] * _numSamples);
+        _depthBar->Resize(newBufferSize * numSamples);
     }
 
     (*ctx)[HdxTokens->oitDepthBufferBar] = _depthBar;
@@ -284,13 +361,13 @@ HdxOitRenderTask::_PrepareOitBuffers(
     //
     if (!_uniformBar) {
         HdBufferSpecVector specs;
-        specs.push_back(
-            HdBufferSpec(HdxTokens->oitWidth, HdTupleType {HdTypeInt32, 1}));
-        specs.push_back(
-            HdBufferSpec(HdxTokens->oitHeight, HdTupleType {HdTypeInt32, 1}));
-        specs.push_back(
-            HdBufferSpec(HdxTokens->oitNumSamples,
-                         HdTupleType {HdTypeInt32, 1}));
+        specs.push_back( HdBufferSpec(
+            HdxTokens->oitBufferSize, HdTupleType {HdTypeInt32, 1}));
+        specs.push_back( HdBufferSpec(
+            HdxTokens->oitScreenSize,HdTupleType{HdTypeInt32Vec2, 1}));
+        specs.push_back( HdBufferSpec(
+            HdxTokens->oitNumSamples, HdTupleType {HdTypeInt32, 1}));
+
         _uniformBar = resourceRegistry->AllocateUniformBufferArrayRange(
                                             /*role*/HdxTokens->oitUniforms,
                                             specs,
@@ -298,14 +375,14 @@ HdxOitRenderTask::_PrepareOitBuffers(
 
         HdBufferSourceSharedPtrVector uniformSources;
         uniformSources.push_back(HdBufferSourceSharedPtr(
-                new HdVtBufferSource(HdxTokens->oitWidth,
-                                    VtValue((int)_viewport[2]))));
+                new HdVtBufferSource(HdxTokens->oitBufferSize,
+                                    VtValue(newBufferSize*numSamples))));
         uniformSources.push_back(HdBufferSourceSharedPtr(
-                new HdVtBufferSource(HdxTokens->oitHeight,
-                                    VtValue((int)_viewport[3]))));
+                              new HdVtBufferSource(HdxTokens->oitScreenSize,
+                                                   VtValue(_screenSize))));
         uniformSources.push_back(HdBufferSourceSharedPtr(
                 new HdVtBufferSource(HdxTokens->oitNumSamples,
-                                     VtValue(_numSamples))));
+                                     VtValue(_numSamples))))
         resourceRegistry->AddSources(_uniformBar, uniformSources);
     }
 
@@ -315,23 +392,26 @@ HdxOitRenderTask::_PrepareOitBuffers(
     // Binding Requests
     //
     if (rebuildOitBuffers) {
-        _oitRenderPassShader->AddBufferBinding(
+        _oitTranslucentRenderPassShader->AddBufferBinding(
             HdBindingRequest(HdBinding::SSBO,
                              HdxTokens->oitCounterBufferBar, _counterBar,
                              /*interleave*/false));
-        _oitRenderPassShader->AddBufferBinding(
+        _oitTranslucentRenderPassShader->AddBufferBinding(
             HdBindingRequest(HdBinding::SSBO,
                              HdxTokens->oitDataBufferBar, _dataBar,
                              /*interleave*/false));
-        _oitRenderPassShader->AddBufferBinding(
+        _oitTranslucentRenderPassShader->AddBufferBinding(
             HdBindingRequest(HdBinding::SSBO,
                              HdxTokens->oitDepthBufferBar, _depthBar,
                              /*interleave*/false));
-        _oitRenderPassShader->AddBufferBinding(
+        _oitTranslucentRenderPassShader->AddBufferBinding(
             HdBindingRequest(HdBinding::SSBO,
                              HdxTokens->oitIndexBufferBar, _indexBar,
                              /*interleave*/false));
-        _oitRenderPassShader->AddBufferBinding(
+    }
+
+    if (screenChanged) {
+        _oitTranslucentRenderPassShader->AddBufferBinding(
             HdBindingRequest(HdBinding::UBO, 
                              HdxTokens->oitUniformBar, _uniformBar,
                              /*interleave*/true));
