@@ -244,6 +244,12 @@ HdxOitRenderTask::_PrepareOitBuffers(
     // XXX OIT can be globally disabled to preserve GPU memory
     if (!bool(TfGetEnvSetting(HDX_ENABLE_OIT))) return;
 
+    HdRenderDelegate* renderDelegate = renderIndex->GetRenderDelegate();
+    if (!TF_VERIFY(dynamic_cast<HdStRenderDelegate*>(renderDelegate),
+                   "OIT Task only works with HdSt")) {
+        return;
+    }
+
     // XXX Exit if opengl version too old
     if (!glGetTextureLevelParameteriv) return;
 
@@ -382,7 +388,7 @@ HdxOitRenderTask::_PrepareOitBuffers(
                                                    VtValue(_screenSize))));
         uniformSources.push_back(HdBufferSourceSharedPtr(
                 new HdVtBufferSource(HdxTokens->oitNumSamples,
-                                     VtValue(_numSamples))))
+                                     VtValue(_numSamples))));
         resourceRegistry->AddSources(_uniformBar, uniformSources);
     }
 
