@@ -45,6 +45,7 @@ option(PXR_ENABLE_OSL_SUPPORT "Enable OSL (OpenShadingLanguage) based components
 option(PXR_ENABLE_PTEX_SUPPORT "Enable Ptex support" ON)
 option(PXR_MAYA_TBB_BUG_WORKAROUND "Turn on linker flag (-Wl,-Bsymbolic) to work around a Maya TBB bug" OFF)
 option(PXR_ENABLE_NAMESPACES "Enable C++ namespaces." ON)
+option(PXR_BUILD_KATANA_VIEWER_PLUGIN "Build the Katana viewer plugin" ON)
 
 # Precompiled headers are a win on Windows, not on gcc.
 set(pxr_enable_pch "OFF")
