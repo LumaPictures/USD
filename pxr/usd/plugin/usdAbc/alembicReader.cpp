@@ -62,6 +62,7 @@
 #include <Alembic/AbcGeom/IXform.h>
 #include <Alembic/AbcGeom/SchemaInfoDeclarations.h>
 #include <Alembic/AbcGeom/Visibility.h>
+#include <functional>
 #include <memory>
 #include <mutex>
 
@@ -94,6 +95,12 @@ TF_DEFINE_ENV_SETTING(
 TF_DEFINE_ENV_SETTING(
     USD_ABC_XFORM_PRIM_COLLAPSE, true,
     "Collapse Xforms containing a single geometry into a single geom Prim in USD");
+
+#if ALEMBIC_LIBRARY_VERSION >= 10709
+TF_DEFINE_ENV_SETTING(
+    USD_ABC_READ_ARCHIVE_USE_MMAP, false,
+    "Use mmap when reading from an Ogawa archive.");
+#endif
 
 namespace {
 
@@ -480,9 +487,6 @@ public:
     AlembicProperty(const SdfPath& path, const std::string& name,
                     const ICompoundProperty& parent);
 
-    /// Returns the Usd path for this property.
-    const SdfPath& GetPath() const;
-
     /// Returns the parent compound property.
     ICompoundProperty GetParent() const;
 
@@ -540,12 +544,6 @@ AlembicProperty::AlembicProperty(
     // Do nothing
 }
 
-const SdfPath&
-AlembicProperty::GetPath() const
-{
-    return _path;
-}
-
 ICompoundProperty
 AlembicProperty::GetParent() const
 {
@@ -576,7 +574,7 @@ AlembicProperty::GetHeader() const
 /// previous via a \c _PrimReaderContext.
 class _ReaderSchema {
 public:
-    typedef boost::function<void (_PrimReaderContext*)> PrimReader;
+    typedef std::function<void (_PrimReaderContext*)> PrimReader;
     typedef std::vector<PrimReader> PrimReaderVector;
     typedef UsdAbc_AlembicDataConversion::ToUsdConverter Converter;
 
@@ -655,8 +653,8 @@ _ReaderSchema::GetPrimReaders(const std::string& schema) const
 class _ReaderContext {
 public:
     /// Gets data from some property at a given sample.
-    typedef boost::function<bool (const UsdAbc_AlembicDataAny&,
-                                  const ISampleSelector&)> Converter;
+    typedef std::function<bool (const UsdAbc_AlembicDataAny&,
+                                const ISampleSelector&)> Converter;
 
     /// An optional ordering of name children or properties.
     typedef boost::optional<TfTokenVector> Ordering;
@@ -1369,8 +1367,16 @@ _ReaderContext::_OpenOgawa(
     std::recursive_mutex** mutex) const
 {
     *format = "Ogawa";
+    #if ALEMBIC_LIBRARY_VERSION >= 10709
+    *result = IArchive(
+                Alembic::AbcCoreOgawa::ReadArchive(
+                    _GetNumOgawaStreams(), 
+                    TfGetEnvSetting(USD_ABC_READ_ARCHIVE_USE_MMAP)),
+                filePath, ErrorHandler::kQuietNoopPolicy);
+    #else
     *result = IArchive(Alembic::AbcCoreOgawa::ReadArchive(_GetNumOgawaStreams()),
                        filePath, ErrorHandler::kQuietNoopPolicy);
+    #endif
     return *result;
 }
 
@@ -1808,9 +1814,9 @@ public:
     typedef _IsValidTag IsValidTag;
     typedef _MetaDataTag MetaDataTag;
     typedef _SampleTimesTag SampleTimesTag;
-    typedef boost::function<bool (IsValidTag)> IsValid;
-    typedef boost::function<const MetaData& (MetaDataTag)> GetMetaData;
-    typedef boost::function<_AlembicTimeSamples(SampleTimesTag)> GetSampleTimes;
+    typedef std::function<bool (IsValidTag)> IsValid;
+    typedef std::function<const MetaData& (MetaDataTag)> GetMetaData;
+    typedef std::function<_AlembicTimeSamples(SampleTimesTag)> GetSampleTimes;
 
     _PrimReaderContext(_ReaderContext&,
                        const IObject& prim,
@@ -1822,19 +1828,12 @@ public:
     /// Returns the Usd path to this prim.
     const SdfPath& GetPath() const;
 
-    /// Returns \c true iff a flag is in the set.
-    bool IsFlagSet(const TfToken& flagName) const;
-
     /// Returns \p name converted to a valid Usd name not currently used
     /// by any property on this prim.
     std::string GetUsdName(const std::string& name) const;
 
     /// Returns the prim cache.
     Prim& GetPrim();
-
-    /// Returns the property cache for the property named \p name.  Returns
-    /// an empty property if the property hasn't been added yet.
-    const Property& GetProperty(const TfToken& name) const;
 
     /// Adds a property named \p name of type \p typeName with the converter
     /// \p converter.  \p converter must be a functor object that conforms
@@ -1860,10 +1859,6 @@ public:
     /// property hierarchy with \p name as the left-most component.
     void AddOutOfSchemaProperty(const std::string& name,
                                 const AlembicProperty& property);
-
-    /// Replaces the converter on the property named \p name.
-    void SetPropertyConverter(const TfToken& name,
-                              const Converter& converter);
 
     /// Set the schema.  This makes additional properties available via
     /// the \c ExtractSchema() method.
@@ -1899,10 +1894,6 @@ public:
     /// Returns the names of properties that have not been extracted yet
     /// in Alembic property order.
     std::vector<std::string> GetUnextractedNames() const;
-
-    /// Returns the names of properties that have not been extracted yet
-    /// from the schema in Alembic property order.
-    std::vector<std::string> GetUnextractedSchemaNames() const;
 
     /// Returns a _PrimReaderContext corresponding to the parent of this context.
     _PrimReaderContext GetParentContext() const;
@@ -1964,12 +1955,6 @@ _PrimReaderContext::GetPath() const
     return _path;
 }
 
-bool
-_PrimReaderContext::IsFlagSet(const TfToken& flagName) const
-{
-    return _context.IsFlagSet(flagName);
-}
-
 std::string
 _PrimReaderContext::GetUsdName(const std::string& name) const
 {
@@ -1982,28 +1967,6 @@ _PrimReaderContext::Prim&
 _PrimReaderContext::GetPrim()
 {
     return _context.AddPrim(GetPath());
-}
-
-const _PrimReaderContext::Property&
-_PrimReaderContext::GetProperty(const TfToken& name) const
-{
-    if (const _ReaderContext::Property* property =
-            _context.FindProperty(GetPath().AppendProperty(name))) {
-        return *property;
-    }
-    static _ReaderContext::Property empty;
-    return empty;
-}
-
-void
-_PrimReaderContext::SetPropertyConverter(
-    const TfToken& name,
-    const Converter& converter)
-{
-    const SdfPath path = GetPath().AppendProperty(name);
-    if (TF_VERIFY(_context.FindProperty(path))) {
-        _context.FindOrCreateProperty(path).converter = converter;
-    }
 }
 
 void
@@ -2052,12 +2015,6 @@ std::vector<std::string>
 _PrimReaderContext::GetUnextractedNames() const
 {
     return _unextracted;
-}
-
-std::vector<std::string>
-_PrimReaderContext::GetUnextractedSchemaNames() const
-{
-    return _unextractedSchema;
 }
 
 template <class T>
@@ -3060,20 +3017,6 @@ _ReadProperty(_PrimReaderContext* context, const char* name, TfToken propName, S
             _CopyGeneric<T, UsdValueType>(prop));
     }
 }
-
-/* Unused
-static
-void
-_ReadOtherSchema(_PrimReaderContext* context)
-{
-    // Read every unextracted property to Usd using default converters.
-    // This handles any property we don't have specific rules for.
-    for (const auto& name : context->GetUnextractedSchemaNames()) {
-        context->AddOutOfSchemaProperty(
-            context->GetUsdName(name), context->ExtractSchema(name));
-    }
-}
-*/
 
 static
 void

@@ -32,6 +32,8 @@ from collections import deque, OrderedDict
 
 # Usd Library Components
 from pxr import Usd, UsdGeom, UsdShade, UsdUtils, UsdImagingGL, Glf, Sdf, Tf, Ar
+from pxr import UsdAppUtils
+from pxr.UsdAppUtils.complexityArgs import RefinementComplexities
 
 # UI Components
 from ._usdviewq import Utils
@@ -63,7 +65,7 @@ from common import (UIBaseColors, UIPropertyValueSourceColors, UIFonts,
                     PickModes, SelectionHighlightModes, CameraMaskModes,
                     PropTreeWidgetTypeIsRel, PrimNotFoundException,
                     GetRootLayerStackInfo, HasSessionVis, GetEnclosingModelPrim,
-                    GetPrimsLoadability, Complexities, ClearColors,
+                    GetPrimsLoadability, ClearColors,
                     HighlightColors)
 
 import settings2
@@ -93,15 +95,6 @@ class HUDEntries(ConstantGroup):
 
 class PropertyIndex(ConstantGroup):
     VALUE, METADATA, LAYERSTACK, COMPOSITION = range(4)
-
-class DebugTypes(ConstantGroup):
-    # Tf Debug entries to include in debug menu
-    HDST = "HDST"
-    HD = "HD"
-    HDX = "HDX"
-    USD = "USD"
-    USDIMAGING = "USDIMAGING"
-    USDVIEWQ = "USDVIEWQ"
 
 class UIDefaults(ConstantGroup):
     STAGE_VIEW_WIDTH = 604
@@ -322,6 +315,7 @@ class AppController(QtCore.QObject):
             self._currentSpec = None
             self._currentLayer = None
             self._console = None
+            self._debugFlagsWindow = None
             self._interpreter = None
             self._parserData = parserData
             self._noRender = parserData.noRender
@@ -418,10 +412,9 @@ class AppController(QtCore.QObject):
                 self._initialSelectPrim = None
 
             try:
-                self._dataModel.viewSettings.complexity = Complexities.fromId(
-                    parserData.complexity)
+                self._dataModel.viewSettings.complexity = parserData.complexity
             except ValueError:
-                fallback = Complexities.LOW
+                fallback = RefinementComplexities.LOW
                 sys.stderr.write(("Error: Invalid complexity '{}'. "
                     "Using fallback '{}' instead.\n").format(
                         parserData.complexity, fallback.id))
@@ -431,11 +424,12 @@ class AppController(QtCore.QObject):
             self._timeSamples = None
             self._stageView = None
             self._startingPrimCamera = None
-            if isinstance(parserData.camera, Sdf.Path):
+            if (parserData.camera.IsAbsolutePath() or
+                    parserData.camera.pathElementCount > 1):
                 self._startingPrimCameraName = None
                 self._startingPrimCameraPath = parserData.camera
             else:
-                self._startingPrimCameraName = parserData.camera
+                self._startingPrimCameraName = parserData.camera.pathString
                 self._startingPrimCameraPath = None
 
             settingsPathDir = self._outputBaseDirectory()
@@ -732,7 +726,7 @@ class AppController(QtCore.QObject):
 
             self._ui.primView.expanded.connect(self._primViewExpanded)
 
-            self._ui.frameSlider.valueChanged.connect(self.setFrame)
+            self._ui.frameSlider.valueChanged.connect(self._setFrameIndex)
             self._ui.frameSlider.sliderMoved.connect(self._sliderMoved)
             self._ui.frameSlider.sliderReleased.connect(self._updateGUIForFrameChange)
 
@@ -748,7 +742,7 @@ class AppController(QtCore.QObject):
 
             self._ui.actionFrame_Backwards.triggered.connect(self._retreatFrame)
 
-            self._ui.actionReset_View.triggered.connect(self._resetView)
+            self._ui.actionReset_View.triggered.connect(lambda: self._resetView())
 
             self._ui.topBottomSplitter.splitterMoved.connect(self._cacheViewerModeEscapeSizes)
             self._ui.primStageSplitter.splitterMoved.connect(self._cacheViewerModeEscapeSizes)
@@ -767,6 +761,8 @@ class AppController(QtCore.QObject):
             self._ui.useExtentsHint.triggered.connect(self._setUseExtentsHint)
 
             self._ui.showInterpreter.triggered.connect(self._showInterpreter)
+
+            self._ui.showDebugFlags.triggered.connect(self._showDebugFlags)
 
             self._ui.redrawOnScrub.toggled.connect(self._redrawOptionToggled)
 
@@ -1035,8 +1031,6 @@ class AppController(QtCore.QObject):
 
             self._ui.actionDeactivate.triggered.connect(self.deactivateSelectedPrims)
 
-            self._setupDebugMenu()
-
             # We refresh as if all view settings changed. In the future, we
             # should do more granular refreshes. This first requires more
             # granular signals from ViewSettingsDataModel.
@@ -1213,7 +1207,17 @@ class AppController(QtCore.QObject):
         self._ui.stageBegin.setText(str(stageStartTimeCode))
         self._ui.stageEnd.setText(str(stageEndTimeCode))
 
+        # Use a valid current frame supplied by user, or allow _UpdateTimeSamples
+        # to set the current frame.
+        cf = self._parserData.currentframe
+        if cf:
+            if (cf < self.realStartTimeCode or cf > self.realEndTimeCode):
+                sys.stderr.write('Warning: Invalid current frame specified (%s)\n' % (cf))
+            else:
+                self._dataModel.currentFrame = Usd.TimeCode(cf)
+        
         self._UpdateTimeSamples(resetStageDataOnly)
+
 
     def _UpdateTimeSamples(self, resetStageDataOnly=False):
         if self.realStartTimeCode is not None and self.realEndTimeCode is not None:
@@ -1235,11 +1239,15 @@ class AppController(QtCore.QObject):
         if self._hasTimeSamples:
             self._ui.rangeBegin.setText(str(self._timeSamples[0]))
             self._ui.rangeEnd.setText(str(self._timeSamples[-1]))
-
+            if ( self._dataModel.currentFrame.IsDefault() or
+                 self._dataModel.currentFrame < self._timeSamples[0] ):
+                self._dataModel.currentFrame = Usd.TimeCode(self._timeSamples[0])
+            if self._dataModel.currentFrame > self._timeSamples[-1]:
+                self._dataModel.currentFrame = Usd.TimeCode(self._timeSamples[-1])
+        else:
+            self._dataModel.currentFrame = Usd.TimeCode(0.0)
+        
         if not resetStageDataOnly:
-            self._dataModel.currentFrame = (
-                Usd.TimeCode(self._timeSamples[0])
-                if self._hasTimeSamples else Usd.TimeCode(0.0))
             self._ui.frameField.setText(
                 str(self._dataModel.currentFrame.GetValue()))
 
@@ -1680,17 +1688,17 @@ class AppController(QtCore.QObject):
 
     def _incrementComplexity(self):
         """Jump up to the next level of complexity."""
-        self._setComplexity(Complexities.next(
+        self._setComplexity(RefinementComplexities.next(
             self._dataModel.viewSettings.complexity))
 
     def _decrementComplexity(self):
         """Jump back to the previous level of complexity."""
-        self._setComplexity(Complexities.prev(
+        self._setComplexity(RefinementComplexities.prev(
             self._dataModel.viewSettings.complexity))
 
     def _changeComplexity(self, action):
         """Update the complexity from a selected QAction."""
-        self._setComplexity(Complexities.fromName(action.text()))
+        self._setComplexity(RefinementComplexities.fromName(action.text()))
 
     def _adjustFOV(self):
         fov = QtWidgets.QInputDialog.getDouble(self._mainWindow, "Adjust FOV",
@@ -1822,7 +1830,7 @@ class AppController(QtCore.QObject):
             int: The closest matching frame index or 0 if one cannot be
             found.
         """
-        closestIndex = int((timeSample - self._timeSamples[0]) / self.step)
+        closestIndex = int(round((timeSample - self._timeSamples[0]) / self.step))
 
         # Bounds checking
         # 0 <= closestIndex <= number of time samples - 1
@@ -1850,19 +1858,12 @@ class AppController(QtCore.QObject):
             self._UpdateTimeSamples(resetStageDataOnly=False)
 
     def _frameStringChanged(self):
-        timeSample = float(self._ui.frameField.text())
-        indexOfFrame = self._findClosestFrameIndex(timeSample)
-
-        if (indexOfFrame != Usd.TimeCode.Default()):
-            self.setFrame(indexOfFrame, forceUpdate=True)
-            self._ui.frameSlider.setValue(indexOfFrame)
-
-        self._ui.frameField.setText(
-            str(self._dataModel.currentFrame.GetValue()))
+        value = float(self._ui.frameField.text())
+        self.setFrame(value)
 
     def _sliderMoved(self, frameIndex):
         """Slot called when the frame slider is moved by a user.
-        
+
         Args:
             frameIndex (int): The new frame index value.
         """
@@ -2273,6 +2274,13 @@ class AppController(QtCore.QObject):
         self._interpreter.show()
         self._interpreter.activateWindow()
         self._interpreter.setFocus()
+
+    def _showDebugFlags(self):
+        if self._debugFlagsWindow is None:
+            from debugFlagsWidget import DebugFlagsWidget
+            self._debugFlagsWindow = DebugFlagsWidget()
+
+        self._debugFlagsWindow.show()
 
     # Screen capture functionality ===========================================
 
@@ -3186,32 +3194,36 @@ class AppController(QtCore.QObject):
         self.contextMenu = PrimContextMenu(self._mainWindow, item, self)
         self.contextMenu.exec_(QtGui.QCursor.pos())
 
-    def setFrame(self, frameIndex, forceUpdate=False):
-        frameAtStart = self._dataModel.currentFrame
+    def setFrame(self, frame):
+        """Set the `frame`.
 
-        frame = self._timeSamples[int(frameIndex)]
-        if self._dataModel.currentFrame.GetValue() != frame:
-            minDist = 1.0e30
-            closestFrame = None
-            for t in self._timeSamples:
-                dist = abs(t - frame)
-                if dist < minDist:
-                    minDist = dist
-                    closestFrame = t
+        Args:
+            frame (float): The new frame value.
+        """
+        frameIndex = self._findClosestFrameIndex(frame)
+        self._setFrameIndex(frameIndex)
 
-            if closestFrame is None:
-                return
+    def _setFrameIndex(self, frameIndex):
+        """Set the `frameIndex`.
 
-            self._dataModel.currentFrame = Usd.TimeCode(closestFrame)
+        Args:
+            frameIndex (int): The new frame index value.
+        """
+        # Ensure the frameIndex exists, if not, return.
+        try:
+            frame = self._timeSamples[frameIndex]
+        except IndexError:
+            return
 
-        # XXX Why do we *always* update the widget, but only
-        # conditionally update?  All this function should do, after
-        # computing a new frame number, is emit a signal that the
-        # time has changed.  Future work.
-        self.setFrameField(self._dataModel.currentFrame.GetValue())
+        currentFrame = Usd.TimeCode(frame)
+        if self._dataModel.currentFrame != currentFrame:
+            self._dataModel.currentFrame = currentFrame
 
-        if (self._dataModel.currentFrame != frameAtStart) or forceUpdate:
+            self._ui.frameSlider.setValue(frameIndex)
+
             self._updateOnFrameChange()
+
+        self.setFrameField(self._dataModel.currentFrame.GetValue())
 
     def _updateGUIForFrameChange(self):
         """Called when the frame changes have finished.
@@ -3656,8 +3668,16 @@ class AppController(QtCore.QObject):
         
         numMetadataRows = (len(m) - 1) + numClipRows
 
+        # Variant selections that don't have a defined variant set will be 
+        # displayed as well to aid debugging. Collect them separately from
+        # the variant sets.
         variantSets = {}
+        setlessVariantSelections = {}
         if (isinstance(obj, Usd.Prim)):
+            # Get all variant selections as setless and remove the ones we find
+            # sets for.
+            setlessVariantSelections = obj.GetVariantSets().GetAllVariantSelections()
+
             variantSetNames = obj.GetVariantSets().GetNames()
             for variantSetName in variantSetNames:
                 variantSet = obj.GetVariantSet(variantSetName)
@@ -3672,8 +3692,11 @@ class AppController(QtCore.QObject):
                 indexToSelect = combo.findText(variantSelection)
                 combo.setCurrentIndex(indexToSelect)
                 variantSets[variantSetName] = combo
+                # Remove found variant set from setless.
+                setlessVariantSelections.pop(variantSetName, None)
 
-        tableWidget.setRowCount(numMetadataRows + len(variantSets))
+        tableWidget.setRowCount(numMetadataRows + len(variantSets) + 
+                                len(setlessVariantSelections))
 
         rowIndex = 0
         for key in sorted(m.keys()):
@@ -3711,6 +3734,21 @@ class AppController(QtCore.QObject):
             combo.currentIndexChanged.connect(
                 lambda i, combo=combo: combo.updateVariantSelection(
                     i, self._printTiming))
+            rowIndex += 1
+
+        # Add all the setless variant selections directly after the variant 
+        # combo boxes
+        for variantSetName, variantSelection in setlessVariantSelections.iteritems():
+            attrName = QtWidgets.QTableWidgetItem(str(variantSetName+ ' variant'))
+            tableWidget.setItem(rowIndex, 0, attrName)
+
+            valStr, ttStr = self._formatMetadataValueView(variantSelection)
+            # Italicized label to stand out when debugging a scene.
+            label = QtWidgets.QLabel('<i>' + valStr + '</i>')
+            label.setIndent(3)
+            label.setToolTip(ttStr)
+            tableWidget.setCellWidget(rowIndex, 1, label)
+
             rowIndex += 1
 
         tableWidget.resizeColumnToContents(0)
@@ -4076,29 +4114,6 @@ class AppController(QtCore.QObject):
             print "Error encountered while computing prim subtree HUD info: %s" % err
         finally:
             QtWidgets.QApplication.restoreOverrideCursor()
-
-
-    def _setupDebugMenu(self):
-        def __helper(debugType, menu):
-            return lambda: self._createTfDebugMenu(menu, '{0}_'.format(debugType))
-
-        for debugType in DebugTypes:
-            menu = self._ui.menuDebug.addMenu('{0} Flags'.format(debugType))
-            menu.aboutToShow.connect(__helper(debugType, menu))
-
-    def _createTfDebugMenu(self, menu, flagFilter):
-        def __createTriggerLambda(flagToSet, value):
-            return lambda: Tf.Debug.SetDebugSymbolsByName(flagToSet, value)
-
-        flags = [flag for flag in Tf.Debug.GetDebugSymbolNames() if flag.startswith(flagFilter)]
-        menu.clear()
-        for flag in flags:
-            action = menu.addAction(flag)
-            isEnabled = Tf.Debug.IsDebugSymbolNameEnabled(flag)
-            action.setCheckable(True)
-            action.setChecked(isEnabled)
-            action.setStatusTip(Tf.Debug.GetDebugSymbolDescription(flag))
-            action.triggered[bool].connect(__createTriggerLambda(flag, not isEnabled))
 
     def _updateNavigationMenu(self):
         """Make the Navigation menu items enabled or disabled depending on the
@@ -4620,6 +4635,9 @@ class AppController(QtCore.QObject):
         clearColorText = self._dataModel.viewSettings.clearColorText
         for action in self._clearColorActions:
             action.setChecked(str(action.text()) == clearColorText)
+
+    def getActiveCamera(self):
+        return self._dataModel.viewSettings.cameraPrim
 
     def _refreshCameraMenu(self):
         cameraPath = self._dataModel.viewSettings.cameraPath

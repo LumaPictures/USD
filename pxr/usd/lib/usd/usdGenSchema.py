@@ -133,6 +133,11 @@ def _GetLibPrefix(layer):
         _ProperCase(_GetLibName(layer)))
 
 
+def _GetLibTokens(layer):
+    """ Return dictionary of library-wide tokens defined in layer. """
+    return _GetLibMetadata(layer).get('libraryTokens', {})
+    
+
 def _GetTokensPrefix(layer):
     """ Return the tokensPrefix defined in layer."""
 
@@ -231,7 +236,7 @@ class AttrInfo(PropInfo):
         
         self.variability = str(sdfProp.variability).replace('Sdf.', 'Sdf')
         self.fallback = sdfProp.default
-        self.cppType = sdfProp.typeName.cppTypeName
+        self.typeName = sdfProp.typeName
 
         if sdfProp.typeName not in valueTypeNameToStr:
             raise _GetSchemaDefException(
@@ -244,7 +249,7 @@ class AttrInfo(PropInfo):
             self.usdType = "SdfValueTypeNames->%s" % (
                 valueTypeNameToStr[sdfProp.typeName])
         
-        self.details = [('C++ Type', self.cppType),
+        self.details = [('C++ Type', self.typeName.cppTypeName),
                         ('Usd Type', self.usdType),
                         ('Variability', self.variability),
                         ('Fallback Value', 'No Fallback'
@@ -622,7 +627,7 @@ def ParseUsd(usdFilePath):
             _GetLibPrefix(sdfLayer),
             _GetTokensPrefix(sdfLayer),
             _GetUseExportAPI(sdfLayer),
-            _GetLibMetadata(sdfLayer).get('libraryTokens', {}),
+            _GetLibTokens(sdfLayer),
             classes)
 
 
@@ -718,6 +723,7 @@ def GatherTokens(classes, libName, libTokens):
 
     # Add tokens from all classes to the token set
     for cls in classes:
+        # Add tokens from attributes to the token set
         for attr in cls.attrs.values():
 
             # Add Attribute Names to token set
@@ -726,7 +732,7 @@ def GatherTokens(classes, libName, libTokens):
 
             
             # Add default value (if token type) to token set
-            if attr.usdType == 'SdfValueTypeNames->Token' and attr.fallback:
+            if attr.typeName == Sdf.ValueTypeNames.Token and attr.fallback:
                 fallbackName = _CamelCase(attr.fallback)
                 desc = 'Default value for %s::Get%sAttr()' % \
                        (cls.cppClassName, _ProperCase(attr.name))
@@ -741,16 +747,33 @@ def GatherTokens(classes, libName, libTokens):
                            (cls.cppClassName, _ProperCase(attr.name))
                     cls.tokens.add(tokenId)
                     _AddToken(tokenDict, tokenId, val, desc)
-                    
-        # Add Relationship Names to token set
+
+        # Add tokens from relationships to the token set
         for rel in cls.rels.values():
             cls.tokens.add(rel.name)
             _AddToken(tokenDict, rel.name, rel.rawName, cls.cppClassName)
             
+        # Add schema tokens to token set
+        schemaTokens = cls.customData.get("schemaTokens", {})
+        for token, tokenInfo in schemaTokens.iteritems():
+            cls.tokens.add(token)
+            _AddToken(tokenDict, token, tokenInfo.get("value", token),
+                      _SanitizeDoc(tokenInfo.get("doc", 
+                          "Special token for the %s schema." % cls.cppClassName), ' '))
+
+        # Add property namespace prefix token for multiple-apply API
+        # schema to token set
+        if cls.propertyNamespacePrefix:
+            cls.tokens.add(cls.propertyNamespacePrefix)
+            _AddToken(tokenDict, cls.propertyNamespacePrefix,
+                      cls.propertyNamespacePrefix,
+                      "Property namespace prefix for the %s schema." % cls.cppClassName)
+
     # Add library-wide tokens to token set
     for token, tokenInfo in libTokens.iteritems():
-        _AddToken(tokenDict, token, tokenInfo.get("value", token), _SanitizeDoc(tokenInfo.get("doc",
-            "Special token for the %s library." % libName), ' '))
+        _AddToken(tokenDict, token, tokenInfo.get("value", token), 
+                  _SanitizeDoc(tokenInfo.get("doc",
+                      "Special token for the %s library." % libName), ' '))
 
     return sorted(tokenDict.values(), key=lambda token: token.id.lower())
 
@@ -803,7 +826,8 @@ def GenerateCode(templatePath, codeGenPath, tokenData, classes, validate,
             
     for cls in classes:
         hasTokenAttrs = any(
-            [cls.attrs[attr].usdType == 'SdfValueTypeNames->Token' for attr in cls.attrs])
+            [cls.attrs[attr].typeName == Sdf.ValueTypeNames.Token
+             for attr in cls.attrs])
 
         # header file
         clsHFilePath = os.path.join(codeGenPath, cls.GetHeaderFile())

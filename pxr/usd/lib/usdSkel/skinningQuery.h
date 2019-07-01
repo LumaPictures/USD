@@ -60,6 +60,7 @@ public:
     USDSKEL_API
     UsdSkelSkinningQuery(const UsdPrim& prim,
                          const VtTokenArray& skelJointOrder,
+                         const VtTokenArray& blendShapeOrder,
                          const UsdAttribute& jointIndices,
                          const UsdAttribute& jointWeights,
                          const UsdAttribute& geomBindTransform,
@@ -119,15 +120,37 @@ public:
         return _blendShapeTargets;
     }
 
-    /// Return the mapper for this target, if any.
-    /// This corresponds to the mapping of the joint order from
-    /// the ordering on the skeleton to the order of a custom
-    /// \em skel:joints relationships, set inside the hierarchy.
-    const UsdSkelAnimMapperRefPtr& GetMapper() const { return _mapper; }
+    /// Return a mapper for remapping from the joint order of the skeleton
+    /// to the local joint order of this prim, if any. Returns a null
+    /// pointer if the prim has no custom joint orer.
+    /// The mapper maps data from the order given by the \em joints order
+    /// on the Skeleton to the order given by the \em skel:joints property,
+    /// as optionally set through the UsdSkelBindingAPI.
+    const UsdSkelAnimMapperRefPtr& GetJointMapper() const {
+        return _jointMapper;
+    }
+
+    /// \deprecated Use GetJointMapper.
+    const UsdSkelAnimMapperRefPtr& GetMapper() const { return _jointMapper; }
+
+
+    /// Return the mapper for remapping blend shapes from the order of the
+    /// bound SkelAnimation to the local blend shape order of this prim.
+    /// Returns a null reference if the underlying prim has no blend shapes.
+    /// The mapper maps data from the order given by the \em blendShapes order
+    /// on the SkelAnimation to the order given by the \em skel:blendShapes
+    /// property, as set through the UsdSkelBindingAPI.
+    const UsdSkelAnimMapperRefPtr& GetBlendShapeMapper() const {
+        return _blendShapeMapper;
+    }
 
     /// Get the custom joint order for this skinning site, if any.
     USDSKEL_API
     bool GetJointOrder(VtTokenArray* jointOrder) const;
+
+    /// Get the blend shapes for this skinning site, if any.
+    USDSKEL_API
+    bool GetBlendShapeOrder(VtTokenArray* blendShapes) const;
 
     /// Populate \p times with the union of time samples for all properties
     /// that affect skinning, independent of joint transforms and any
@@ -177,6 +200,19 @@ public:
     template <typename Matrix4>
     USDSKEL_API
     bool ComputeSkinnedPoints(const VtArray<Matrix4>& xforms,
+                              VtVec3fArray* points,
+                              UsdTimeCode time=UsdTimeCode::Default()) const;
+
+    /// Compute skinned normals using linear blend skinning.
+    /// Both \p xforms and \p points are given in _skeleton space_,
+    /// using the joint order of the bound skeleton.
+    /// Joint influences and the (optional) binding transform are computed
+    /// at time \p time (which will typically be unvarying).
+    ///
+    /// \sa UsdSkelSkeletonQuery::ComputeSkinningTransforms
+    template <typename Matrix4>
+    USDSKEL_API
+    bool ComputeSkinnedNormals(const VtArray<Matrix4>& xforms,
                               VtVec3fArray* points,
                               UsdTimeCode time=UsdTimeCode::Default()) const;
 
@@ -233,8 +269,10 @@ private:
     UsdAttribute _geomBindTransformAttr;
     UsdAttribute _blendShapes;
     UsdRelationship _blendShapeTargets;
-    UsdSkelAnimMapperRefPtr _mapper;
+    UsdSkelAnimMapperRefPtr _jointMapper;
+    UsdSkelAnimMapperRefPtr _blendShapeMapper;
     boost::optional<VtTokenArray> _jointOrder;
+    boost::optional<VtTokenArray> _blendShapeOrder;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

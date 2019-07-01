@@ -26,23 +26,24 @@
 #include "pxr/usd/pcp/primIndex.h"
 #include "pxr/usd/pcp/arc.h"
 #include "pxr/usd/pcp/cache.h"
+#include "pxr/usd/pcp/dynamicFileFormatContext.h"
 #include "pxr/usd/pcp/composeSite.h"
 #include "pxr/usd/pcp/debugCodes.h"
 #include "pxr/usd/pcp/diagnostic.h"
+#include "pxr/usd/pcp/dynamicFileFormatInterface.h"
 #include "pxr/usd/pcp/instancing.h"
 #include "pxr/usd/pcp/layerStack.h"
 #include "pxr/usd/pcp/layerStackRegistry.h"
 #include "pxr/usd/pcp/node_Iterator.h"
 #include "pxr/usd/pcp/primIndex_Graph.h"
 #include "pxr/usd/pcp/primIndex_StackFrame.h"
-#include "pxr/usd/pcp/payloadContext.h"
-#include "pxr/usd/pcp/payloadDecorator.h"
 #include "pxr/usd/pcp/statistics.h"
 #include "pxr/usd/pcp/strengthOrdering.h"
 #include "pxr/usd/pcp/types.h"
 #include "pxr/usd/pcp/utils.h"
 #include "pxr/usd/ar/resolver.h"
 #include "pxr/usd/ar/resolverContextBinder.h"
+#include "pxr/usd/sdf/fileFormat.h"
 #include "pxr/usd/sdf/layer.h"
 #include "pxr/usd/sdf/layerUtils.h"
 #include "pxr/base/trace/trace.h"
@@ -362,7 +363,7 @@ PcpPrimIndexInputs::IsEquivalentTo(const PcpPrimIndexInputs& inputs) const
 ////////////////////////////////////////////////////////////////////////
 
 PcpNodeRef 
-PcpPrimIndexOutputs::Append(const PcpPrimIndexOutputs& childOutputs, 
+PcpPrimIndexOutputs::Append(PcpPrimIndexOutputs&& childOutputs, 
                             const PcpArc& arcToParent)
 {
     PcpNodeRef parent = arcToParent.parent;
@@ -372,13 +373,30 @@ PcpPrimIndexOutputs::Append(const PcpPrimIndexOutputs& childOutputs,
     if (childOutputs.primIndex.GetGraph()->HasPayloads()) {
         parent.GetOwningGraph()->SetHasPayloads(true);
     }
+    // Append the contents of the child's file format dependency object to
+    // ours.
+    dynamicFileFormatDependency.AppendDependencyData(
+        std::move(childOutputs.dynamicFileFormatDependency));
 
     allErrors.insert(
         allErrors.end(), 
         childOutputs.allErrors.begin(), childOutputs.allErrors.end());
 
-    includedDiscoveredPayload |= childOutputs.includedDiscoveredPayload;
-
+    if (childOutputs.payloadState == NoPayload) {
+        // Do nothing, keep our payloadState.
+    }
+    else if (payloadState == NoPayload) {
+        // Take the child's payloadState.
+        payloadState = childOutputs.payloadState;
+    }
+    else if (childOutputs.payloadState != payloadState) {
+        // Inconsistent payload state -- issue a warning.
+        TF_WARN("Inconsistent payload states for primIndex <%s> -- "
+                "parent=%d vs child=%d; taking parent=%d\n",
+                primIndex.GetPath().GetText(),
+                payloadState, childOutputs.payloadState, payloadState);
+    }
+                
     return newNode;
 }
 
@@ -391,7 +409,7 @@ Pcp_BuildPrimIndex(
     int ancestorRecursionDepth,
     bool evaluateImpliedSpecializes,
     bool evaluateVariants,
-    bool directNodeShouldContributeSpecs,
+    bool rootNodeShouldContributeSpecs,
     PcpPrimIndex_StackFrame *previousFrame,
     const PcpPrimIndexInputs& inputs,
     PcpPrimIndexOutputs* outputs);
@@ -408,7 +426,7 @@ static bool
 _HasSpecializesChild(const PcpNodeRef & parent)
 {
     TF_FOR_ALL(child, Pcp_GetChildrenRange(parent)) {
-        if (PcpIsSpecializesArc((*child).GetArcType()))
+        if (PcpIsSpecializeArc((*child).GetArcType()))
             return true;
     }
     return false;
@@ -423,7 +441,7 @@ _FindStartingNodeForImpliedSpecializes(const PcpNodeRef& node)
     PcpNodeRef specializesNode;
     for (PcpNodeRef n = node, e = n.GetRootNode(); n != e; 
          n = n.GetParentNode()) {
-        if (PcpIsSpecializesArc(n.GetArcType())) {
+        if (PcpIsSpecializeArc(n.GetArcType())) {
             specializesNode = n;
         }
     }
@@ -452,7 +470,7 @@ _HasClassBasedChild(const PcpNodeRef & parent)
 // One tricky aspect is that we need to distinguish nested class
 // hierarchies at different levels of namespace, aka ancestral classes.
 // Returning to the example above, consider if I -> ... -> C3 were all
-// nested as sibling children under a global class, G, with instance M:
+// nested as sibling children under a class, G, with instance M:
 //
 //          inherits
 // M ------------------------> G (depth=1)
@@ -703,14 +721,10 @@ struct Task {
             // arcs with order-independent results.
             switch (a.type) {
             case EvalNodePayload:
-                if (_hasPayloadDecorator) {
-                    // Payload decorators can depend on non-local information,
-                    // so we must process these in strength order.
-                    return PcpCompareNodeStrength(a.node, b.node) == 1;
-                } else {
-                    // Arbitrary order
-                    return a.node > b.node;
-                }
+                // Payloads can have dynamic file format arguments that depend 
+                // on non-local information, so we must process these in 
+                // strength order.
+                return PcpCompareNodeStrength(a.node, b.node) == 1;
             case EvalNodeVariantAuthored:
             case EvalNodeVariantFallback:
                 // Variant selections can depend on non-local information
@@ -735,11 +749,6 @@ struct Task {
                 return a.node > b.node;
             }
         }
-        // We can use a slightly cheaper ordering for payload arcs
-        // when there is no payload decorator.
-        const bool _hasPayloadDecorator;
-        PriorityOrder(bool hasPayloadDecorator)
-            : _hasPayloadDecorator(hasPayloadDecorator) {}
     };
 
     explicit Task(Type type, const PcpNodeRef& node = PcpNodeRef())
@@ -917,7 +926,7 @@ struct Pcp_PrimIndexer
                     // Check if we've violated the order.  We've violated it if
                     // the comparator says the new task is less than the
                     // previously last task.
-                    Task::PriorityOrder comp(inputs.payloadDecorator);
+                    Task::PriorityOrder comp;
                     tasksSorted =
                         !comp(tasks[tasks.size()-1], tasks[tasks.size()-2]);
                 }
@@ -933,7 +942,7 @@ struct Pcp_PrimIndexer
         Task task(Task::Type::None);
         if (!tasks.empty()) {
             if (!tasksSorted) {
-                Task::PriorityOrder comp(inputs.payloadDecorator);
+                Task::PriorityOrder comp;
                 std::sort(tasks.begin(), tasks.end(), comp);
                 tasks.erase(
                     std::unique(tasks.begin(), tasks.end()), tasks.end());
@@ -1113,7 +1122,7 @@ struct Pcp_PrimIndexer
                       });
 
         // Sort and merge.
-        Task::PriorityOrder comp(inputs.payloadDecorator);
+        Task::PriorityOrder comp;
         std::sort(tasks.begin(), nonAuthVariantsEnd, comp);
         std::inplace_merge(
             tasks.begin(), nonAuthVariantsEnd, authVariantsEnd, comp);
@@ -1515,9 +1524,7 @@ _AddArc(
         // Ancestral opinions are those above the source site in namespace.
         // We only need to account for them if the site is not a root prim
         // (since root prims have no ancestors with scene description, only
-        // the pseudo-root). This is why we do not need to handle ancestral
-        // opinions for references, payloads, or global classes: they are
-        // all restricted to root prims.
+        // the pseudo-root).
         //
         // Account for ancestral opinions by building out the graph for
         // that site and incorporating its root node as the new child.
@@ -1566,7 +1573,7 @@ _AddArc(
                             &childOutputs );
 
         // Combine the child output with our current output.
-        newNode = indexer->outputs->Append(childOutputs, newArc);
+        newNode = indexer->outputs->Append(std::move(childOutputs), newArc);
         PCP_INDEXING_UPDATE(
             indexer, newNode, 
             "Added subtree for site %s to graph",
@@ -1577,7 +1584,7 @@ _AddArc(
     // at the new node can be culled. This doesn't have to recurse down
     // the new subtree; instead, it just needs to check the new node only. 
     // This is because computing the source prim index above will have culled
-    // everything it can *except* for the direct node. 
+    // everything it can *except* for the subtree's root node. 
     if (indexer->inputs.cull) {
         if (_NodeCanBeCulled(newNode, indexer->rootSite)) {
             newNode.SetCulled(true);
@@ -1698,11 +1705,6 @@ _AddArc(
 ////////////////////////////////////////////////////////////////////////
 // References
 
-// Declare helper function for creating PcpPayloadContext, 
-// implemented in payloadContext.cpp
-PcpPayloadContext 
-Pcp_CreatePayloadContext(const PcpNodeRef&, PcpPrimIndex_StackFrame*);
-
 static SdfPath
 _GetDefaultPrimPath(SdfLayerHandle const &layer)
 {
@@ -1711,30 +1713,56 @@ _GetDefaultPrimPath(SdfLayerHandle const &layer)
         SdfPath::AbsoluteRootPath().AppendChild(target) : SdfPath();
 }
 
-// Decorates a payload for payload arcs
+// Declare helper function for creating PcpDynamicFileFormatContext, 
+// implemented in dynamicFileFormatContext.cpp
+PcpDynamicFileFormatContext
+Pcp_CreateDynamicFileFormatContext(
+    const PcpNodeRef &, PcpPrimIndex_StackFrame *, TfToken::Set *);
+
+// Generates dynamic file format arguments for a payload's asset path if the 
+// asset's file format supports it.
 static void
-_ApplyPayloadDecorator(const PcpNodeRef &node,
-                       const Pcp_PrimIndexer &indexer,
-                       const SdfPayload& payload,
-                       SdfLayer::FileFormatArguments *args)
+_ComposeFieldsForFileFormatArguments(const PcpNodeRef &node,
+                                     const Pcp_PrimIndexer &indexer,
+                                     const SdfPayload &payload,
+                                     SdfLayer::FileFormatArguments *args)
 {
-    if (indexer.inputs.payloadDecorator) {
-        PcpPayloadContext payloadCtx = Pcp_CreatePayloadContext(
-            node, indexer.previousFrame);
-        indexer.inputs.payloadDecorator->
-            DecoratePayload(indexer.rootSite.path, payload, payloadCtx, args);
+    SdfFileFormatConstPtr fileFormat = SdfFileFormat::FindByExtension(
+        SdfFileFormat::GetFileExtension(payload.GetAssetPath()),
+        indexer.inputs.fileFormatTarget);
+    if (!fileFormat) {
+        return;
+    }
+    if (const PcpDynamicFileFormatInterface *dynamicFileFormat = 
+            dynamic_cast<const PcpDynamicFileFormatInterface *>(
+                get_pointer(fileFormat))) {
+        // Create the context for composing the prim fields from the current 
+        // state of the index. This context will also populate a list of the
+        // fields that it composed for dependency tracking
+        TfToken::Set composedFieldNames;
+        PcpDynamicFileFormatContext context = Pcp_CreateDynamicFileFormatContext(
+            node, indexer.previousFrame, &composedFieldNames);
+        // Ask the file format to generate dynamic file format arguments for 
+        // the asset in this context.
+        VtValue dependencyContextData;
+        dynamicFileFormat->ComposeFieldsForFileFormatArguments(
+            payload.GetAssetPath(), context, args, &dependencyContextData);
+
+        // Add this dependency context to dynamic file format dependency object.
+        indexer.outputs->dynamicFileFormatDependency.AddDependencyContext(
+            dynamicFileFormat, std::move(dependencyContextData), 
+            std::move(composedFieldNames));
     }
 }
 
-// Define a no op payload decorate function for SdfReference so that 
-// _EvalRefOrPayloadArcs can compile for references.
-static void
-_ApplyPayloadDecorator(const PcpNodeRef &, 
-                       const Pcp_PrimIndexer &,
-                       const SdfReference&,
-                       SdfLayer::FileFormatArguments *)
+static bool
+_ComposeFieldsForFileFormatArguments(const PcpNodeRef &node,
+                                     const Pcp_PrimIndexer &indexer,
+                                     const SdfReference &ref,
+                                     SdfLayer::FileFormatArguments *args)
 {
-    // Do nothing
+    // References don't support dynamic file format arguments.
+    return false;
 }
 
 // Reference and payload arcs are composed in essentially the same way. 
@@ -1826,11 +1854,13 @@ _EvalRefOrPayloadArcs(PcpNodeRef node,
             }
 
             SdfLayer::FileFormatArguments args;
-            // Apply payload decorators (payloads only)
-            _ApplyPayloadDecorator(node, *indexer, refOrPayload, &args);
-            Pcp_GetArgumentsForTargetSchema(
+            // Compose any file format arguments that may come from the asset
+            // file format if it's dynamic.
+            _ComposeFieldsForFileFormatArguments(
+                node, *indexer, refOrPayload, &args);
+            Pcp_GetArgumentsForFileFormatTarget(
                 refOrPayload.GetAssetPath(), 
-                indexer->inputs.targetSchema, &args);
+                indexer->inputs.fileFormatTarget, &args);
 
             TfErrorMark m;
 
@@ -2000,21 +2030,31 @@ _EvalNodePayloads(
         return;
     }
     SdfPath const &path = indexer->rootSite.path;
-    tbb::spin_rw_mutex::scoped_lock lock;
-    auto *mutex = indexer->inputs.includedPayloadsMutex;
-    if (mutex) { lock.acquire(*mutex, /*write=*/false); }
-    bool inIncludeSet = includedPayloads->count(path);
-    if (mutex) { lock.release(); }
-    if (!inIncludeSet) {
-        auto const &pred = indexer->inputs.includePayloadPredicate;
-        if (pred && pred(path)) {
-            indexer->outputs->includedDiscoveredPayload = true;
-        } else {
-            PCP_INDEXING_MSG(indexer, node,
-                "Payload <%s> was not included, skipping",
-                path.GetText());
-            return;
-        }
+
+    // If there's a payload predicate, we invoke that to decide whether or not
+    // this payload should be included.
+    bool composePayload = false;
+    if (auto const &pred = indexer->inputs.includePayloadPredicate) {
+        composePayload = pred(path);
+        indexer->outputs->payloadState = composePayload ?
+            PcpPrimIndexOutputs::IncludedByPredicate : 
+            PcpPrimIndexOutputs::ExcludedByPredicate;
+    }
+    else {
+        tbb::spin_rw_mutex::scoped_lock lock;
+        auto *mutex = indexer->inputs.includedPayloadsMutex;
+        if (mutex) { lock.acquire(*mutex, /*write=*/false); }
+        composePayload = includedPayloads->count(path);
+        indexer->outputs->payloadState = composePayload ?
+            PcpPrimIndexOutputs::IncludedByIncludeSet : 
+            PcpPrimIndexOutputs::ExcludedByIncludeSet;
+    }
+     
+    if (!composePayload) {
+        PCP_INDEXING_MSG(indexer, node,
+                         "Payload <%s> was not included, skipping",
+                         path.GetText());
+        return;
     }
 
     _EvalRefOrPayloadArcs<SdfPayload, PcpArcTypePayload>(
@@ -2164,10 +2204,8 @@ _EvalNodeRelocations(
             // add. See TrickyMultipleRelocations for an example.
         case PcpArcTypeReference:
         case PcpArcTypePayload:
-        case PcpArcTypeLocalInherit:
-        case PcpArcTypeGlobalInherit:
-        case PcpArcTypeLocalSpecializes:
-        case PcpArcTypeGlobalSpecializes:
+        case PcpArcTypeInherit:
+        case PcpArcTypeSpecialize:
             // Ancestral opinions at a relocation target across a reference
             // or inherit are silently ignored. See TrickyRelocationSquatter
             // for an example.
@@ -2474,10 +2512,10 @@ _AddClassBasedArc(
         // to inherit opinions along this inherit arc.
         //
         // For example, this could be an inherit that reaches outside
-        // a referenced root to another non-global class, which cannot
-        // be mapped across that reference.  Or it could be a global
+        // a referenced root to another subroot class, which cannot
+        // be mapped across that reference.  Or it could be a root class
         // inherit in the context of a variant: variants cannot contain
-        // opinions about global classes.
+        // opinions about root classes.
         //
         // This is not an error; it just means the class arc is not
         // meaningful from this site.
@@ -2548,10 +2586,9 @@ _AddClassBasedArc(
     // to the same site.
     const bool skipDuplicateNodes = shouldContributeSpecs;
 
-    // Only local classes need to compute ancestral opinions, since
-    // global classes are root nodes.
+    // Only subroot prim classes need to compute ancestral opinions.
     const bool includeAncestralOpinions =
-        PcpIsLocalClassBasedArc(arcType) && shouldContributeSpecs;
+        shouldContributeSpecs && !inheritPath.IsRootPrimPath();
 
     PcpNodeRef newNode =
         _AddArc( arcType, parent, origin,
@@ -2572,14 +2609,10 @@ _AddClassBasedArcs(
     PcpPrimIndex* index,
     const PcpNodeRef& node,
     const SdfPathVector& classArcs,
-    PcpArcType globalArcType,
-    PcpArcType localArcType,
+    PcpArcType arcType,
     Pcp_PrimIndexer* indexer)
 {
     for (size_t arcNum=0; arcNum < classArcs.size(); ++arcNum) {
-        PcpArcType arcType =
-            classArcs[arcNum].IsRootPrimPath() ? globalArcType : localArcType;
-
         PCP_INDEXING_MSG(indexer, node, "Found %s to <%s>", 
             TfEnum::GetDisplayName(arcType).c_str(),
             classArcs[arcNum].GetText());
@@ -2888,7 +2921,7 @@ _EvalImpliedClasses(
     // We will use it to map ("transfer") the class to the parent.
     // The mapping to the parent may have a restricted domain, such as
     // for a reference arc, which only maps the reference root prim.
-    // To map global classes across such a mapping, we need to add
+    // To map root classes across such a mapping, we need to add
     // an identity (/->/) entry.  This is not a violation of reference
     // namespace encapsulation: classes deliberately work this way.
     PcpMapExpression transferFunc = node.GetMapToParent().AddRootIdentity();
@@ -2924,7 +2957,7 @@ _EvalNodeInherits(
     // Add inherits arcs.
     _AddClassBasedArcs(
         index, node, inhArcs,
-        PcpArcTypeGlobalInherit, PcpArcTypeLocalInherit,
+        PcpArcTypeInherit,
         indexer);
 }
 
@@ -2953,7 +2986,7 @@ _EvalNodeSpecializes(
     // Add specializes arcs.
     _AddClassBasedArcs(
         index, node, specArcs,
-        PcpArcTypeGlobalSpecializes, PcpArcTypeLocalSpecializes,
+        PcpArcTypeSpecialize,
         indexer);
 }
 
@@ -2964,7 +2997,7 @@ static bool
 _IsPropagatedSpecializesNode(
     const PcpNodeRef& node)
 {
-    return (PcpIsSpecializesArc(node.GetArcType()) && 
+    return (PcpIsSpecializeArc(node.GetArcType()) && 
             node.GetParentNode() == node.GetRootNode() && 
             node.GetSite() == node.GetOriginNode().GetSite());
 }
@@ -3004,7 +3037,7 @@ _PropagateNodeToParent(
             mapToParent, srcNode.GetDepthBelowIntroduction());
 
         if (!newNode) {
-            // Only propagate a node if it's a direct arc or if it's an
+            // Only propagate a node if it's a non-implied arc or if it's an
             // implied arc whose origin is outside the subgraph we're 
             // propagating. If this is an implied arc whose origin is
             // within the subgraph, it will be handled when we evaluate
@@ -3080,7 +3113,7 @@ _PropagateSpecializesTreeToRoot(
     }
 
     for (PcpNodeRef childNode : Pcp_GetChildren(srcNode)) {
-        if (!PcpIsSpecializesArc(childNode.GetArcType())) {
+        if (!PcpIsSpecializeArc(childNode.GetArcType())) {
             _PropagateSpecializesTreeToRoot(
                 index, newNode.first, childNode, newNode.first, 
                 childNode.GetMapToParent(), srcTreeRoot, indexer);
@@ -3108,7 +3141,7 @@ _FindSpecializesToPropagateToRoot(
         return;
     }
 
-    if (PcpIsSpecializesArc(node.GetArcType())) {
+    if (PcpIsSpecializeArc(node.GetArcType())) {
         PCP_INDEXING_MSG(
             indexer, node, node.GetRootNode(),
             "Propagating specializes arc %s to root", 
@@ -3195,7 +3228,7 @@ _FindArcsToPropagateToOrigin(
     const PcpNodeRef& node,
     Pcp_PrimIndexer* indexer)
 {
-    TF_VERIFY(PcpIsSpecializesArc(node.GetArcType()));
+    TF_VERIFY(PcpIsSpecializeArc(node.GetArcType()));
 
     for (PcpNodeRef childNode : Pcp_GetChildren(node)) {
         PCP_INDEXING_MSG(
@@ -4105,14 +4138,14 @@ _NodeCanBeCulled(
     // This could happen if this node was culled ancestrally.
     if (node.IsCulled()) {
 #ifdef PCP_DIAGNOSTIC_VALIDATION
-        TF_VERIFY(!node.IsDirect());
+        TF_VERIFY(!node.IsRootNode());
 #endif // PCP_DIAGNOSTIC_VALIDATION
         return true;
     }
 
     // The root node of a prim index is never culled. If needed, this
     // node will be culled when attached to another prim index in _AddArc.
-    if (node.IsDirect()) {
+    if (node.IsRootNode()) {
         return false;
     }
 
@@ -4143,24 +4176,27 @@ _NodeCanBeCulled(
     // CsdPrim::GetBases wants to return the path of all prims in the
     // composed scene from which this prim inherits opinions. To ensure
     // Csd has all the info it needs for this, Pcp has to avoid culling any
-    // local inherit nodes in the root layer stack. To see why, consider:
+    // subroot prim inherit nodes in the root layer stack. To see why, consider:
     //
     // root layer stack      ref layer stack
-    //                       /GlobalClass <--+ (global inh)
+    //                       /GlobalClass <--+ 
+    //                                       | (root prim inh) 
     // /Model_1  (ref) ----> /Model    ------+
     //                        + SymArm <-+
-    //                        + LArm   --+ (local inh)
+    //                                   | (subroot prim inh)
+    //                        + LArm   --+
     //
     // The prim index for /Model_1/LArm would normally have the inherit nodes 
     // for /GlobalClass/LArm and /Model_1/SymArm culled, as there are no specs
-    // for either in the root layer stack. The nature of global classes implies
+    // for either in the root layer stack. The nature of root classes implies
     // that, if no specs for /GlobalClass exist in the root layer, there is
     // no /GlobalClass in the composed scene. So, we don't have to protect
-    // global inherits from being culled. However, because of referencing, 
-    // the local inherit /Model_1/SymArm *does* exist in the composed scene.
+    // root prim inherits from being culled. However, because of referencing, 
+    // the subroot inherit /Model_1/SymArm *does* exist in the composed scene.
     // So, we can't cull that node -- GetBases needs it.
-    if (node.GetArcType() == PcpArcTypeLocalInherit &&
-        node.GetLayerStack() == rootSite.layerStack) {
+    if (node.GetArcType() == PcpArcTypeInherit &&
+        node.GetLayerStack() == rootSite.layerStack &&
+        !node.GetPathAtIntroduction().IsRootPrimPath()) {
         return false;
     }
 
@@ -4193,7 +4229,7 @@ _CullSubtreesWithNoOpinions(
         // for specializes arcs, so when we cull we need to ensure we do so
         // in both places consistently. For simplicity, we're going to skip
         // this for now and not cull beneath any specializes arcs.
-        if (PcpIsSpecializesArc(child->GetArcType())) {
+        if (PcpIsSpecializeArc(child->GetArcType())) {
             continue;
         }
 
@@ -4236,7 +4272,7 @@ _BuildInitialPrimIndexFromAncestor(
     int ancestorRecursionDepth,
     PcpPrimIndex_StackFrame *previousFrame,
     bool evaluateImpliedSpecializes,
-    bool directNodeShouldContributeSpecs,
+    bool rootNodeShouldContributeSpecs,
     const PcpPrimIndexInputs& inputs,
     PcpPrimIndexOutputs* outputs)
 {
@@ -4282,7 +4318,7 @@ _BuildInitialPrimIndexFromAncestor(
                            evaluateImpliedSpecializes,
                            /* Always pick up ancestral opinions from variants
                               evaluateVariants = */ true,
-                           /* directNodeShouldContributeSpecs = */ true,
+                           /* rootNodeShouldContributeSpecs = */ true,
                            previousFrame, inputs, outputs);
 
         ancestorIsInstanceable = 
@@ -4321,10 +4357,10 @@ _BuildInitialPrimIndexFromAncestor(
     }
 
     // Force the root node to inert if the caller has specified that the
-    // direct root node should not contribute specs. Note that the node
+    // root node should not contribute specs. Note that the node
     // may already be set to inert when applying instancing restrictions
     // above.
-    if (!directNodeShouldContributeSpecs) {
+    if (!rootNodeShouldContributeSpecs) {
         rootNode.SetInert(true);
     }
 
@@ -4341,7 +4377,7 @@ Pcp_BuildPrimIndex(
     int ancestorRecursionDepth,
     bool evaluateImpliedSpecializes,
     bool evaluateVariants,
-    bool directNodeShouldContributeSpecs,
+    bool rootNodeShouldContributeSpecs,
     PcpPrimIndex_StackFrame *previousFrame,
     const PcpPrimIndexInputs& inputs,
     PcpPrimIndexOutputs* outputs )
@@ -4380,7 +4416,7 @@ Pcp_BuildPrimIndex(
 
         PcpNodeRef node = outputs->primIndex.GetGraph()->GetRootNode();
         node.SetHasSpecs(PcpComposeSiteHasPrimSpecs(node));
-        node.SetInert(!directNodeShouldContributeSpecs);
+        node.SetInert(!rootNodeShouldContributeSpecs);
     } else {
         // Start by building and cloning the namespace parent's index.
         // This is to account for ancestral opinions: references and
@@ -4389,7 +4425,7 @@ Pcp_BuildPrimIndex(
         _BuildInitialPrimIndexFromAncestor(
             site, rootSite, ancestorRecursionDepth, previousFrame,
             evaluateImpliedSpecializes,
-            directNodeShouldContributeSpecs,
+            rootNodeShouldContributeSpecs,
             inputs, outputs);
     }
 
@@ -4479,7 +4515,7 @@ PcpComputePrimIndex(
                        /* ancestorRecursionDepth = */ 0,
                        /* evaluateImpliedSpecializes = */ true,
                        /* evaluateVariants = */ true,
-                       /* directNodeShouldContributeSpecs = */ true,
+                       /* rootNodeShouldContributeSpecs = */ true,
                        /* previousFrame = */ NULL,
                        inputs, outputs);
 

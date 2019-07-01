@@ -52,12 +52,10 @@ PXR_NAMESPACE_OPEN_SCOPE
     (oitIndexBufferBar)         \
     (oitUniformBar)             \
     (oitRenderPassState)        \
-    (oitHeight)                 \
-    (oitWidth)                  \
-    (oitSamples)                \
+    (oitBufferSize)             \
+    (oitScreenSize)             \
     (renderPassState)           \
     (renderIndexVersion)        \
-    (renderTags)                \
     (selection)                 \
     (selectionState)            \
     (selectionOffsets)          \
@@ -76,12 +74,17 @@ TF_DECLARE_PUBLIC_TOKENS(HdxTokens, HDX_API, HDX_TOKENS);
                                 \
     (oitRenderTask)             \
     (oitRenderSetupTask)        \
+    (oitResolveTask)            \
     (renderTask)                \
     (renderSetupTask)           \
     (simpleLightTask)           \
     (shadowTask)                \
     (drawTargetTask)            \
-    (drawTargetResolveTask)
+    (drawTargetResolveTask)     \
+    (pickTask)                  \
+    (pickFromRenderBufferTask)  \
+    (colorizeTask)              \
+    (colorizeSelectionTask)
 
 TF_DECLARE_PUBLIC_TOKENS(HdxPrimitiveTokens, HDX_API, HDX_PRIMITIVE_TOKENS);
 

@@ -27,7 +27,6 @@
 #include "pxr/pxr.h"
 
 #include "pxr/imaging/hdx/api.h"
-#include "pxr/imaging/hdx/intersector.h"
 #include "pxr/imaging/hdx/selectionTracker.h"
 #include "pxr/imaging/hdx/renderSetupTask.h"
 #include "pxr/imaging/hdx/shadowTask.h"
@@ -49,29 +48,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 // XXX: This API is transitional. At the least, render/picking/selection
 // APIs should be decoupled.
-
-/// Intersection mode tokens, mapped to HdxIntersector API.
-/// Note: The "nearest*" hitmodes may be considerably more efficient.
-/// - "nearestToCamera" returns the single hit point closest (by depth) to the
-///                     camera
-/// - "nearestToCenter" returns the single hit point nearest to the center of
-///                     the selection region; note that this should be faster
-///                     than nearestToCamera, as it will sample outward from the
-///                     center, and stop as soon as it finds any hit, while
-///                     nearestToCamera will check ALL pixels in the selection
-///                     region, and return the hit that has the lowest z
-/// - "unique"  returns the set of unique hit prims, keeping only the nearest
-///             depth per prim.
-/// - "all"     returns all hit points, possibly including multiple hits per
-///             prim.
-#define HDX_INTERSECTION_MODE_TOKENS           \
-    (nearestToCamera)                          \
-    (nearestToCenter)                          \
-    (unique)                                   \
-    (all)
-
-TF_DECLARE_PUBLIC_TOKENS(HdxIntersectionModeTokens, HDX_API, \
-    HDX_INTERSECTION_MODE_TOKENS);
 
 class HdRenderBuffer;
 
@@ -95,12 +71,15 @@ public:
     /// Execution API
 
     /// Obtain the set of tasks managed by the task controller,
-    /// for execution. The tasks returned will be different based on
-    /// current renderer state.
-    ///
-    /// A vector of zero length indicates error.
+    /// for image generation. The tasks returned will be different
+    /// based on current renderer state.
     HDX_API
-    HdTaskSharedPtrVector const GetTasks() const;
+    HdTaskSharedPtrVector const GetRenderingTasks() const;
+
+    /// Obtain the set of tasks managed by the task controller,
+    /// for picking.
+    HDX_API
+    HdTaskSharedPtrVector const GetPickingTasks() const;
 
     /// -------------------------------------------------------
     /// Rendering API
@@ -109,12 +88,19 @@ public:
     HDX_API
     void SetCollection(HdRprimCollection const& collection);
 
-    /// Set the render params. Note: params.camera and params.viewport will
-    /// be overwritten, since they come from SetCameraState.
+    /// Set the render params. Note: params.viewport will
+    /// be overwritten, since it comes from SetRenderViewport.
     /// XXX: For GL renders, HdxTaskController relies on the caller to
     /// correctly set GL_SAMPLE_ALPHA_TO_COVERAGE.
     HDX_API
     void SetRenderParams(HdxRenderTaskParams const& params);
+
+    /// Set the "view" opinion of the scenes render tags.
+    /// The opinion is the base opinion for the entire scene.
+    /// Individual tasks (such as the shadow task) may
+    /// have a stronger opinion and override this opinion
+    HDX_API
+    void SetRenderTags(TfTokenVector const& renderTags);
 
     /// -------------------------------------------------------
     /// AOV API
@@ -151,42 +137,27 @@ public:
     void SetLightingState(GlfSimpleLightingContextPtr const& src);
 
     /// -------------------------------------------------------
-    /// Camera API
+    /// Camera and Framing API
     
-    /// Set the parameters for the viewer default camera.
+    /// Set the viewport param on tasks.
     HDX_API
-    void SetCameraMatrices(GfMatrix4d const& viewMatrix,
-                           GfMatrix4d const& projectionMatrix);
+    void SetRenderViewport(GfVec4d const& viewport);
 
-    /// Set the camera viewport.
+    /// -- Scene camera --
+    /// Set the camera param on tasks to a USD camera path.
     HDX_API
-    void SetCameraViewport(GfVec4d const& viewport);
-
-    /// Set the camera clip planes.
+    void SetCameraPath(SdfPath const& id);
+    
+    /// -- Free camera --
+    /// Set the view and projection matrices for the free camera.
+    /// Note: The projection matrix must be pre-adjusted for the window policy.
     HDX_API
-    void SetCameraClipPlanes(std::vector<GfVec4d> const& clipPlanes);
-
-    /// Set the camera window policy.
+    void SetFreeCameraMatrices(GfMatrix4d const& viewMatrix,
+                               GfMatrix4d const& projectionMatrix);
+    /// Set the free camera clip planes.
+    /// (Note: Scene cameras use clipping planes authored on the camera prim)
     HDX_API
-    void SetCameraWindowPolicy(CameraUtilConformWindowPolicy windowPolicy);
-
-    /// -------------------------------------------------------
-    /// Picking API
-
-    /// Set pick target resolution (if applicable).
-    /// XXX: Is there a better place for this to live?
-    HDX_API
-    void SetPickResolution(unsigned int size);
-
-    /// Test for intersection.
-    /// XXX: This should be changed to not take an HdEngine*.
-    HDX_API
-    bool TestIntersection(
-            HdEngine* engine,
-            HdRprimCollection const& collection,
-            HdxIntersector::Params const& qparams,
-            TfToken const& intersectionMode,
-            HdxIntersector::HitVector *allHits);
+    void SetFreeCameraClipPlanes(std::vector<GfVec4d> const& clipPlanes);
 
     /// -------------------------------------------------------
     /// Selection API
@@ -207,7 +178,7 @@ public:
     void SetEnableShadows(bool enable);
 
     /// Set the shadow params. Note: params.camera will
-    /// be overwritten, since it comes from SetCameraState.
+    /// be overwritten, since it comes from SetCameraPath/SetCameraState.
     HDX_API
     void SetShadowParams(HdxShadowTaskParams const& params);
 
@@ -235,8 +206,6 @@ private:
     HdRenderIndex *_index;
     SdfPath const _controllerId;
 
-    std::unique_ptr<HdxIntersector> _intersector;
-
     // Create taskController objects. Since the camera is a parameter
     // to the tasks, _CreateCamera() should be called first.
     void _CreateRenderGraph();
@@ -250,6 +219,10 @@ private:
     void _CreateColorizeTask();
     void _CreateColorizeSelectionTask();
     void _CreateColorCorrectionTask();
+    void _CreatePickTask();
+    void _CreatePickFromRenderBufferTask();
+    
+    void _SetCameraParamForTasks(SdfPath const& id);
 
     void _SetBlendStateForMaterialTag(TfToken const& materialTag,
                                       HdxRenderTaskParams *renderParams) const;
@@ -304,10 +277,13 @@ private:
 
         // HdSceneDelegate interface
         virtual VtValue Get(SdfPath const& id, TfToken const& key);
+        virtual VtValue GetCameraParamValue(SdfPath const& id, 
+                                            TfToken const& key);
         virtual bool IsEnabled(TfToken const& option) const;
-        virtual std::vector<GfVec4d> GetClipPlanes(SdfPath const& cameraId);
         virtual HdRenderBufferDescriptor
             GetRenderBufferDescriptor(SdfPath const& id);
+        virtual TfTokenVector GetTaskRenderTags(SdfPath const& taskId);
+
 
     private:
         typedef TfHashMap<TfToken, VtValue, TfToken::HashFunctor> _ValueCache;
@@ -325,10 +301,14 @@ private:
     SdfPath _colorizeSelectionTaskId;
     SdfPath _colorizeTaskId;
     SdfPath _colorCorrectionTaskId;
+    SdfPath _pickTaskId;
+    SdfPath _pickFromRenderBufferTaskId;
 
-    // Generated cameras
-    SdfPath _cameraId;
-
+    // Generated camera (for the default/free cam)
+    SdfPath _freeCamId;
+    // Current active camera
+    SdfPath _activeCameraId;
+    
     // Generated lights
     SdfPathVector _lightIds;
 

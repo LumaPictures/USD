@@ -58,6 +58,7 @@ UsdSkelSkinningQuery::UsdSkelSkinningQuery()
 UsdSkelSkinningQuery::UsdSkelSkinningQuery(
     const UsdPrim& prim,
     const VtTokenArray& skelJointOrder,
+    const VtTokenArray& animBlendShapeOrder,
     const UsdAttribute& jointIndices,
     const UsdAttribute& jointWeights,
     const UsdAttribute& geomBindTransform,
@@ -72,11 +73,16 @@ UsdSkelSkinningQuery::UsdSkelSkinningQuery(
       _blendShapes(blendShapes),
       _blendShapeTargets(blendShapeTargets)
 {
-    VtTokenArray jointOrder;
-    if (joints && joints.Get(&jointOrder)) {
-        _jointOrder = jointOrder;
-        _mapper =
-            std::make_shared<UsdSkelAnimMapper>(skelJointOrder, jointOrder);
+    VtTokenArray order;
+    if (joints && joints.Get(&order)) {
+        _jointOrder = order;
+        _jointMapper =
+            std::make_shared<UsdSkelAnimMapper>(skelJointOrder, order);
+    }
+    if (blendShapes && blendShapes.Get(&order)) {
+        _blendShapeOrder = order;
+        _blendShapeMapper =
+            std::make_shared<UsdSkelAnimMapper>(animBlendShapeOrder, order);
     }
 
     _InitializeJointInfluenceBindings(jointIndices, jointWeights);
@@ -146,7 +152,7 @@ UsdSkelSkinningQuery::_InitializeBlendShapeBindings(
     const UsdAttribute& blendShapes,
     const UsdRelationship& blendShapeTargets)
 {
-    if (blendShapes && blendShapeTargets) {
+    if (blendShapes && blendShapeTargets && _blendShapeMapper) {
         _flags |= UsdSkel_HasBlendShapes;
     }
 }
@@ -183,6 +189,21 @@ UsdSkelSkinningQuery::GetJointOrder(VtTokenArray* jointOrder) const
         }
     } else {
         TF_CODING_ERROR("'jointOrder' pointer is null.");
+    }
+    return false;
+}
+
+
+bool
+UsdSkelSkinningQuery::GetBlendShapeOrder(VtTokenArray* blendShapeOrder) const
+{
+    if (blendShapeOrder) {
+        if (_blendShapeOrder) {
+            *blendShapeOrder = *_blendShapeOrder;
+            return true;
+        }
+    } else {
+        TF_CODING_ERROR("'blendShapeOrder' pointer is null.");
     }
     return false;
 }
@@ -324,8 +345,8 @@ UsdSkelSkinningQuery::ComputeSkinnedPoints(const VtArray<Matrix4>& xforms,
         // a mapper that should be used to reorder transforms
         // (skel order -> binding order)
         VtArray<Matrix4> orderedXforms(xforms);
-        if (_mapper) {
-            if (!_mapper->RemapTransforms(xforms, &orderedXforms)) {
+        if (_jointMapper) {
+            if (!_jointMapper->RemapTransforms(xforms, &orderedXforms)) {
                 return false;
             }
         }
@@ -346,6 +367,86 @@ UsdSkelSkinningQuery::ComputeSkinnedPoints(const VtArray<GfMatrix4d>&,
 
 template USDSKEL_API bool
 UsdSkelSkinningQuery::ComputeSkinnedPoints(const VtArray<GfMatrix4f>&,
+                                           VtVec3fArray*, UsdTimeCode) const;
+
+
+template <class Matrix4>
+struct _Matrix3FromMatrix4 {};
+
+template <>
+struct _Matrix3FromMatrix4<GfMatrix4d>
+{
+    using value_type = GfMatrix3d;
+};
+    
+template <>
+struct _Matrix3FromMatrix4<GfMatrix4f>
+{
+    using value_type = GfMatrix3f;
+};
+
+
+template <class Matrix4>
+bool
+UsdSkelSkinningQuery::ComputeSkinnedNormals(const VtArray<Matrix4>& xforms,
+                                            VtVec3fArray* normals,
+                                            UsdTimeCode time) const
+{
+    TRACE_FUNCTION();
+
+    using Matrix3 = typename _Matrix3FromMatrix4<Matrix4>::value_type;
+
+    if (!normals) {
+        TF_CODING_ERROR("'normals' pointer is null.");
+        return false;
+    }
+
+    VtIntArray jointIndices;
+    VtFloatArray jointWeights;
+    if (ComputeVaryingJointInfluences(normals->size(), &jointIndices,
+                                      &jointWeights, time)) {
+
+        // If the binding site has a custom joint ordering, the query will have
+        // a mapper that should be used to reorder transforms
+        // (skel order -> binding order)
+        VtArray<Matrix4> orderedXforms(xforms);
+        if (_jointMapper) {
+            if (!_jointMapper->RemapTransforms(xforms, &orderedXforms)) {
+                return false;
+            }
+        }
+
+        // Since we are transforming normals, we want the *inverse transpose*
+        // of the rotation matrices extracted from the skinning transforms.
+        VtArray<Matrix3> invTransposeXforms(orderedXforms.size());
+        {
+            auto dst = TfMakeSpan(invTransposeXforms);
+            for (size_t i = 0; i < dst.size(); ++i) {
+                dst[i] = orderedXforms[i].ExtractRotationMatrix()
+                    .GetInverse().GetTranspose();
+            }
+        }
+
+        const Matrix4 geomBindXform(GetGeomBindTransform(time));
+        const Matrix3 geomBindInvTransposeXform =
+            geomBindXform.ExtractRotationMatrix().GetInverse().GetTranspose();
+
+        return UsdSkelSkinNormalsLBS(geomBindInvTransposeXform,
+                                     invTransposeXforms,
+                                     jointIndices, jointWeights,
+                                     _numInfluencesPerComponent,
+                                     *normals);
+    }
+    return false;
+}
+
+
+template USDSKEL_API bool
+UsdSkelSkinningQuery::ComputeSkinnedNormals(const VtArray<GfMatrix4d>&,
+                                           VtVec3fArray*, UsdTimeCode) const;
+
+template USDSKEL_API bool
+UsdSkelSkinningQuery::ComputeSkinnedNormals(const VtArray<GfMatrix4f>&,
                                            VtVec3fArray*, UsdTimeCode) const;
 
 
@@ -376,8 +477,8 @@ UsdSkelSkinningQuery::ComputeSkinnedTransform(const VtArray<Matrix4>& xforms,
         // a mapper that should be used to reorder transforms
         // (skel order -> binding order)
         VtArray<Matrix4> orderedXforms(xforms);
-        if (_mapper) {
-            if (!_mapper->Remap(xforms, &orderedXforms)) {
+        if (_jointMapper) {
+            if (!_jointMapper->Remap(xforms, &orderedXforms)) {
                 return false;
             }
         }

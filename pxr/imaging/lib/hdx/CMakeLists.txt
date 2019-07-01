@@ -42,10 +42,11 @@ pxr_library(hdx
         drawTargetRenderPass
         drawTargetTask
         drawTargetResolveTask
-        intersector
         oitRenderTask
         oitResolveTask
         package
+        pickTask
+        pickFromRenderBufferTask
         progressiveTask
         rendererPlugin
         rendererPluginRegistry
@@ -80,10 +81,12 @@ pxr_library(hdx
         shaders/renderPass.glslfx
         shaders/renderPassShader.glslfx
         shaders/renderPassIdShader.glslfx
+        shaders/renderPassPickingShader.glslfx
         shaders/renderPassShadowShader.glslfx
         shaders/selection.glslfx
         shaders/simpleLightingShader.glslfx
         shaders/renderPassOitShader.glslfx
+        shaders/renderPassOitOpaqueShader.glslfx
         shaders/oitResolveImageShader.glslfx
 )
 

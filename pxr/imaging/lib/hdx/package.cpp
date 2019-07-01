@@ -66,6 +66,13 @@ HdxPackageRenderPassIdShader()
 }
 
 TfToken
+HdxPackageRenderPassPickingShader()
+{
+    static TfToken shader = _GetShaderPath("renderPassPickingShader.glslfx");
+    return shader;
+}
+
+TfToken
 HdxPackageRenderPassShadowShader()
 {
     static TfToken shader = _GetShaderPath("renderPassShadowShader.glslfx");
@@ -91,6 +98,13 @@ TfToken
 HdxPackageRenderPassOitShader()
 {
     static TfToken shader = _GetShaderPath("renderPassOitShader.glslfx");
+    return shader;
+}
+
+TfToken
+HdxPackageRenderPassOitOpaqueShader()
+{
+    static TfToken shader = _GetShaderPath("renderPassOitOpaqueShader.glslfx");
     return shader;
 }
 
