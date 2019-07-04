@@ -19,7 +19,6 @@ pxr_shared_library(${PXR_PACKAGE}
         ${OPENGL_gl_LIBRARY}
 
     INCLUDE_DIRS
-        ${Boost_INCLUDE_DIRS}
         ${GLEW_INCLUDE_DIR}
         ${MAYA_INCLUDE_DIRS}
         ${OPENGL_INCLUDE_DIRS}
