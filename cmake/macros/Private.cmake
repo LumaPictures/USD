@@ -992,13 +992,7 @@ function(_pxr_python_module NAME)
     # All Python modules require support code from tf.  Linking with the
     # monolithic library will (deliberately) not pick up the dependency
     # on tf.
-    # But we can't do this if the core is not built.
-    if (PXR_BUILD_USD)
-        add_dependencies(${LIBRARY_NAME} tf)
-    else ()
-        _pxr_target_link_libraries(${LIBRARY_NAME}
-            tf)
-    endif ()
+    add_dependencies(${LIBRARY_NAME} tf)
 
     # Include headers from the build directory.
     get_filename_component(
