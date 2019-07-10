@@ -178,12 +178,12 @@ void HydraKatana::draw(ViewportWrapperPtr viewport)
     // Camera Matrices
     GfMatrix4d projMatrix = toGfMatrixd(camera->getProjectionMatrix());
     GfMatrix4d viewMatrix = toGfMatrixd(camera->getViewMatrix());
-    m_taskController->SetCameraMatrices(viewMatrix, projMatrix);
+    m_taskController->SetFreeCameraMatrices(viewMatrix, projMatrix);
 
     // GL Viewport
     GfVec4d glviewport;
     glGetDoublev(GL_VIEWPORT, &glviewport[0]);
-    m_taskController->SetCameraViewport(glviewport);
+    m_taskController->SetRenderViewport(glviewport);
 
     // Set Task Params
     m_taskController->SetRenderParams(m_renderTaskParams);
