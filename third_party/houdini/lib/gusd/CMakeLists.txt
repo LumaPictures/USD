@@ -33,11 +33,11 @@ pxr_shared_library(${PXR_PACKAGE}
         usdGeom
         usdRi
         usdShade
+        usdSkel
         usdUtils
         ${HOUDINI_LIB_NAMES}
 
     INCLUDE_DIRS
-        ${Boost_INCLUDE_DIRS}
         ${HOUDINI_INCLUDE_DIRS}
 
     PUBLIC_CLASSES
