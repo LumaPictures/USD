@@ -62,6 +62,7 @@ if (PXR_BUILD_USD)
 # We are not building USD libraries, so we need to find them.
 else ()
     find_package(USD REQUIRED)
+    include("${USD_CONFIG_FILE}")
     include_directories(${USD_INCLUDE_DIR})
     link_directories(${USD_LIBRARY_DIR})
 endif ()
