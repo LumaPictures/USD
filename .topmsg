@@ -1,0 +1,5 @@
+From: Paul Molodowitch <paulm@lumapictures.com>
+Subject: [imaging] fix another sign compare issue
+
+slipped through because it was in a template that's not used by core
+(but is by HdPrman)
