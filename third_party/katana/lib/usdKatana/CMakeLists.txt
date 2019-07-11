@@ -30,7 +30,8 @@ pxr_shared_library(${PXR_PACKAGE}
         glf
         katanaAttrfncApi
         ${vtKatana_LIBRARY}
-        ${Boost_THREAD_LIBRARY} 
+        ${Boost_THREAD_LIBRARY}
+        ${Boost_SYSTEM_LIBRARY}
 
     PUBLIC_CLASSES
         attrMap
