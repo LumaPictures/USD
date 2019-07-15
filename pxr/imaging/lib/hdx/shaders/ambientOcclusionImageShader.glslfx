@@ -37,8 +37,15 @@
 
 -- glsl AmbientOcclusion.SSAO
 
+layout(location = 42) uniform sampler2D depthTexture;
+
 vec4 imageShader(vec2 uv)
 {
     // return vec4(0, 0, 0, clamp(AO_SAMPLES / 8.0, 0, 1));
-    return vec4(0);
+    // return vec4(0);
+    // return vec4(float(gl_FragCoord.x) / float(textureSize(depthTexture, 0).x),
+    //             float(gl_FragCoord.y) / float(textureSize(depthTexture, 0).y),
+    //             0.0,
+    //             0.0);
+    return vec4(texture2D(depthTexture, uv).xxx, 1.0);
 }

@@ -23,6 +23,7 @@
 //
 //
 #include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/glf/contextCaps.h"
 
 #include "pxr/imaging/hdx/utils.h"
 
@@ -35,16 +36,16 @@ namespace HdxUtils {
 GfVec2i
 GetScreenSize()
 {
-    // XXX Ideally we want screenSize to be passed in via the app.
+    // XXX Ideally we want screenSize to be passed in via the app. 
     // (see Presto Stagecontext/TaskGraph), but for now we query this from GL.
     //
     // Using GL_VIEWPORT here (or viewport from RenderParams) is in-correct!
     //
-    // The gl_FragCoord we use in the OIT shaders is relative to the FRAMEBUFFER
+    // The gl_FragCoord we use in the OIT shaders is relative to the FRAMEBUFFER 
     // size (screen size), not the gl_viewport size.
     // We do various tricks with glViewport for Presto slate mode so we cannot
     // rely on it to determine the 'screenWidth' we need in the gl shaders.
-    //
+    // 
     // The CounterBuffer is especially fragile to this because in the glsl shdr
     // we calculate a 'screenIndex' based on gl_fragCoord that indexes into
     // the CounterBuffer. If we did not make enough room in the CounterBuffer
@@ -55,14 +56,14 @@ GetScreenSize()
 
     GLint attachType = 0;
     glGetFramebufferAttachmentParameteriv(
-        GL_DRAW_FRAMEBUFFER,
+        GL_DRAW_FRAMEBUFFER, 
         GL_COLOR_ATTACHMENT0,
         GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE,
         &attachType);
 
     GLint attachId = 0;
     glGetFramebufferAttachmentParameteriv(
-        GL_DRAW_FRAMEBUFFER,
+        GL_DRAW_FRAMEBUFFER, 
         GL_COLOR_ATTACHMENT0,
         GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME,
         &attachId);
@@ -79,15 +80,36 @@ GetScreenSize()
         return s;
     }
 
-    if (attachType == GL_TEXTURE) {
-        glGetTextureLevelParameteriv(attachId, 0, GL_TEXTURE_WIDTH, &s[0]);
-        glGetTextureLevelParameteriv(attachId, 0, GL_TEXTURE_HEIGHT, &s[1]);
-    } else if (attachType == GL_RENDERBUFFER) {
-        glGetNamedRenderbufferParameteriv(attachId,GL_RENDERBUFFER_WIDTH,&s[0]);
-        glGetNamedRenderbufferParameteriv(attachId,GL_RENDERBUFFER_HEIGHT,&s[1]);
+    GlfContextCaps const &caps = GlfContextCaps::GetInstance();
+
+    if (ARCH_LIKELY(caps.directStateAccessEnabled)) {
+        if (attachType == GL_TEXTURE) {
+            glGetTextureLevelParameteriv(attachId, 0, GL_TEXTURE_WIDTH, &s[0]);
+            glGetTextureLevelParameteriv(attachId, 0, GL_TEXTURE_HEIGHT, &s[1]);
+        } else if (attachType == GL_RENDERBUFFER) {
+            glGetNamedRenderbufferParameteriv(
+                attachId, GL_RENDERBUFFER_WIDTH, &s[0]);
+            glGetNamedRenderbufferParameteriv(
+                attachId, GL_RENDERBUFFER_HEIGHT, &s[1]);
+        }
     } else {
-        TF_CODING_ERROR("Unknown framebuffer attachment");
-        return s;
+        if (attachType == GL_TEXTURE) {
+            int oldBinding;
+            glGetIntegerv(GL_TEXTURE_BINDING_2D, &oldBinding);
+            glBindTexture(GL_TEXTURE_2D, attachId);
+            glGetTexLevelParameteriv(GL_TEXTURE_2D,0, GL_TEXTURE_WIDTH, &s[0]);
+            glGetTexLevelParameteriv(GL_TEXTURE_2D,0, GL_TEXTURE_HEIGHT, &s[1]);
+            glBindTexture(GL_TEXTURE_2D, oldBinding);
+        } else if (attachType == GL_RENDERBUFFER) {
+            int oldBinding;
+            glGetIntegerv(GL_RENDERBUFFER_BINDING, &oldBinding);
+            glBindRenderbuffer(GL_RENDERBUFFER, attachId);
+            glGetRenderbufferParameteriv(
+                GL_RENDERBUFFER,GL_RENDERBUFFER_WIDTH,&s[0]);
+            glGetRenderbufferParameteriv(
+                GL_RENDERBUFFER,GL_RENDERBUFFER_HEIGHT,&s[1]);
+            glBindRenderbuffer(GL_RENDERBUFFER, oldBinding);
+        }
     }
 
     return s;

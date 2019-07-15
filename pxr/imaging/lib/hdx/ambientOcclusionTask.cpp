@@ -22,6 +22,7 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/glf/diagnostic.h"
 
 #include "pxr/imaging/hdx/ambientOcclusionTask.h"
 
@@ -40,6 +41,7 @@
 #include "pxr/imaging/hdSt/tokens.h"
 
 #include "pxr/imaging/hdx/package.h"
+#include "pxr/imaging/hdx/utils.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -181,15 +183,38 @@ void HdxAmbientOcclusionTask::Execute(HdTaskContext* ctx)
 
     if (!TF_VERIFY(_renderPassState)) return;
 
-    // HdStRenderPassState* stRenderPassState =
-    //     static_cast<HdStRenderPassState*>(_renderPassState.get());
+    // const auto screenSize = HdxUtils::GetScreenSize();
+    GLuint depthTex = 0;
+    glGenTextures(1, &depthTex);
+    // Other functions require a bound texture.
+    // glBindTextureUnit(0, depthTex);
+    // glBindTexture(GL_TEXTURE_2D, depthTex);
+    // glTextureStorage2D(depthTex, 1, GL_R32F, screenSize[0], screenSize[1]);
+    // glTexStorage2D(GL_TEXTURE_2D, 1, GL_R32F, screenSize[0], screenSize[1]);
+    // std::vector<float> data;
+    // data.resize(screenSize[0] * screenSize[1], 0.5f);
+    // Other functions require a bound texture.
+    // glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, screenSize[0], screenSize[1], 0,
+    //              GL_RED, GL_FLOAT, data.data());
+    // glTextureSubImage2D(depthTex, 0, 0, 0, screenSize[0], screenSize[1],
+    //                    GL_FLOAT, GL_RED, data.data());
 
-    // GfVec4i viewport;
-    // glGetIntegerv(GL_VIEWPORT, viewport.data());
-    // GLuint depthTex = 0;
-    // glGenTextures(1, &depthTex);
+    GLF_POST_PENDING_GL_ERRORS();
 
     _renderPassState->Bind();
+
+    // GLint program = 32;
+    // There are no active programs in use, so we can't bind the texture.
+    // Need to find an alternative solution, possibly by subclassing the render
+    // pass state?
+    // glGetIntegerv(GL_CURRENT_PROGRAM, &program);
+    // glActiveTexture(GL_TEXTURE0 + 42);
+    // glBindTexture(GL_TEXTURE_2D, depthTex);
+    // glBindTextureUnit(42, depthTex);
+
+    // TF_STATUS("\n\t %i", program);
+
+    GLF_POST_PENDING_GL_ERRORS();
 
     glDisable(GL_DEPTH_TEST);
 
@@ -199,7 +224,7 @@ void HdxAmbientOcclusionTask::Execute(HdTaskContext* ctx)
 
     _renderPassState->Unbind();
 
-    // glDeleteTextures(1, &depthTex);
+    glDeleteTextures(1, &depthTex);
 }
 
 std::ostream& operator<<(
