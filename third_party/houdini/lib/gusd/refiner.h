@@ -28,6 +28,7 @@
 
 #include <GT/GT_Refine.h>
 #include <GT/GT_RefineParms.h>
+#include <GT/GT_PrimVDB.h>
 #include <GU/GU_DetailHandle.h>
 #include <UT/UT_SharedPtr.h>
 
@@ -154,13 +155,14 @@ public:
 
     GusdWriteCtrlFlags      m_writeCtrlFlags;
 
+    // Convert a prim's name into a prim path taking into account prefix and
+    // modifying to be a valid Usd prim path.
+    GUSD_API
+    std::string createPrimPath( const std::string& primName);
+
     /////////////////////////////////////////////////////////////////////////////
 
 private:
-
-    // Convert a prim's name into a prim path taking into account prefix and
-    // modifying to be a valid Usd prim path.
-    std::string createPrimPath( const std::string& primName);
 
     // Place to collect refined prims
     GusdRefinerCollector&   m_collector;
@@ -220,6 +222,8 @@ public:
         const TfToken &             purpose,
         const GusdWriteCtrlFlags&   writeCtrlFlags );
 
+    void addVDB(GT_PrimitiveHandle prim);
+
     /// Add a prim to be added to a point instancer during finish
     void addInstPrim( const SdfPath& path, GT_PrimitiveHandle p, int index=0 );
 
@@ -233,6 +237,9 @@ public:
 
     // The results of the refine
     GusdRefiner::GprimArray m_gprims;
+
+    // VDB Data
+    std::vector<GT_PrimitiveHandle> m_vdbs;
 
     // Map used to generate unique names for each prim
     std::map<SdfPath,NameInfo> m_names;
