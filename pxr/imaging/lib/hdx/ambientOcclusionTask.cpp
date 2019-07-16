@@ -76,6 +76,16 @@ public:
         return _hash;
     }
 
+    void BindResources(const HdSt_ResourceBinder& binder, int program) override {
+        glActiveTexture(GL_TEXTURE0 + 41);
+        glBindTexture(GL_TEXTURE_2D, _depthTex);
+        HdStRenderPassShader::BindResources(binder, program);
+    }
+
+    inline void SetDepthTexture(GLuint depthTex) {
+        _depthTex = depthTex;
+    }
+
     ~HdxAmbientOcclusionRenderPassShader() override = default;
 private:
     HdxAmbientOcclusionRenderPassShader()                                                       = delete;
@@ -86,6 +96,7 @@ private:
 
     const int _numSamples;
     ID _hash;
+    int _depthTex;
 };
 
 }
@@ -183,38 +194,38 @@ void HdxAmbientOcclusionTask::Execute(HdTaskContext* ctx)
 
     if (!TF_VERIFY(_renderPassState)) return;
 
-    // const auto screenSize = HdxUtils::GetScreenSize();
+    GLint drawFramebuffer;
+    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &drawFramebuffer);
+
+    const auto screenSize = HdxUtils::GetScreenSize();
     GLuint depthTex = 0;
     glGenTextures(1, &depthTex);
-    // Other functions require a bound texture.
-    // glBindTextureUnit(0, depthTex);
-    // glBindTexture(GL_TEXTURE_2D, depthTex);
-    // glTextureStorage2D(depthTex, 1, GL_R32F, screenSize[0], screenSize[1]);
-    // glTexStorage2D(GL_TEXTURE_2D, 1, GL_R32F, screenSize[0], screenSize[1]);
-    // std::vector<float> data;
-    // data.resize(screenSize[0] * screenSize[1], 0.5f);
-    // Other functions require a bound texture.
-    // glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, screenSize[0], screenSize[1], 0,
-    //              GL_RED, GL_FLOAT, data.data());
-    // glTextureSubImage2D(depthTex, 0, 0, 0, screenSize[0], screenSize[1],
-    //                    GL_FLOAT, GL_RED, data.data());
+    auto* shader = static_cast<HdxAmbientOcclusionRenderPassShader*>(
+        _renderPassShader.get());
+    shader->SetDepthTexture(depthTex);
 
+    glBindTexture(GL_TEXTURE_2D, depthTex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F,
+                 screenSize[0], screenSize[1], 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, 0);
+
+    GLuint framebuffer;
+    glGenFramebuffers(1, &framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTex, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, drawFramebuffer);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer);
+    glBlitFramebuffer(0, 0, screenSize[0], screenSize[1], 0, 0, screenSize[0], screenSize[1], GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+    
+    glBindFramebuffer(GL_FRAMEBUFFER, drawFramebuffer);
     GLF_POST_PENDING_GL_ERRORS();
 
     _renderPassState->Bind();
-
-    // GLint program = 32;
-    // There are no active programs in use, so we can't bind the texture.
-    // Need to find an alternative solution, possibly by subclassing the render
-    // pass state?
-    // glGetIntegerv(GL_CURRENT_PROGRAM, &program);
-    // glActiveTexture(GL_TEXTURE0 + 42);
-    // glBindTexture(GL_TEXTURE_2D, depthTex);
-    // glBindTextureUnit(42, depthTex);
-
-    // TF_STATUS("\n\t %i", program);
-
-    GLF_POST_PENDING_GL_ERRORS();
 
     glDisable(GL_DEPTH_TEST);
 
@@ -225,6 +236,7 @@ void HdxAmbientOcclusionTask::Execute(HdTaskContext* ctx)
     _renderPassState->Unbind();
 
     glDeleteTextures(1, &depthTex);
+    glDeleteFramebuffers(1, &framebuffer);
 }
 
 std::ostream& operator<<(
