@@ -1,5 +1,5 @@
 //
-// Copyright 2017 Pixar
+// Copyright 2018 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,7 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-
 #ifndef USDCOMPONENT_H_
 #define USDCOMPONENT_H_
 
@@ -40,11 +39,19 @@
 
 #include <ImathBox.h>
 
-#include <unordered_map>
+#include <set>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
 using namespace Foundry::Katana::ViewerAPI;
+
+// A set of rprim paths and their corresponsing instance index. This identifies
+// an RPrim with or without instancing. The instance index will be used to find
+// the exact UsdPrim for this RPrim for the cases in which the Rprim is an
+// instance, otherwise only the SdfPath will be used to identify the UsdPrim and
+// the instanceIndex will be ignored.
+typedef std::pair<SdfPath, int> RPrimPathAndIndex;
+typedef std::set<RPrimPathAndIndex> RPrimsSet;
 
 /**
  * @brief ViewerDelegateComponent used to render USD locations.
@@ -196,7 +203,7 @@ public: /* Public functions specific to USDComponent */
      *
      * This will also update the bounds for the selected RPrims.
      */
-    void getLocationsForSelection(const SdfPathSet& rprimSdfPaths,
+    void getLocationsForSelection(const RPrimsSet& rprims,
                                   std::set<std::string>& locationPaths);
 
     /** 
@@ -205,7 +212,7 @@ public: /* Public functions specific to USDComponent */
      * In USD location selection mode (non sub proxy selection) this will simply
      * clear the RPrim selection, bounds and highlighting.
           */
-    void updateSelectedRPrims(const SdfPathSet& rprimSdfPaths,
+    void updateSelectedRPrims(const RPrimsSet& rprims,
                               bool shift, bool ctrl);
 
     /// A root Sdf Path for all the objects in the Render Index. All the roots
@@ -237,7 +244,7 @@ private:
     bool m_useRprimSelection;
 
     /// Set of all the sub-stage selected RPrims, used in RPrim selection mode
-    SdfPathSet m_selectedRPrims;
+    RPrimsSet m_selectedRPrims;
 
     /// Attribute that caches the selected RPrims' total bounding box
     FnAttribute::DoubleAttribute m_selectedRPrimsBounds;
@@ -265,7 +272,7 @@ private:
     void updateSelectionColor();
 
     /** @brief Marks the given RPrims and its descendants to be highlighted.*/
-    void highlightRprims(const SdfPathSet& sdfPaths, bool replace=true);
+    void highlightRprims(const RPrimsSet& rprims, bool replace=true);
 
     /**
      * @brief Gets the equivalent RPrim SdfPath for the given location path.

@@ -1,5 +1,5 @@
 //
-// Copyright 2017 Pixar
+// Copyright 2018 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,7 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-
 /// USDLocationData
 
 #include "usdLocationData.h"
@@ -119,7 +118,7 @@ UsdStageRefPtr USDLocationData::getStage()
 SdfPath USDLocationData::getPrimPathFromRPrimPath(
     const SdfPath& rprimSdfPath, bool includeReferencePath)
 {
-    if (rprimSdfPath.HasPrefix(m_rootPath))
+    if (rprimSdfPath.IsPrimPath() && rprimSdfPath.HasPrefix(m_rootPath))
     {
         SdfPath prefix = includeReferencePath? m_rootPath : m_rootAndReferencePath;
 
@@ -132,18 +131,20 @@ SdfPath USDLocationData::getPrimPathFromRPrimPath(
 }
 
 bool USDLocationData::getRPrimBounds(const SdfPath& rprimSdfPath,
+                                     int instanceIndex,
                                      Imath::Box3d& bbox)
 {
     // Get the Prim for the given RPrim path
-    UsdPrim prim = getPrimFromRprim(rprimSdfPath);
+    bool isInstanced;
+    UsdPrim prim = getPrimFromRprim(rprimSdfPath, instanceIndex, &isInstanced);
     if (!prim.IsValid()) { return false; }
 
-    return getPrimBounds(prim, bbox);
+    return getPrimBounds(prim, !isInstanced, bbox);
 }
 
 bool USDLocationData::getTotalBounds(Imath::Box3d& bbox)
 {
-    return getPrimBounds(m_referencePrim, bbox);
+    return getPrimBounds(m_referencePrim, true, bbox);
 }
 
 void USDLocationData::flushBoundsCache()
@@ -155,9 +156,34 @@ void USDLocationData::flushBoundsCache()
     }
 }
 
-UsdPrim USDLocationData::getPrimFromRprim(const SdfPath& rprimSdfPath)
+UsdPrim USDLocationData::getPrimFromRprim(const SdfPath& rprimSdfPath,
+                                          int instanceIndex,
+                                          bool* isInstanced)
 {
-    SdfPath primPath = getPrimPathFromRPrimPath(rprimSdfPath, true);
+    SdfPath primPath;
+
+    if (instanceIndex >= 0)
+    {
+        int _absoluteInstanceIndex;
+        SdfPathVector _instanceContext;
+
+        m_imagingDelegate->GetPathForInstanceIndex(
+            rprimSdfPath,
+            instanceIndex,
+            &_absoluteInstanceIndex,
+            &primPath,
+            &_instanceContext);
+    }
+    
+    if (primPath.IsEmpty())
+    {
+        primPath = getPrimPathFromRPrimPath(rprimSdfPath, true);
+        *isInstanced = false;
+    }
+    else
+    {
+        *isInstanced = true;
+    }
 
     if (primPath.IsEmpty())
     {
@@ -168,6 +194,7 @@ UsdPrim USDLocationData::getPrimFromRprim(const SdfPath& rprimSdfPath)
 }
 
 bool USDLocationData::getPrimBounds(const UsdPrim& prim,
+                                    bool relativeToReference,
                                     Imath::Box3d& bbox)
 {
     // Lazily init the prim bbox cache
@@ -182,8 +209,20 @@ bool USDLocationData::getPrimBounds(const UsdPrim& prim,
     m_bboxCache->SetTime(m_imagingDelegate->GetTime());
 
     // Calculate/Get the bbox for this prim from the bbox cache
-    GfBBox3d bbox3d = m_bboxCache->ComputeRelativeBound(prim, m_referencePrim);
+
+    GfBBox3d bbox3d;
+
+    if (relativeToReference)
+    {
+        bbox3d = m_bboxCache->ComputeRelativeBound(prim, m_referencePrim);
+    }
+    else
+    {
+        bbox3d = m_bboxCache->ComputeLocalBound(prim);
+    }
+    
     GfRange3d range = bbox3d.ComputeAlignedRange();
+
     const double* rangeMin = range.GetMin().data();
     const double* rangeMax = range.GetMax().data();
     bbox.min.x = rangeMin[0]; bbox.min.y = rangeMin[1]; bbox.min.z = rangeMin[2];
