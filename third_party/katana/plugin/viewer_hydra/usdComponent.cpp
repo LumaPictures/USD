@@ -1,5 +1,5 @@
 //
-// Copyright 2017 Pixar
+// Copyright 2018 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,7 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-
 #include "usdComponent.h"
 
 #include <FnViewer/utils/FnImathHelpers.h>
@@ -159,7 +158,7 @@ void USDComponent::locationsSelected(
     if (!m_hydraComponent && !initHydraComponentRef()) { return; }
 
     // Construct a vector of SdfPaths of the given locations
-    SdfPathSet sdfPaths;
+    RPrimsSet rprims;
 
     if (!m_useRprimSelection)
     {
@@ -184,16 +183,17 @@ void USDComponent::locationsSelected(
                         usdLocation->getPath());
 
                     // Add the root location to the rprims list
-                    sdfPaths.insert(rootUsdPath);
+                    RPrimPathAndIndex rprim = std::make_pair(rootUsdPath, -1);
+                    rprims.insert(rprim);
                 }
             }
         }
     }
 
     // Append the selected RPrims
-    sdfPaths.insert(m_selectedRPrims.begin(), m_selectedRPrims.end());
+    rprims.insert(m_selectedRPrims.begin(), m_selectedRPrims.end());
 
-    highlightRprims(sdfPaths, false);
+    highlightRprims(rprims, false);
 }
 
 FnAttribute::DoubleAttribute USDComponent::getBounds(
@@ -287,12 +287,13 @@ bool USDComponent::hasSelectedRPrims()
     return !m_selectedRPrims.empty();
 }
 
-void USDComponent::getLocationsForSelection(const SdfPathSet& rprimSdfPaths,
+void USDComponent::getLocationsForSelection(const RPrimsSet& rprims,
                                             std::set<std::string>& locationPaths)
 {
-    if (m_useRprimSelection)
+    for (auto rprim : rprims)
     {
-        for (auto sdfPath : rprimSdfPaths)
+        SdfPath sdfPath = rprim.first;
+        if (m_useRprimSelection)
         {
             // In RPrim selection we are only interested in expanded locations
             // that correspond to RPrims that are under proxies, since RPrims on
@@ -319,6 +320,7 @@ void USDComponent::getLocationsForSelection(const SdfPathSet& rprimSdfPaths,
             // once expanded
             SdfPath primSdfPath = usdData->getPrimPathFromRPrimPath(sdfPath,
                                                 false/*includeReferencePath*/);
+            if (primSdfPath.IsEmpty()) { continue; }
 
             // Construct the expanded path by appending the Prim path to the
             // usd Path
@@ -326,11 +328,8 @@ void USDComponent::getLocationsForSelection(const SdfPathSet& rprimSdfPaths,
                                        primSdfPath.GetString();
             locationPaths.insert(locationPath);
         }
-    }
-    else
-    {
-        for (auto sdfPath : rprimSdfPaths)
-        {            
+        else
+        {
             // Select USD locations for the given RPrim paths:
             ViewerLocation* location = getUSDLocationOfRPrimPath(sdfPath);
             if (location)
@@ -341,7 +340,7 @@ void USDComponent::getLocationsForSelection(const SdfPathSet& rprimSdfPaths,
     }
 }
 
-void USDComponent::updateSelectedRPrims(const SdfPathSet& rprimSdfPaths,
+void USDComponent::updateSelectedRPrims(const RPrimsSet& rprims,
                                         bool shift, bool ctrl)
 {
     if (m_useRprimSelection)
@@ -350,27 +349,27 @@ void USDComponent::updateSelectedRPrims(const SdfPathSet& rprimSdfPaths,
         if (!shift && !ctrl)
         {
             // no Shift nor Ctrl: Substitute
-            m_selectedRPrims = rprimSdfPaths;
+            m_selectedRPrims = rprims;
         }
         else if (shift && ctrl)
         {
             // Shift+Ctrl: Add all
-            m_selectedRPrims.insert(rprimSdfPaths.begin(), rprimSdfPaths.end());
+            m_selectedRPrims.insert(rprims.begin(), rprims.end());
         }
         else if (ctrl)
         {
             // Ctrl : Remove selected
-            for (auto sdfPath : rprimSdfPaths)
+            for (auto rprim : rprims)
             {
-                m_selectedRPrims.erase(sdfPath);
+                m_selectedRPrims.erase(rprim);
             }
         }
         else if (shift)
         {
             // Shift : Flip
-            for (auto sdfPath : rprimSdfPaths)
+            for (auto rprim : rprims)
             {
-                auto it = m_selectedRPrims.find(sdfPath);
+                auto it = m_selectedRPrims.find(rprim);
                 if (it != m_selectedRPrims.end())
                 {
                     // Shift on selected locations : Remove
@@ -379,7 +378,7 @@ void USDComponent::updateSelectedRPrims(const SdfPathSet& rprimSdfPaths,
                 else
                 {
                     // Shift no not selected locations: Add
-                    m_selectedRPrims.insert(sdfPath);
+                    m_selectedRPrims.insert(rprim);
                 }
             }
         }
@@ -520,8 +519,8 @@ bool USDComponent::loadUsd(ViewerLocation* location)
         // selection mode, not in RPrim selection.
         if (location->isSelected() || location->isAncestorSelected())
         {
-            SdfPathSet selection;
-            selection.insert(rootPath);
+            RPrimsSet selection;
+            selection.insert(std::make_pair(rootPath, -1));
             highlightRprims(selection, false);
         }
     }
@@ -561,11 +560,15 @@ void USDComponent::propagateXform(ViewerLocation* location)
     }
 }
 
-void USDComponent::highlightRprims(const SdfPathSet& sdfPaths, bool replace)
+void USDComponent::highlightRprims(const RPrimsSet& rprims, bool replace)
 {
     // Remove all irrelevant descendants
     SdfPathVector sdfPathsVec;
-    sdfPathsVec.assign(sdfPaths.begin(), sdfPaths.end());
+    for (auto rprim : rprims)
+    {
+        // Add the Rprim's sdfpath
+        sdfPathsVec.push_back(rprim.first);
+    }
     SdfPath::RemoveDescendentPaths(&sdfPathsVec);
 
     // Get all descendants
@@ -726,10 +729,10 @@ void USDComponent::updateSelectedRPrimBounds()
         Imath::Box3d totalBbox;
 
         bool foundBounds = false;
-        for (auto rprimSdfPath : m_selectedRPrims)
+        for (auto rprim : m_selectedRPrims)
         {
             // Check if this is a rprim from an existing usd location
-            ViewerLocation* usdLocation = findNearestUSDAncestor(rprimSdfPath);
+            ViewerLocation* usdLocation = findNearestUSDAncestor(rprim.first);
             if (!usdLocation) { continue; }
 
             // Check if the usd location has data 
@@ -739,7 +742,8 @@ void USDComponent::updateSelectedRPrimBounds()
 
             // Get the bbox and extend the total bbox with it
             Imath::Box3d bbox;
-            if (usdData->getRPrimBounds(rprimSdfPath, bbox))
+
+            if (usdData->getRPrimBounds(rprim.first, rprim.second, bbox))
             {   
                 // Convert the bounds to world space and extend the total bbox
                 bbox = Imath::transform(bbox, usdLocation->getWorldXform());
