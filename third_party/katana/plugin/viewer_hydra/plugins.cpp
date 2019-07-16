@@ -1,5 +1,5 @@
 //
-// Copyright 2017 Pixar
+// Copyright 2018 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,7 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-
 #include <FnViewer/plugin/FnViewerDelegate.h>
 #include <FnViewer/plugin/FnViewportLayer.h>
 #include <FnViewer/plugin/FnViewport.h>

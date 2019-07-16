@@ -1,5 +1,5 @@
 //
-// Copyright 2017 Pixar
+// Copyright 2018 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,7 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-
 #ifndef VIEWER_UTILS_HYDRA_KATANA_H
 #define VIEWER_UTILS_HYDRA_KATANA_H
 
@@ -56,12 +55,6 @@ using Foundry::Katana::ViewerAPI::ViewportWrapperPtr;
 #endif
 
 PXR_NAMESPACE_OPEN_SCOPE
-
-TF_DEFINE_PRIVATE_TOKENS(
-    _tokens,
-    (proxy)
-    (render)
-);
 
 TF_DEBUG_CODES( 
     KATANA_HYDRA   
@@ -170,6 +163,11 @@ private:
     /** @brief Initializes the default lights. */
     GlfSimpleLightingContextRefPtr initLighting();
 
+    /** @brief Synchronizes Hydra collection representation with the Hydra Viewer
+     *  display mode. 
+     */
+    void syncDisplayMode(ViewportWrapperPtr viewport);
+
     /// The Render Delegate. Currently the constructor will always instantiate
     /// a HdStRenderDelegate for it, but in order to support different renderers
     /// this should be changed.
@@ -181,13 +179,16 @@ private:
     /// The different objects used in the rendering of the scene.
     HdEngine                       m_engine;
     HdxTaskController*             m_taskController;
-    TfTokenVector                  m_renderTags;
-    HdxRenderTaskParams            m_renderTaskParams;
     HdxSelectionTrackerSharedPtr   m_selectionTracker;
     GlfSimpleLightingContextRefPtr m_lightingContext;
+    HdxPickTaskContextParams       m_pickParams;
+    HdRprimCollection              m_geoCollection;
 
     // The selection color
     GfVec4f m_selectionColor;
+
+    // Keeps track of the Hydra Viewer display mode option.
+    FnAttribute::StringAttribute m_displayModeAttr;
 };
 
 
