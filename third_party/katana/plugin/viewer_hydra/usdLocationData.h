@@ -1,5 +1,5 @@
 //
-// Copyright 2017 Pixar
+// Copyright 2018 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,7 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-
 #ifndef USD_LOCATION_DATA_H_
 #define USD_LOCATION_DATA_H_
 
@@ -81,8 +80,14 @@ public:
     SdfPath getPrimPathFromRPrimPath(const SdfPath& rprimSdfPath,
                                      bool includeReferencePath);
 
-    /** @brief: Gets the bbox of an RPrim.*/
-    bool getRPrimBounds(const SdfPath& rprimSdfPath, Imath::Box3d& bbox);
+    /** @brief: Gets the bbox of an RPrim.
+     *
+     * If instanceIndex is >= 0 then we will try to resolve the instance and
+     * return the local bounds of the instanced object.
+     */
+    bool getRPrimBounds(const SdfPath& rprimSdfPath,
+                        int instanceIndex,
+                        Imath::Box3d& bbox);
 
     /** @brief: Gets the total bbox for all the RPrims in this location.*/
     bool getTotalBounds(Imath::Box3d& bbox);
@@ -132,11 +137,21 @@ private:
 
     USDLocationAttrHashes m_hashes;
 
-    /// Get the prim from the stage that corresponds to the given RPrim
-    UsdPrim getPrimFromRprim(const SdfPath& rprimSdfPath);
+    /// Get the prim from the stage that corresponds to the given RPrim.
+    /// If instanceIndex is specified, then this will resolve the instancing
+    /// and return the instancing master prim. isInstanced will be set to true
+    /// if this path/index pair refers to an instance, in that case the returned
+    /// prim will be of the master prim being instantiated.
+    UsdPrim getPrimFromRprim(const SdfPath& rprimSdfPath,
+                             int instanceIndex,
+                             bool* isInstanced);
 
-    /// Gets the bounding box for a prim
-    bool getPrimBounds(const UsdPrim& prim, Imath::Box3d& bbox);
+    /// Gets the bounding box for a prim. If relativeToReference=true then get
+    /// the bound relative to m_referencePrim. For example, instance Prims will
+    /// not be relative to m_referencePrim.
+    bool getPrimBounds(const UsdPrim& prim,
+                       bool relativeToReference,
+                       Imath::Box3d& bbox);
 };
 
 #endif

@@ -1,5 +1,5 @@
 //
-// Copyright 2017 Pixar
+// Copyright 2018 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,7 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-
 #include "usdLayer.h"
 
 #include <FnViewer/plugin/FnViewport.h>
@@ -122,7 +121,7 @@ bool USDLayer::customPick(unsigned int x, unsigned int y,
                           PickedAttrsMap& pickedAttrs,
                           float* singlePointDepth)
 {
-    SdfPathSet sdfPaths;
+    RPrimsSet rprims;
 
     // Perform the picking
     HdxPickHitVector hits;
@@ -138,7 +137,8 @@ bool USDLayer::customPick(unsigned int x, unsigned int y,
         // repetitions
         for (const auto& hit : hits)
         {
-            sdfPaths.insert(hit.objectId);
+            RPrimPathAndIndex rprim = std::make_pair(hit.objectId, hit.instanceIndex);
+            rprims.insert(rprim);
         }
     }
 
@@ -146,10 +146,10 @@ bool USDLayer::customPick(unsigned int x, unsigned int y,
     // locations that correspond to the picked Rprims or the whole USD locations
     // (depending on the selection mode)
     std::set<std::string> locationPaths;
-    m_usdComponent->getLocationsForSelection(sdfPaths, locationPaths);
+    m_usdComponent->getLocationsForSelection(rprims, locationPaths);
 
     // Update or clear the selected RPrims
-    m_usdComponent->updateSelectedRPrims(sdfPaths,
+    m_usdComponent->updateSelectedRPrims(rprims,
                                          m_shiftModifier,
                                          m_ctrlModifier);
 
