@@ -1,5 +1,5 @@
 //
-// Copyright 2018 Pixar
+// Copyright 2019 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,37 +21,28 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef WORK_SORT_H
-#define WORK_SORT_H
+//
+#ifndef HDX_UTILS
+#define HDX_UTILS
 
-/// \file work/sort.h
-#include "pxr/base/work/threadLimits.h"
+#include "pxr/pxr.h"
 
-#include <tbb/parallel_sort.h>
-#include <algorithm>
+#include "pxr/imaging/hdx/api.h"
+
+#include "pxr/base/gf/vec2i.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
-///////////////////////////////////////////////////////////////////////////////
-///
-/// WorkParallelSort(Container& container)
-///
-///
-/// Sorts in-place a container that has a begin and end iterator
-///
-template <typename C>
-void 
-WorkParallelSort(C* container)
+namespace HdxUtils
 {
-    // Don't bother with parallel_for, if concurrency is limited to 1.
-    if (WorkGetConcurrencyLimit() > 1) {
-        tbb::parallel_sort(container->begin(), container->end());
-    }else{
-        std::sort(container->begin(), container->end());
-    }
+
+/// Query the screen size from either the currently active framebuffer or
+/// using the OpenGL viewport size.
+HDX_API
+GfVec2i GetScreenSize();
+
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif // WORK_SORT_H
+#endif // HDX_UTILS

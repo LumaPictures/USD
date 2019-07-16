@@ -80,15 +80,17 @@ private:
     void _PrepareOitBuffers(HdTaskContext* ctx, HdRenderIndex* renderIndex);
     void _ClearOitGpuBuffers(HdTaskContext* ctx);
 
-    HdStRenderPassShaderSharedPtr _oitRenderPassShader;
+    HdStRenderPassShaderSharedPtr _oitTranslucentRenderPassShader;
+    HdStRenderPassShaderSharedPtr _oitOpaqueRenderPassShader;
 
-    GfVec4i _viewport;
+    int _bufferSize;
+    bool _isOitEnabled;
     HdBufferArrayRangeSharedPtr _counterBar;
     HdBufferArrayRangeSharedPtr _dataBar;
     HdBufferArrayRangeSharedPtr _depthBar;
     HdBufferArrayRangeSharedPtr _indexBar;
     HdBufferArrayRangeSharedPtr _uniformBar;
-    int _layerCount = -1;
+    int _numSamples = -1;
 };
 
 

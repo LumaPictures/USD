@@ -57,22 +57,19 @@ PXR_NAMESPACE_OPEN_SCOPE
 TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_TINY_PRIM_CULLING, false,
                       "Enable tiny prim culling");
 
-TF_DEFINE_ENV_SETTING(HD_OIT_LAYER_COUNT, 8,
-                      "Number of Object Independent Transparency layers per "
+TF_DEFINE_ENV_SETTING(HD_OIT_NUM_SAMPLES, 8,
+                      "Number of Object Independent Transparency samples per "
                       "pixel. Increasing the value decreases translucency "
                       "artifacts and flicker, but significantly increases "
                       "memory usage and degrades performance");
 
-TF_DEFINE_ENV_SETTING(HD_OIT_ENABLE_APPROXIMATION, false,
-                      "Enable the use of a step function to approximate Object "
-                      "Independent Transparency. Enabling this option "
-                      "increases performance, but decreases translucency "
-                      "accuracy.")
+TF_DEFINE_ENV_SETTING(HD_ENABLE_AMBIENT_OCCLUSION, true,
+           "Enables ambient occlusion by default.");
 
-TF_DEFINE_ENV_SETTING(HD_OIT_STEP_FUNCTION_RESOLUTION, 4,
-                      "Resolution of the step function used to approximate "
-                      "translucency. Increasing the value improves"
-                      "translucency accuracy, but degrades performance.");
+TF_DEFINE_ENV_SETTING(HD_AMBIENT_OCCLUSION_NUM_SAMPLES, 8,
+                      "Number of ambient occlusion samples. Increase the value"
+                      "increases frame time, but improves ambient occlusion"
+                      "quality.");
 
 const TfTokenVector HdStRenderDelegate::SUPPORTED_RPRIM_TYPES =
 {
@@ -126,19 +123,19 @@ HdStRenderDelegate::_Initialize()
     }
 
     // Initialize the settings and settings descriptors.
-    _settingDescriptors.resize(4);
-    _settingDescriptors[0] = { "Enable Tiny Prim Culling",
+    _settingDescriptors.reserve(4);
+    _settingDescriptors.emplace_back("Enable Tiny Prim Culling",
         HdStRenderSettingsTokens->enableTinyPrimCulling,
-        VtValue(bool(TfGetEnvSetting(HD_ENABLE_GPU_TINY_PRIM_CULLING))) };
-    _settingDescriptors[1] = { "OIT Layer Count",
-        HdStRenderSettingsTokens->oitLayerCount,
-        VtValue(int(TfGetEnvSetting(HD_OIT_LAYER_COUNT))) };
-    _settingDescriptors[2] = { "OIT Enable Approximation",
-        HdStRenderSettingsTokens->oitEnableApproximation,
-        VtValue(bool(TfGetEnvSetting(HD_OIT_ENABLE_APPROXIMATION))) };
-    _settingDescriptors[3] = { "OIT Step Function Resolution",
-        HdStRenderSettingsTokens->oitStepFunctionResolution,
-        VtValue(int(TfGetEnvSetting(HD_OIT_STEP_FUNCTION_RESOLUTION))) };
+        VtValue(bool(TfGetEnvSetting(HD_ENABLE_GPU_TINY_PRIM_CULLING))));
+    _settingDescriptors.emplace_back("OIT Number of Samples",
+        HdStRenderSettingsTokens->oitNumSamples,
+        VtValue(int(TfGetEnvSetting(HD_OIT_NUM_SAMPLES))));
+    _settingDescriptors.emplace_back("Enable Ambient Occlusion",
+        HdStRenderSettingsTokens->enableAo,
+        VtValue(bool(TfGetEnvSetting(HD_ENABLE_AMBIENT_OCCLUSION))));
+    _settingDescriptors.emplace_back("Ambient Occlusion Number of Samples",
+        HdStRenderSettingsTokens->aoNumSamples,
+        VtValue(int(TfGetEnvSetting(HD_AMBIENT_OCCLUSION_NUM_SAMPLES))));
     _PopulateDefaultSettings(_settingDescriptors);
 }
 

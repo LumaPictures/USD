@@ -39,7 +39,9 @@ TfToken HdxPackageRenderPassShadowShader();
 TfToken HdxPackageSimpleLightingShader();
 TfToken HdxPackageColorCorrectionShader();
 TfToken HdxPackageRenderPassOitShader();
+TfToken HdxPackageRenderPassOitOpaqueShader();
 TfToken HdxPackageOitResolveImageShader();
+TfToken HdxPackageAmbientOcclusionImageShader();
 
 
 PXR_NAMESPACE_CLOSE_SCOPE

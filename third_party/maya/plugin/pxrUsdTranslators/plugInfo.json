@@ -51,7 +51,8 @@
                             "PxrEnvDayLight",
                             "PxrMeshLight",
                             "PxrRectLight",
-                            "PxrSphereLight"
+                            "PxrSphereLight",
+                            "stroke"
                         ]
                     }
                 }

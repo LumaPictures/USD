@@ -1,5 +1,5 @@
 //
-// Copyright 2017 Pixar
+// Copyright 2018 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,7 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-
 #include "hydraKatana.h"
 
 #include "pxr/base/tf/debug.h"
@@ -131,13 +130,18 @@ void HydraKatana::setup()
     m_taskController->SetSelectionColor(m_selectionColor);
 
     // Task Params
-    m_renderTaskParams.enableLighting = true;
+    HdxRenderTaskParams renderTaskParams;
+    renderTaskParams.enableLighting = true;
+    m_taskController->SetRenderParams(renderTaskParams);
 
     // Render Tags
-    m_renderTags.push_back(HdTokens->geometry);
-    m_renderTags.push_back(HdTokens->proxy);
-    // NOTE: in order to render in full res use this instead of HdTokens->proxy:
-    // m_renderTags.push_back(HdTokens->render);
+    TfTokenVector renderTags;
+    renderTags.push_back(HdRenderTagTokens->geometry);
+    renderTags.push_back(HdRenderTagTokens->proxy);
+    // NOTE: in order to render in full res use this instead of 
+    // HdRenderTagTokens->proxy: 
+    // renderTags.push_back(HdRenderTagTokens->render);
+    m_taskController->SetRenderTags(renderTags);
 
     // Selection Tracker
     m_selectionTracker.reset(new HdxSelectionTracker());
@@ -145,28 +149,27 @@ void HydraKatana::setup()
     // Lighting Context
     m_lightingContext = initLighting();
 
-    // Set the Collection
-    HdRprimCollection collection(HdTokens->geometry,
-            HdReprSelector(HdReprTokens->smoothHull));
-    collection.SetRootPath(SdfPath::AbsoluteRootPath());
-    m_taskController->SetCollection(collection);
+    // Create the collection with all the geometry
+    m_geoCollection = HdRprimCollection(
+        TfToken("katanaHydraGeo"),
+        HdReprSelector(HdReprTokens->smoothHull));
+    m_geoCollection.SetRootPath(SdfPath::AbsoluteRootPath());
+
+    // Set the Collection in various entities
+    m_taskController->SetCollection(m_geoCollection);
+    m_renderIndex->GetChangeTracker().AddCollection(m_geoCollection.GetName());
 }
 
 void HydraKatana::draw(ViewportWrapperPtr viewport)
 {
     if (!isReadyToRender()) { return; }
 
-    using namespace Foundry::Katana;
-    ViewerUtils::GLStateRestore glStateRestore(
-    ViewerUtils::Enable |
-    ViewerUtils::ColorBuffer |
-    ViewerUtils::DepthBuffer |
-    ViewerUtils::Multisample);
-
-    // Init some GL capabilities
-    glDisable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_MULTISAMPLE);
+    // Currently needed. According to @mwdd:
+    //   """
+    //   HdxTaskController::_Delegate::IsEnabled() is what is forcing you to do
+    //   it. If that returned false, the value in HdxRenderTaskParams, would be
+    //   used.  We should fix that!
+    //   """
     glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
 
     // Set the Lighting State
@@ -178,16 +181,14 @@ void HydraKatana::draw(ViewportWrapperPtr viewport)
     // Camera Matrices
     GfMatrix4d projMatrix = toGfMatrixd(camera->getProjectionMatrix());
     GfMatrix4d viewMatrix = toGfMatrixd(camera->getViewMatrix());
-    m_taskController->SetCameraMatrices(viewMatrix, projMatrix);
+    m_taskController->SetFreeCameraMatrices(viewMatrix, projMatrix);
 
-    // GL Viewport
-    GfVec4d glviewport;
-    glGetDoublev(GL_VIEWPORT, &glviewport[0]);
-    m_taskController->SetCameraViewport(glviewport);
+    // Viewport size
+    GfVec4d glviewport(0, 0, viewport->getWidth(), viewport->getHeight());
+    m_taskController->SetRenderViewport(glviewport);
 
-    // Set Task Params
-    m_taskController->SetRenderParams(m_renderTaskParams);
-    m_taskController->SetRenderTags(m_renderTags);
+    // Sync collection with viewer display mode
+    syncDisplayMode(viewport);
 
     // Engine Selection State
     VtValue selectionValue(m_selectionTracker);
@@ -208,13 +209,16 @@ bool HydraKatana::pick(ViewportWrapperPtr viewport,
     // Make GL context current
     GlfGLContext::MakeCurrent(GlfGLContext::GetCurrentGLContext());
 
+    HdxPickTaskContextParams pickParams;
+    pickParams.outHits = &hits;
+
     // Define the hit mode
-    TfToken hitMode = HdxPickTokens->hitFirst;
-    TfToken resolveMode = HdxPickTokens->resolveNearestToCenter;
-    if (deepPicking)
-    {
-        hitMode = HdxPickTokens->hitFirst;
-        resolveMode = HdxPickTokens->resolveAll;
+    if (deepPicking) {
+        pickParams.hitMode = HdxPickTokens->hitAll;
+        pickParams.resolveMode = HdxPickTokens->resolveAll;
+    } else {
+        pickParams.hitMode = HdxPickTokens->hitFirst;
+        pickParams.resolveMode = HdxPickTokens->resolveNearestToCenter;
     }
 
     // Get the Viewport dimensions in pixels
@@ -226,34 +230,21 @@ bool HydraKatana::pick(ViewportWrapperPtr viewport,
     const Imath::Matrix44<double> projectionMat = getFrustumFromRect(x, y, w, h,
         viewportWidth, viewportHeight, viewport->getProjectionMatrix());
 
-    GfMatrix4d projMatrix = toGfMatrixd(projectionMat.getValue());
-    GfMatrix4d viewMatrix = toGfMatrixd(viewport->getViewMatrix());
+    pickParams.projectionMatrix = toGfMatrixd(projectionMat.getValue());
+    pickParams.viewMatrix = toGfMatrixd(viewport->getViewMatrix());
 
-    // This will set some HdxPickTaskParams, such as cullStyle
-    m_taskController->SetRenderParams(m_renderTaskParams);
-    m_taskController->SetRenderTags(m_renderTags);
+    // Sync collection with viewer display mode
+    syncDisplayMode(viewport);
 
-    // Intersector parameters
-    HdxPickTaskContextParams pickParams;
-    pickParams.hitMode = hitMode;
-    pickParams.resolveMode = resolveMode;
-    pickParams.viewMatrix = viewMatrix;
-    pickParams.projectionMatrix = projMatrix;
-    // is this needed? won't we effectively get it from the projection matrix?
-    //pickParams.clipPlanes = ?;
-    pickParams.outHits = &hits;
+    pickParams.collection = m_geoCollection;
 
-    // Prim Collection
-    HdRprimCollection collection(HdTokens->geometry,
-            HdReprSelector(HdReprTokens->smoothHull));
-    collection.SetRootPath(SdfPath::AbsoluteRootPath());
-    //collection.SetExcludePaths(excludedPaths);
-    pickParams.collection = collection;
-
+    // Get the hit objects
     VtValue vtPickParams(pickParams);
     m_engine.SetTaskContextData(HdxPickTokens->pickParams, vtPickParams);
-    auto pickingTasks = m_taskController->GetPickingTasks();
-    m_engine.Execute(m_renderIndex, &pickingTasks);
+
+    // Execute the picking tasks
+    auto tasks = m_taskController->GetPickingTasks();
+    m_engine.Execute(m_renderIndex, &tasks);
 
     // Hydra resizes the viewport to 128x128. We had to reset it back.
     glViewport(0, 0, viewportWidth, viewportHeight);
@@ -362,6 +353,43 @@ GlfSimpleLightingContextRefPtr HydraKatana::initLighting()
 
     context->SetLights(lights);
     return context;
+}
+
+void HydraKatana::syncDisplayMode(ViewportWrapperPtr viewport)
+{
+    FnAttribute::StringAttribute displayModeAttr =
+        viewport->getOption("Global.View.Display Mode");
+
+    if (displayModeAttr == m_displayModeAttr)
+    {
+        return;
+    }
+
+    m_displayModeAttr = displayModeAttr;
+
+    const std::string displayMode = displayModeAttr.getValue("Solid", false);
+
+    TfToken reprType;
+
+    if (displayMode == "Points")
+    {
+        reprType = HdReprTokens->points;
+    }   
+    else if (displayMode == "Wireframe")
+    {
+        reprType = HdReprTokens->wire;
+    }
+    else if (displayMode == "Flat Shaded")
+    {
+        reprType = HdReprTokens->hull;
+    }
+    else // Solid
+    {
+        reprType = HdReprTokens->smoothHull;
+    }
+
+    m_geoCollection.SetReprSelector(HdReprSelector(reprType));
+    m_taskController->SetCollection(m_geoCollection);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

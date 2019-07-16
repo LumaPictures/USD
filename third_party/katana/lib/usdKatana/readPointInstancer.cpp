@@ -28,6 +28,7 @@
 #include "usdKatana/utils.h"
 
 #include "pxr/usd/usdGeom/pointInstancer.h"
+#include "pxr/usd/usdGeom/xform.h"
 #include "pxr/usd/usd/modelAPI.h"
 #include "pxr/usd/usdShade/material.h"
 #include "pxr/usd/kind/registry.h"
@@ -338,6 +339,7 @@ PxrUsdKatanaReadPointInstancer(
     omitList.reserve(numInstances);
 
     std::map<SdfPath, std::string> protoPathsToKatPaths;
+    std::map<std::string, std::vector<std::string>> usdPrimPathsTracker;
 
     
 
@@ -356,14 +358,14 @@ PxrUsdKatanaReadPointInstancer(
 
         const SdfPath &protoPath = protoPaths[index];
 
-        // Compute the full (Katana) path to this prototype.
+        // Compute the Katana path to this prototype.
         //
-        std::string fullProtoPath;
+        std::string katProtoPath;
         std::map<SdfPath, std::string>::const_iterator pptkpIt =
                 protoPathsToKatPaths.find(protoPath);
         if (pptkpIt != protoPathsToKatPaths.end())
         {
-            fullProtoPath = pptkpIt->second;
+            katProtoPath = pptkpIt->second;
         }
         else
         {
@@ -373,41 +375,92 @@ PxrUsdKatanaReadPointInstancer(
                 continue;
             }
 
-            const std::string buildPath = protoPath.GetString();
-
-            FnKat::Attribute materialAssignAttr;
-
-            // If the prototype prim is a (sub)component, it should have
-            // materials defined below it.
+            // Determine where (what path) to start building the prototype prim
+            // such that the Look prims that it depends on will also get built.
+            // This could be the prototype path itself or an ancestor path.
             //
-            TfToken kind;
-            std::string assetName;
-            auto assetAPI = UsdModelAPI(protoPrim);
+            SdfPathVector commonPrefixes;
 
-            const bool hasMaterialChildren = (
-                    assetAPI.GetAssetName(&assetName) and
-                    assetAPI.GetKind(&kind) and (
-                        KindRegistry::IsA(kind, KindTokens->component) or
-                        KindRegistry::IsA(kind, KindTokens->subcomponent)));
-
-            // Otherwise, walk up from the prototype prim looking for a material
-            // binding, and if one is found, assign it directly to the generated
-            // instance source location.
+            // If the proto prim itself doesn't have any bindings or isn't a
+            // (sub)component, we'll walk upwards until we find a prim that
+            // does/is. Stop walking if we reach the instancer or the usdInArgs
+            // root.
             //
-            if (!hasMaterialChildren)
+            UsdPrim prim = protoPrim;
+            while (prim and prim != instancer.GetPrim() and
+                   prim != data.GetUsdInArgs()->GetRootPrim())
             {
-                UsdPrim prim = protoPrim;
-                while (prim and prim != instancer.GetPrim() and
-                       prim != data.GetUsdInArgs()->GetRootPrim())
+                UsdRelationship materialBindingsRel =
+                        UsdShadeMaterial::GetBindingRel(prim);
+                SdfPathVector materialPaths;
+                bool hasMaterialBindings = (materialBindingsRel and
+                        materialBindingsRel.GetForwardedTargets(
+                            &materialPaths) and !materialPaths.empty());
+
+                TfToken kind;
+                std::string assetName;
+                auto assetAPI = UsdModelAPI(prim);
+                // If the prim is a (sub)component, it should have materials
+                // defined below it.
+                bool hasMaterialChildren = (
+                        assetAPI.GetAssetName(&assetName) and
+                        assetAPI.GetKind(&kind) and (
+                            KindRegistry::IsA(kind, KindTokens->component) or
+                            KindRegistry::IsA(kind, KindTokens->subcomponent)));
+
+                if (hasMaterialChildren)
                 {
-                    materialAssignAttr = 
-                        PxrUsdKatanaUtils::GetMaterialAssignAttr(prim, data);
-                    if (materialAssignAttr.isValid()) {
-                        break;
-                    }
-                    prim = prim.GetParent();
+                    // The prim has material children, so start building at the
+                    // prim's path.
+                    //
+                    commonPrefixes.push_back(prim.GetPath());
+                    break;
                 }
+
+                if (hasMaterialBindings)
+                {
+                    for (auto materialPath : materialPaths)
+                    {
+                        const SdfPath &commonPrefix =
+                                protoPath.GetCommonPrefix(materialPath);
+                        if (commonPrefix.GetString() == "/" || instancerSdfPath.HasPrefix(commonPrefix))
+                        {
+                            // XXX Unhandled case.
+                            // The prim and its material are not under the same
+                            // parent; start building at the prim's path
+                            // (although it is likely that bindings will be
+                            // broken).
+                            //
+                            commonPrefixes.push_back(prim.GetPath());
+                        }
+                        else
+                        {
+                            // Start building at the common ancestor between the
+                            // prim and its material.
+                            //
+                            commonPrefixes.push_back(commonPrefix);
+                        }
+                    }
+                    break;
+                }
+
+                prim = prim.GetParent();
             }
+
+            // Fail-safe in case no common prefixes were found.
+            //
+            if (commonPrefixes.empty())
+            {
+                commonPrefixes.push_back(protoPath);
+            }
+
+            // XXX Unhandled case.
+            // We'll use the first common ancestor even if there is more than
+            // one (which shouldn't happen if the prototype prim and its bindings
+            // are under the same parent).
+            //
+            SdfPath::RemoveDescendentPaths(&commonPrefixes);
+            const std::string buildPath = commonPrefixes[0].GetString();
 
             // See if the path is a child of the point instancer. If so, we'll
             // match its hierarchy. If not, we'll put it under a 'prototypes'
@@ -425,72 +478,116 @@ PxrUsdKatanaReadPointInstancer(
                         FnGeolibUtil::Path::GetLeafName(buildPath);
             }
 
-            // Start generating the full path to the prototype.
+            // Start generating the Katana path to the prototype.
             //
-            fullProtoPath = katOutputPath + "/" + relBuildPath;
-
-            // Make the common ancestor our instance source.
-            //
-            sourcesBldr.setAttrAtLocation(relBuildPath,
-                    "type", FnKat::StringAttribute("instance source"));
-            sourcesBldr.setAttrAtLocation(relBuildPath,
-                    "materialAssign", materialAssignAttr);
-
-            // Author a tracking attr.
-            //
-            sourcesBldr.setAttrAtLocation(relBuildPath,
-                    "info.usd.sourceUsdPath",
-                    FnKat::StringAttribute(buildPath));
+            katProtoPath = katOutputPath + "/" + relBuildPath;
 
             // Tell the BuildIntermediate op to start building at the common
-            // ancestor.
+            // ancestor, but don't clobber the paths of any other prims that
+            // need to be built out too.
             //
-            sourcesBldr.setAttrAtLocation(relBuildPath,
-                    "usdPrimPath", FnKat::StringAttribute(buildPath));
-            sourcesBldr.setAttrAtLocation(relBuildPath,
-                    "usdPrimName", FnKat::StringAttribute("geo"));
+            const std::string relBuildPathUpOne =
+                    FnGeolibUtil::Path::GetLocationParent(relBuildPath);
+            if (usdPrimPathsTracker.find(relBuildPathUpOne) ==
+                    usdPrimPathsTracker.end())
+            {
+                usdPrimPathsTracker[relBuildPathUpOne].push_back(buildPath);
+            }
+            else
+            {
+                auto& primPaths = usdPrimPathsTracker[relBuildPathUpOne];
+                if (std::find(primPaths.begin(), primPaths.end(), buildPath) ==
+                        primPaths.end())
+                {
+                    primPaths.push_back(buildPath);
+                }
+            }
+            sourcesBldr.setAttrAtLocation(relBuildPathUpOne,
+                    "usdPrimPath", FnKat::StringAttribute(
+                            usdPrimPathsTracker[relBuildPathUpOne]));
 
             // Build an AttributeSet op that will delete the prototype's
             // transform, since we've already folded it into the instance
             // transforms via IncludeProtoXform.
             //
-            FnGeolibServices::AttributeSetOpArgsBuilder asb;
-            asb.deleteAttr("xform");
+            FnGeolibServices::AttributeSetOpArgsBuilder delXformBldr;
+            delXformBldr.deleteAttr("xform");
 
+            std::string relProtoPath = relBuildPath;
             if (protoPath.GetString() != buildPath)
             {
-                // Finish generating the full path to the prototype.
+                // Finish generating the Katana path to the prototype.
                 //
-                fullProtoPath = fullProtoPath + "/geo" + pystring::replace(
+                katProtoPath = katProtoPath + pystring::replace(
                         protoPath.GetString(), buildPath, "");
+                relProtoPath = relProtoPath + pystring::replace(
+                        protoPath.GetString(), buildPath, "");
+            }
 
-                asb.setLocationPaths(fullProtoPath);
+            // Dermine whether or not we can use the prototype prim itself as
+            // the instance source or if we should insert an empty group into
+            // the hierarchy to hold the instance source type. The latter will
+            // be true if the prototype's native Katana type needs to be
+            // preserved, for example, if the prototype is a gprim.
+            //
+            // XXX Since we can't make an assumption about what Katana type the
+            // PxrUsdIn ops will author, we'll have to make a best guess. For
+            // now, consider Xform prims without an authored kind to be usable
+            // as instance sources.
+            //
+            TfToken kind;
+            const bool useProtoAsInstanceSource =
+                    protoPrim.IsA<UsdGeomXform>() &&
+                    !UsdModelAPI(protoPrim).GetKind(&kind);
+            if (useProtoAsInstanceSource)
+            {
+                delXformBldr.setLocationPaths(katProtoPath);
                 sourcesBldr.addSubOpAtLocation(
-                        relBuildPath + "/geo" + pystring::replace(
-                                protoPath.GetString(), buildPath, ""),
-                        "AttributeSet", asb.build());
+                        relProtoPath,
+                        "AttributeSet", delXformBldr.build());
             }
             else
             {
-                asb.setLocationPaths(fullProtoPath + "/geo");
+                // Tell PxrUsdIn to create an empty group when it gets to the
+                // prototype's location.
+                //
+                sourcesBldr.setAttrAtLocation(relProtoPath,
+                        "insertEmptyGroup", FnKat::IntAttribute(1));
+
+                // Since the empty group will have the same name as the
+                // prototype, we can add the prototype's name to its original
+                // Katana path to get its post-insertion Katana path.
+                //
+                const std::string protoName = protoPrim.GetName();
+                delXformBldr.setLocationPaths(katProtoPath + "/" + protoName);
                 sourcesBldr.addSubOpAtLocation(
-                        relBuildPath + "/geo",
-                        "AttributeSet", asb.build());
+                        relProtoPath + "/" + protoName,
+                        "AttributeSet", delXformBldr.build());
             }
 
-            // Create a mapping that will link the instance's index to its
-            // prototype's full path.
+            // Build an AttributeSet op that will set the instance source type
+            // on the prototype or the empty group (if we inserted one).
             //
-            instanceSourceIndexMap[fullProtoPath] = instanceSources.size();
-            instanceSources.push_back(fullProtoPath);
+            FnGeolibServices::AttributeSetOpArgsBuilder setTypeBldr;
+            setTypeBldr.setAttr("type",
+                    FnKat::StringAttribute("instance source"));
+            setTypeBldr.setLocationPaths(katProtoPath);
+            sourcesBldr.addSubOpAtLocation(relProtoPath,
+                    "AttributeSet", setTypeBldr.build());
 
-            // Finally, store the full path in the map so we won't have to do
+            // Create a mapping that will link the instance's index to its
+            // prototype's Katana path.
+            //
+            instanceSourceIndexMap[katProtoPath] = instanceSources.size();
+            instanceSources.push_back(katProtoPath);
+
+            // Finally, store the Katana path in the map so we won't have to do
             // this work again.
             //
-            protoPathsToKatPaths[protoPath] = fullProtoPath;
+            protoPathsToKatPaths[protoPath] = katProtoPath;
         }
 
-        instanceIndices.push_back(instanceSourceIndexMap[fullProtoPath]);
+        instanceIndices.push_back(instanceSourceIndexMap[katProtoPath]);
     }
 
     //
@@ -567,25 +664,26 @@ PxrUsdKatanaReadPointInstancer(
     // Transfer primvars.
     //
 
-    FnKat::GroupBuilder instancerPrimvarsBldr;
     FnKat::GroupBuilder instancesPrimvarsBldr;
     for (int64_t i = 0; i < primvarAttrs.getNumberOfChildren(); ++i)
     {
         const std::string primvarName = primvarAttrs.getChildName(i);
+        FnKat::GroupAttribute primvarAttr = primvarAttrs.getChildByIndex(i);
 
-        // Use "point" scope for the instancer.
-        instancerPrimvarsBldr.set(primvarName, primvarAttrs.getChildByIndex(i));
-        instancerPrimvarsBldr.set(primvarName + ".scope",
-                FnKat::StringAttribute("point"));
+        instancesPrimvarsBldr.set(primvarName, primvarAttr);
+        FnKat::StringAttribute scopeAttr = primvarAttr.getChildByName("scope");
+        const std::string scope = scopeAttr.getValue("primitive", false);
 
-        // User "primitive" scope for the instances.
-        instancesPrimvarsBldr.set(primvarName, primvarAttrs.getChildByIndex(i));
-        instancesPrimvarsBldr.set(primvarName + ".scope",
-                FnKat::StringAttribute("primitive"));
+        if (scope != "primitive")
+        {
+            instancesPrimvarsBldr.set(primvarName + ".scope",
+                                      FnKat::StringAttribute("point"));
+        }
     }
-    instancerAttrMap.set("geometry.arbitrary", instancerPrimvarsBldr.build());
-    instancesBldr.setAttrAtLocation("instances",
-            "geometry.arbitrary", instancesPrimvarsBldr.build());
+    instancesBldr.setAttrAtLocation(
+        "instances", "geometry.arbitrary", instancesPrimvarsBldr.build());
+    // No need for any geometry attributes on the usd point instancer location.
+    instancerAttrMap.del("geometry");
 
     //
     // Set the final aggregate bounds.

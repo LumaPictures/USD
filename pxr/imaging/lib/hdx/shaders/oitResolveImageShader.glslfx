@@ -37,99 +37,57 @@
 
 -- glsl OitResolve.Image
 
-#ifdef OIT_ENABLE_APPROXIMATION
-
-#define OSR OIT_STEP_FUNCTION_RESOLUTION
-
-struct StepNodes {
-    int count;
-    float depth[OSR];
-    float trans[OSR];
-};
-
-void insertNode(float depth, float trans, inout StepNodes nodes) {
-    // No compression for now.
-    // Should we linearize depth? It might be better to put bigger importance
-    // on front fragments, when compressing.
-    int insertIndex = 0;
-    while (insertIndex < min(OSR, nodes.count) &&
-           depth > nodes.depth[insertIndex]) {
-        insertIndex += 1;
-    }
-    if (insertIndex == OSR) {
-        return;
-    }
-
-    for (int id = min(nodes.count, OSR) - 1; id > insertIndex; id -= 1) {
-        nodes.depth[id] = nodes.depth[id - 1];
-        nodes.trans[id] = nodes.trans[id - 1] * trans;
-    }
-
-    nodes.depth[insertIndex] = depth;
-    nodes.depth[insertIndex] = trans;
-    nodes.count += 1;
-}
-
-#endif
-
 vec4 imageShader(vec2 uv)
 {
 #if defined(HD_HAS_hdxOitDataBuffer)
-    int screenWidth = HdGet_oitWidth();
-    int screenHeight = HdGet_oitHeight();
-    int numSamples = HdGet_oitSamples();
-    int bufferSize = screenWidth * screenHeight * numSamples;
+    int screenWidth = int(HdGet_oitScreenSize().x);
 
+    // +1 because index 0 of counter buffer is reserved as atomic counter in
+    // WriteOitLayersToBuffer
     int screenIndex = int(gl_FragCoord.x) + int(gl_FragCoord.y) * screenWidth;
-    int nodeIndex = hdxOitCounterBuffer[screenIndex+1];
-#ifdef OIT_ENABLE_APPROXIMATION
-    if (nodeIndex == -1) {
-        return vec4(0.0, 0.0, 0.0, 0.0);
-    }
+    screenIndex += 1;
 
-    StepNodes nodes;
-    for (int id = 0; id < OSR; id += 1) {
-        nodes.depth[id] = 1.0e30;
-        nodes.trans[id] = 1.0;
-    }
-    nodes.count = 0;
-
-    for (int id = nodeIndex; id != -1; id = hdxOitIndexBuffer[id]) {
-        float currentDepth = hdxOitDepthBuffer[id];
-        float currentTrans = 1.0 - hdxOitDataBuffer[id].w;
-        insertNode(currentDepth, currentTrans, nodes);
-    }
-
-    vec3 color = vec3(0.0, 0.0, 0.0);
-    for (int id = nodeIndex; id != -1; id = hdxOitIndexBuffer[id]) {
-        float currentDepth = hdxOitDepthBuffer[id];
-        vec4 currentSample = hdxOitDataBuffer[id];
-        float currentTrans = 1.0 - currentSample.w;
-
-        int closestIndex = 0;
-        while (closestIndex < min(OSR, nodes.count) &&
-               currentDepth > nodes.depth[closestIndex]) {
-            closestIndex += 1;
-        }
-        if (closestIndex != OSR) {
-            color += currentSample.xyz * currentTrans * nodes.trans[closestIndex];
-        }
-    }
-
-    return vec4(color, 1.0);
-#else  // OIT_ENABLE_APPROXIMATION
+    int nodeIndex = hdxOitCounterBuffer[screenIndex];
     int numDepths = 0;
 
     // XXX renderPass.WriteOitLayersToBuffer does not clamp the number of
     //     depth samples we store for a pixel. Here we process no more than
-    //     'OIT_LAYER_COUNT' for a pixel. (If there are greater than
-    //     'OIT_LAYER_COUNT' samples stored for this pixel some will
+    //     'OIT_NUM_SAMPLES' for a pixel. (If there are greater than
+    //     'OIT_NUM_SAMPLES' samples stored for this pixel some will
     //     currently not contribute)
-    vec4 sortedColor[OIT_LAYER_COUNT];
-    float sortedDepth[OIT_LAYER_COUNT];
+    vec4 sortedColor[OIT_NUM_SAMPLES];
+    float sortedDepth[OIT_NUM_SAMPLES];
 
-    while (nodeIndex != -1 && numDepths < OIT_LAYER_COUNT &&
-           nodeIndex < bufferSize){
+#if 1
+    // Select sorting
+    while (nodeIndex != -1 && numDepths < OIT_NUM_SAMPLES) {
+        sortedDepth[numDepths] = hdxOitDepthBuffer[nodeIndex];
+        sortedColor[numDepths] = hdxOitDataBuffer[nodeIndex];
+        nodeIndex = hdxOitIndexBuffer[nodeIndex];
+        numDepths += 1;
+    }
+
+    for (int depth = 0; depth < numDepths - 1; depth += 1) {
+        int swap = depth;
+        for (int i = depth + 1; i < numDepths; i += 1) {
+            if (sortedDepth[swap] > sortedDepth[i]) {
+                swap = i;
+            }
+        }
+        float td = sortedDepth[swap];
+        vec4 tc = sortedColor[swap];
+
+        sortedDepth[swap] = sortedDepth[depth];
+        sortedColor[swap] = sortedColor[depth];
+
+        sortedDepth[depth] = td;
+        sortedColor[depth] = tc;
+    }
+#else
+    while (nodeIndex != -1 && 
+           numDepths < OIT_NUM_SAMPLES && 
+           nodeIndex < hdxOitDataBuffer.length()) 
+    {
         float currentDepth = hdxOitDepthBuffer[nodeIndex]; 
         int insertIndex = numDepths; 
         while (insertIndex > 0 && sortedDepth[insertIndex - 1] > currentDepth) {
@@ -142,24 +100,24 @@ vec4 imageShader(vec2 uv)
         numDepths += 1; 
         nodeIndex = hdxOitIndexBuffer[nodeIndex]; 
     }
+#endif
+
     int depth = 0;
-    vec4 colorAccum = vec4(0,0,0,0);
+    vec4 colorAccum = vec4(0);
     while (depth < numDepths) {
         float ca = sortedColor[depth].a * (1 - colorAccum.a);
         vec3 cb = sortedColor[depth].rgb;
         colorAccum.rgb = colorAccum.rgb + cb * ca;
         colorAccum.a = colorAccum.a + ca;
 
-        colorAccum = clamp(colorAccum, vec4(0), vec4(1));
-        if (colorAccum.a >= 0.99) break;
+        if (colorAccum.a >= 1.0) break;
 
         depth += 1; 
     }
 
+    colorAccum = clamp(colorAccum, vec4(0), vec4(1));
     return colorAccum;
-#endif  // OIT_ENABLE_APPROXIMATION
-
-#else  // HD_HAS_hdxOitDataBuffer
+#else
     return vec4(0);
-#endif   // HD_HAS_hdxOitDataBuffer
+#endif
 }

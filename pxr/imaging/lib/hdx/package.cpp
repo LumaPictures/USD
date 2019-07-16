@@ -102,11 +102,26 @@ HdxPackageRenderPassOitShader()
 }
 
 TfToken
+HdxPackageRenderPassOitOpaqueShader()
+{
+    static TfToken shader = _GetShaderPath("renderPassOitOpaqueShader.glslfx");
+    return shader;
+}
+
+TfToken
 HdxPackageOitResolveImageShader()
 {
     static TfToken shader = _GetShaderPath("oitResolveImageShader.glslfx");
     return shader;
 }
+
+TfToken
+HdxPackageAmbientOcclusionImageShader()
+{
+    static TfToken shader = _GetShaderPath("ambientOcclusionImageShader.glslfx");
+    return shader;
+}
+
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
