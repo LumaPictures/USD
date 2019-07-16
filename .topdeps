@@ -27,3 +27,4 @@ tg/simple_features/oiio_1.9.1
 tg/simple_features/FindRenderman
 tg/simple_features/ambient_occlusion
 tg/bugfixes/sign_compare
+tg/bugfixes/katana_point_instancer_primvar_scope
