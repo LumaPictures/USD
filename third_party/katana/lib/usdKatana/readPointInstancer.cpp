@@ -664,25 +664,26 @@ PxrUsdKatanaReadPointInstancer(
     // Transfer primvars.
     //
 
-    FnKat::GroupBuilder instancerPrimvarsBldr;
     FnKat::GroupBuilder instancesPrimvarsBldr;
     for (int64_t i = 0; i < primvarAttrs.getNumberOfChildren(); ++i)
     {
         const std::string primvarName = primvarAttrs.getChildName(i);
+        FnKat::GroupAttribute primvarAttr = primvarAttrs.getChildByIndex(i);
 
-        // Use "point" scope for the instancer.
-        instancerPrimvarsBldr.set(primvarName, primvarAttrs.getChildByIndex(i));
-        instancerPrimvarsBldr.set(primvarName + ".scope",
-                FnKat::StringAttribute("point"));
+        instancesPrimvarsBldr.set(primvarName, primvarAttr);
+        FnKat::StringAttribute scopeAttr = primvarAttr.getChildByName("scope");
+        const std::string scope = scopeAttr.getValue("primitive", false);
 
-        // User "primitive" scope for the instances.
-        instancesPrimvarsBldr.set(primvarName, primvarAttrs.getChildByIndex(i));
-        instancesPrimvarsBldr.set(primvarName + ".scope",
-                FnKat::StringAttribute("primitive"));
+        if (scope != "primitive")
+        {
+            instancesPrimvarsBldr.set(primvarName + ".scope",
+                                      FnKat::StringAttribute("point"));
+        }
     }
-    instancerAttrMap.set("geometry.arbitrary", instancerPrimvarsBldr.build());
-    instancesBldr.setAttrAtLocation("instances",
-            "geometry.arbitrary", instancesPrimvarsBldr.build());
+    instancesBldr.setAttrAtLocation(
+        "instances", "geometry.arbitrary", instancesPrimvarsBldr.build());
+    // No need for any geometry attributes on the usd point instancer location.
+    instancerAttrMap.del("geometry");
 
     //
     // Set the final aggregate bounds.
