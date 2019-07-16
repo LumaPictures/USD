@@ -1,2 +1,2 @@
 From: Pal Mezei <sirpalee@gmail.com>
-Subject: [PATCH] tg/bugfixes/katana_point_instancer_primvar_scope
+Subject: [usdKatana] Changing the primvar scope on the point instancer when non-constant is used.
