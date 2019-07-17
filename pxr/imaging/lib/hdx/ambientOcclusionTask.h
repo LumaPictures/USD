@@ -57,6 +57,9 @@ private:
     HdStRenderPassStateSharedPtr _renderPassState;
     HdStRenderPassShaderSharedPtr _renderPassShader;
 
+    HdBufferArrayRangeSharedPtr _kernelBar;
+    HdBufferArrayRangeSharedPtr _uniformBar;
+
     int _numSamples = -1;
 };
 
