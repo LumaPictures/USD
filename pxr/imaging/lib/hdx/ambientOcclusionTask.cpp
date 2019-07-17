@@ -33,6 +33,7 @@
 #include "pxr/imaging/hd/renderPassState.h"
 #include "pxr/imaging/hd/rprimCollection.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
+#include "pxr/imaging/hd/vtBufferSource.h"
 
 #include "pxr/imaging/hdSt/renderPassShader.h"
 #include "pxr/imaging/hdSt/renderPassState.h"
@@ -43,7 +44,14 @@
 #include "pxr/imaging/hdx/package.h"
 #include "pxr/imaging/hdx/utils.h"
 
+#include <random>
+
 PXR_NAMESPACE_OPEN_SCOPE
+
+TF_DEFINE_PRIVATE_TOKENS(
+    _tokens,
+    (aoKernel)
+);
 
 namespace {
 
@@ -98,6 +106,24 @@ private:
     ID _hash;
     int _depthTex;
 };
+
+// The sample should conform to poission disc sampling.
+// Once we have the normal available, this becomes a bit easier.
+VtVec2fArray _GenerateSamplingKernel(const int numPoints)
+{
+    std::ranlux24 engine1(42);
+    std::ranlux24 engine2(137);
+
+    std::uniform_real_distribution<float> distribution(0.0f, 1.0f);
+
+    VtVec2fArray ret; ret.assign(numPoints, {0.0f, 0.0f});
+    std::generate(ret.begin(), ret.end(), [&] () -> GfVec2f {
+        const auto angle = distribution(engine1) * M_2_PI;
+        const auto distance = sqrtf(distribution(engine2));
+        return {distance * sinf(angle), distance * cosf(angle)};
+    });
+    return ret;
+}
 
 }
 
@@ -154,6 +180,39 @@ void HdxAmbientOcclusionTask::Prepare(HdTaskContext* ctx,
         rebuildShader = true;
     }
 
+    const auto& resourceRegistry = renderIndex->GetResourceRegistry();
+
+    auto buildKernel = [&] () {
+        HdBufferSpecVector kernelSpecs;
+        kernelSpecs.push_back(
+            HdBufferSpec(
+                _tokens->aoKernel,
+                HdTupleType {HdTypeFloatVec2, static_cast<size_t>(numSamples)})
+        );
+
+        _kernelBar = resourceRegistry->AllocateSingleBufferArrayRange(
+            _tokens->aoKernel,
+            kernelSpecs,
+            HdBufferArrayUsageHint()
+        );
+
+        _renderPassShader->AddBufferBinding(
+            HdBindingRequest(
+                HdBinding::SSBO,
+                _tokens->aoKernel,
+                _kernelBar,
+                false /* interleave */
+            ));
+
+        HdBufferSourceSharedPtr kernelSource(
+            new HdVtBufferSource(
+                _tokens->aoKernel,
+                VtValue(_GenerateSamplingKernel(numSamples))
+            )
+        );
+        resourceRegistry->AddSource(_kernelBar, kernelSource);
+    };
+
     if (!_renderPass) {
         HdRprimCollection collection;
 
@@ -177,13 +236,15 @@ void HdxAmbientOcclusionTask::Prepare(HdTaskContext* ctx,
             HdBlendFactor::HdBlendFactorOne);
 
         _renderPassShader.reset(new HdxAmbientOcclusionRenderPassShader(
-            8));
+            numSamples));
 
         _renderPassState->SetRenderPassShader(_renderPassShader);
+        buildKernel();
     } else if(rebuildShader) {
         _renderPassShader.reset(new HdxAmbientOcclusionRenderPassShader(
             _numSamples));
         _renderPassState->SetRenderPassShader(_renderPassShader);
+        buildKernel();
     }
 }
 
@@ -207,8 +268,8 @@ void HdxAmbientOcclusionTask::Execute(HdTaskContext* ctx)
     glBindTexture(GL_TEXTURE_2D, depthTex);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F,
                  screenSize[0], screenSize[1], 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, 0);
 

@@ -39,12 +39,16 @@
 
 layout(location = 41) uniform sampler2D depthTexture;
 
+float getAmbientOcclusionFactor(float currentDepth, vec2 uv) {
+    return 0.0;
+}
+
 vec4 imageShader(vec2 uv)
 {
     float depth = texture2D(depthTexture, uv).x;
     if (depth > 0.9999) {
         return vec4(0, 0, 0, 0);
     } else {
-        return vec4(depth, depth, depth, 1.0);
+        return vec4(0.0, 0.0, 0.0, getAmbientOcclusionFactor(depth, uv));
     }
 }

@@ -66,7 +66,7 @@ TF_DEFINE_ENV_SETTING(HD_OIT_NUM_SAMPLES, 8,
 TF_DEFINE_ENV_SETTING(HD_ENABLE_AMBIENT_OCCLUSION, true,
            "Enables ambient occlusion by default.");
 
-TF_DEFINE_ENV_SETTING(HD_AMBIENT_OCCLUSION_NUM_SAMPLES, 8,
+TF_DEFINE_ENV_SETTING(HD_AMBIENT_OCCLUSION_NUM_SAMPLES, 32,
                       "Number of ambient occlusion samples. Increase the value"
                       "increases frame time, but improves ambient occlusion"
                       "quality.");
