@@ -397,6 +397,29 @@ public:
     /// @}
 
     // ---------------------------------------------------------------------
+    /// \name Control of background rendering threads.
+    /// @{
+    // ---------------------------------------------------------------------
+
+    /// Query the renderer as to whether it supports pausing and resuming.
+    USDIMAGINGGL_API
+    bool IsPauseRendererSupported() const;
+
+    /// Pause the renderer.
+    ///
+    /// Returns \c true if successful.
+    USDIMAGINGGL_API
+    bool PauseRenderer();
+
+    /// Resume the renderer.
+    ///
+    /// Returns \c true if successful.
+    USDIMAGINGGL_API
+    bool ResumeRenderer();
+
+    /// @}
+
+    // ---------------------------------------------------------------------
     /// \name Color Correction
     /// @{
     // ---------------------------------------------------------------------
@@ -417,13 +440,17 @@ public:
     static bool IsColorCorrectionCapable();
 
     // ---------------------------------------------------------------------
-    /// \name Resource Information
+    /// \name Render Statistics
     /// @{
     // ---------------------------------------------------------------------
 
-    /// Returns GPU resource allocation info
+    /// Returns render statistics.
+    ///
+    /// The contents of the dictionary will depend on the current render 
+    /// delegate.
+    ///
     USDIMAGINGGL_API
-    VtDictionary GetResourceAllocation() const;
+    VtDictionary GetRenderStats() const;
 
     /// @}
 
