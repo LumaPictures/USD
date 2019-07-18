@@ -342,7 +342,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 bool
 UsdGeomModelAPI::GetExtentsHint(VtVec3fArray *extents, 
-                             const UsdTimeCode &time) const
+                                const UsdTimeCode &time) const
 {
     UsdAttribute extentsHintAttr = 
         GetPrim().GetAttribute(UsdGeomTokens->extentsHint);
@@ -355,7 +355,7 @@ UsdGeomModelAPI::GetExtentsHint(VtVec3fArray *extents,
 
 bool
 UsdGeomModelAPI::SetExtentsHint(VtVec3fArray const &extents, 
-                             const UsdTimeCode &time)
+                                const UsdTimeCode &time) const
 {
     if (!TF_VERIFY(extents.size() >= 2 &&
                       extents.size() <= (2 *
@@ -370,14 +370,11 @@ UsdGeomModelAPI::SetExtentsHint(VtVec3fArray const &extents,
     if (!extentsHintAttr)
         return false;
 
-    VtVec3fArray currentExtentsHint;
-    extentsHintAttr.Get(&currentExtentsHint, time);
-   
     return extentsHintAttr.Set(extents, time);
 }
 
 UsdAttribute 
-UsdGeomModelAPI::GetExtentsHintAttr()
+UsdGeomModelAPI::GetExtentsHintAttr() const
 {
     return GetPrim().GetAttribute(UsdGeomTokens->extentsHint);
 }
