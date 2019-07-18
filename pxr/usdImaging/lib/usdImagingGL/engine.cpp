@@ -964,6 +964,42 @@ UsdImagingGLEngine::SetEnableFloatPointDrawTarget(bool state)
     _useFloatPointDrawTarget = state;
 }
 
+// ---------------------------------------------------------------------
+// Control of background rendering threads.
+// ---------------------------------------------------------------------
+bool
+UsdImagingGLEngine::IsPauseRendererSupported() const
+{
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return false;
+    }
+
+    TF_VERIFY(_renderIndex);
+    return _renderIndex->GetRenderDelegate()->IsPauseSupported();
+}
+
+bool
+UsdImagingGLEngine::PauseRenderer()
+{
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return false;
+    }
+
+    TF_VERIFY(_renderIndex);
+    return _renderIndex->GetRenderDelegate()->Pause();
+}
+
+bool
+UsdImagingGLEngine::ResumeRenderer()
+{
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return false;
+    }
+
+    TF_VERIFY(_renderIndex);
+    return _renderIndex->GetRenderDelegate()->Resume();
+}
+
 //----------------------------------------------------------------------------
 // Color Correction
 //----------------------------------------------------------------------------
@@ -1000,14 +1036,14 @@ UsdImagingGLEngine::IsColorCorrectionCapable()
 //----------------------------------------------------------------------------
 
 VtDictionary
-UsdImagingGLEngine::GetResourceAllocation() const
+UsdImagingGLEngine::GetRenderStats() const
 {
     if (ARCH_UNLIKELY(_legacyImpl)) {
         return VtDictionary();
     }
 
     TF_VERIFY(_renderIndex);
-    return _renderIndex->GetResourceRegistry()->GetResourceAllocation();
+    return _renderIndex->GetRenderDelegate()->GetRenderStats();
 }
 
 //----------------------------------------------------------------------------
@@ -1330,15 +1366,15 @@ UsdImagingGLEngine::_ComputeRenderTags(UsdImagingGLRenderParams const& params,
     // the application
     renderTags->clear();
     renderTags->reserve(4);
-    renderTags->push_back(HdTokens->geometry);
+    renderTags->push_back(HdRenderTagTokens->geometry);
     if (params.showGuides) {
-        renderTags->push_back(HdxRenderTagsTokens->guide);
+        renderTags->push_back(HdRenderTagTokens->guide);
     }
     if (params.showProxy) {
-        renderTags->push_back(UsdGeomTokens->proxy);
+        renderTags->push_back(HdRenderTagTokens->proxy);
     }
     if (params.showRender) {
-        renderTags->push_back(UsdGeomTokens->render);
+        renderTags->push_back(HdRenderTagTokens->render);
     }
 }
 
