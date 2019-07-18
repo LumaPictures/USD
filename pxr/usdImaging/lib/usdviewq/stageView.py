@@ -853,6 +853,7 @@ class StageView(QtOpenGL.QGLWidget):
         self._lastY = 0
 
         self._renderer = None
+        self._renderPauseState = False
         self._reportedContextError = False
         self._renderModeDict = {
             RenderModes.WIREFRAME: UsdImagingGL.DrawMode.DRAW_WIREFRAME,
@@ -918,6 +919,7 @@ class StageView(QtOpenGL.QGLWidget):
     def _handleRendererChanged(self, rendererId):
         self._rendererDisplayName = self.GetRendererDisplayName(rendererId)
         self._rendererAovName = "color"
+        self._renderPauseState = False
 
     def closeRenderer(self):
         '''Close the current renderer.'''
@@ -986,6 +988,20 @@ class StageView(QtOpenGL.QGLWidget):
         if self._renderer:
             self._renderer.SetRendererSetting(name, value)
             self.updateGL()
+
+    def SetRendererPaused(self, paused):
+        if self._renderer:
+            if paused:
+                self._renderPauseState = self._renderer.PauseRenderer()
+            else:
+                self._renderPauseState = not self._renderer.ResumeRenderer()
+
+    def IsPauseRendererSupported(self):
+        if self._renderer:
+            if self._renderer.IsPauseRendererSupported():
+                return True
+
+        return False
 
     def _stageReplaced(self):
         '''Set the USD Stage this widget will be displaying. To decommission
@@ -1848,7 +1864,11 @@ class StageView(QtOpenGL.QGLWidget):
             if not hydraMode:
                 hydraMode = "Enabled"
 
-        toPrint = {"Hydra": hydraMode}
+        if self._renderPauseState:
+            toPrint = {"Hydra": "(paused)"}
+        else:
+            toPrint = {"Hydra": hydraMode}
+            
         if self._rendererAovName != "color":
             toPrint["  AOV"] = self._rendererAovName
         self._hud.updateGroup("TopRight", self.width()-160, 14, col,
@@ -1860,22 +1880,23 @@ class StageView(QtOpenGL.QGLWidget):
 
         # GPU stats (TimeElapsed is in nano seconds)
         if self._dataModel.viewSettings.showHUD_GPUstats:
-            allocInfo = renderer.GetResourceAllocation()
-            gpuMemTotal = 0
-            texMem = 0
-            if "gpuMemoryUsed" in allocInfo:
-                gpuMemTotal = allocInfo["gpuMemoryUsed"]
-            if "textureMemory" in allocInfo:
-                texMem = allocInfo["textureMemory"]
-                gpuMemTotal += texMem
+
+            def _addSizeMetric(toPrint, stats, label, key):
+                if key in stats:
+                    toPrint[label] = ReportMetricSize(stats[key])
+
+            rStats = renderer.GetRenderStats()
 
             toPrint["GL prims "] = self._glPrimitiveGeneratedQuery.GetResult()
             toPrint["GPU time "] = "%.2f ms " % (self._glTimeElapsedQuery.GetResult() / 1000000.0)
-            toPrint["GPU mem  "] = ReportMetricSize(gpuMemTotal)
-            toPrint[" primvar "] = ReportMetricSize(allocInfo["primvar"]) if "primvar" in allocInfo else "N/A"
-            toPrint[" topology"] = ReportMetricSize(allocInfo["topology"]) if "topology" in allocInfo else "N/A"
-            toPrint[" shader  "] = ReportMetricSize(allocInfo["drawingShader"]) if "drawingShader" in allocInfo else "N/A"
-            toPrint[" texture "] = ReportMetricSize(texMem)
+            _addSizeMetric(toPrint, rStats, "GPU mem  ", "gpuMemoryUsed")
+            _addSizeMetric(toPrint, rStats, " primvar ", "primvar")
+            _addSizeMetric(toPrint, rStats, " topology", "topology")
+            _addSizeMetric(toPrint, rStats, " shader  ", "drawingShader")
+            _addSizeMetric(toPrint, rStats, " texture ", "textureMemory")
+            
+            if "numCompletedSamples" in rStats:
+                toPrint["Samples done "] = rStats["numCompletedSamples"]
 
         # Playback Rate
         if self._dataModel.viewSettings.showHUD_Performance:
