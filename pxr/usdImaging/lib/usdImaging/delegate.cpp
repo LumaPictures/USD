@@ -1414,6 +1414,25 @@ UsdImagingDelegate::_RefreshUsdObject(SdfPath const& usdPath,
 // -------------------------------------------------------------------------- //
 // Data Collection
 // -------------------------------------------------------------------------- //
+
+VtValue
+UsdImagingDelegate::_GetUsdPrimAttribute(SdfPath const& cachePath,
+                                         TfToken const &attrName)
+{
+    VtValue value;
+
+    _HdPrimInfo *primInfo = _GetHdPrimInfo(cachePath);
+    if (TF_VERIFY(primInfo, "%s\n", cachePath.GetText())) {
+        UsdPrim const& prim = primInfo->usdPrim;
+        if (prim.HasAttribute(attrName)) {
+            UsdAttribute attr = prim.GetAttribute(attrName);
+            attr.Get(&value, GetTime());
+        }
+    }
+
+    return value;
+}
+
 void
 UsdImagingDelegate::_UpdateSingleValue(SdfPath const& cachePath,
                                        int requestBits)
@@ -1561,11 +1580,11 @@ UsdImagingDelegate::GetRenderTag(SdfPath const& id)
 
     if (purpose == UsdGeomTokens->default_) {
         // Simple mapping so all render tags in multiple delegates match
-        purpose = HdTokens->geometry;    
+        purpose = HdRenderTagTokens->geometry;
     } else if (purpose == UsdGeomTokens->guide && !_displayGuides) {
         // When guides are disabled on the delegate we move the
         // guide prims to the hidden command buffer
-        purpose = HdTokens->hidden;
+        purpose = HdRenderTagTokens->hidden;
     }
 
     TF_DEBUG(USDIMAGING_COLLECTIONS).Msg("GetRenderTag %s -> %s \n",
@@ -2846,15 +2865,7 @@ UsdImagingDelegate::GetLightParamValue(SdfPath const &id,
     }
 
     // Fallback to USD attributes.
-    if (prim.HasAttribute(paramName)) {
-        UsdAttribute attr = prim.GetAttribute(paramName);
-        VtValue value;
-        // Reading the value may fail, should we warn here when it does?
-        attr.Get(&value, GetTime());
-        return value;
-    }
-
-    return VtValue();
+    return _GetUsdPrimAttribute(id, paramName);
 }
 
 VtValue 
@@ -2883,8 +2894,10 @@ UsdImagingDelegate::GetCameraParamValue(SdfPath const &id,
         }
         
         _UpdateSingleValue(cachePath, dirtyBit);
-         TF_VERIFY(
-             _valueCache.ExtractCameraParam(cachePath, paramName, &value));
+         if (!_valueCache.ExtractCameraParam(cachePath, paramName, &value)) {
+            // Fallback to USD attributes.
+            value = _GetUsdPrimAttribute(id, paramName);
+        }
     }
     return value;
 }
@@ -3112,7 +3125,6 @@ UsdImagingDelegate::InvokeExtComputation(SdfPath const& computationId,
 {
     _HdPrimInfo *primInfo = _GetHdPrimInfo(computationId);
 
-    _HdPrimInfoMap::iterator it = _hdPrimInfoMap.find(computationId);
     if (TF_VERIFY(primInfo, "%s\n", computationId.GetText()) &&
         TF_VERIFY(primInfo->adapter, "%s\n", computationId.GetText())) {
         primInfo->adapter->InvokeComputation(computationId, context);
