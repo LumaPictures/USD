@@ -87,11 +87,23 @@ public:
     void BindResources(const HdSt_ResourceBinder& binder, int program) override {
         glActiveTexture(GL_TEXTURE0 + 41);
         glBindTexture(GL_TEXTURE_2D, _depthTex);
+        glActiveTexture(GL_TEXTURE0 + 42);
+        glBindTexture(GL_TEXTURE_2D, _colorTex);
+        glActiveTexture(GL_TEXTURE0 + 43);
+        glBindTexture(GL_TEXTURE_2D, _normalTex);
         HdStRenderPassShader::BindResources(binder, program);
     }
 
-    inline void SetDepthTexture(GLuint depthTex) {
-        _depthTex = depthTex;
+    inline void SetDepthTexture(GLuint tex) {
+        _depthTex = tex;
+    }
+
+    inline void SetColorTexture(GLuint tex) {
+        _colorTex = tex;
+    }
+
+    inline void SetNormalTexture(GLuint tex) {
+        _normalTex = tex;
     }
 
     ~HdxAmbientOcclusionRenderPassShader() override = default;
@@ -105,6 +117,8 @@ private:
     const int _numSamples;
     ID _hash;
     int _depthTex;
+    int _colorTex;
+    int _normalTex;
 };
 
 // The sample should conform to poission disc sampling.
@@ -262,29 +276,56 @@ void HdxAmbientOcclusionTask::Execute(HdTaskContext* ctx)
 
     const auto screenSize = HdxUtils::GetScreenSize();
     GLuint depthTex = 0;
+    GLuint colorTex = 0;
+    GLuint normalTex = 0;
     glGenTextures(1, &depthTex);
+    glGenTextures(1, &colorTex);
+    glGenTextures(1, &normalTex);
     auto* shader = static_cast<HdxAmbientOcclusionRenderPassShader*>(
         _renderPassShader.get());
     shader->SetDepthTexture(depthTex);
+    shader->SetColorTexture(colorTex);
+    shader->SetNormalTexture(normalTex);
+
+    auto setTexParams = [] () {
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    };
 
     glBindTexture(GL_TEXTURE_2D, depthTex);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    setTexParams();
     glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F,
-                 screenSize[0], screenSize[1], 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, 0);
+                 screenSize[0], screenSize[1], 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, nullptr);
+
+    // Do we need this? normal is in location 1, so I assume the framebuffer
+    // is not going to be valid if we don't bind anything to location 1.
+    glBindTexture(GL_TEXTURE_2D, colorTex);
+    setTexParams();
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F,
+                 screenSize[0], screenSize[1], 0, GL_RGBA, GL_FLOAT, nullptr);
+
+    glBindTexture(GL_TEXTURE_2D, normalTex);
+    setTexParams();
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F,
+                 screenSize[0], screenSize[1], 0, GL_RGBA, GL_FLOAT, nullptr);
 
     GLuint framebuffer;
     glGenFramebuffers(1, &framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTex, 0);
+    //glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTex, 0);
+    //glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, normalTex, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     glBindFramebuffer(GL_READ_FRAMEBUFFER, drawFramebuffer);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer);
-    glBlitFramebuffer(0, 0, screenSize[0], screenSize[1], 0, 0, screenSize[0], screenSize[1], GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-    
+    glBlitFramebuffer(0, 0, screenSize[0], screenSize[1],
+                      0, 0, screenSize[0], screenSize[1],
+                      // GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT, GL_NEAREST);
+                      GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+
     glBindFramebuffer(GL_FRAMEBUFFER, drawFramebuffer);
     GLF_POST_PENDING_GL_ERRORS();
 
@@ -299,6 +340,8 @@ void HdxAmbientOcclusionTask::Execute(HdTaskContext* ctx)
     _renderPassState->Unbind();
 
     glDeleteTextures(1, &depthTex);
+    glDeleteTextures(1, &colorTex);
+    glDeleteTextures(1, &normalTex);
     glDeleteFramebuffers(1, &framebuffer);
 }
 
