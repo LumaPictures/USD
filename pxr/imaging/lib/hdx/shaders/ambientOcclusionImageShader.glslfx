@@ -38,6 +38,8 @@
 -- glsl AmbientOcclusion.SSAO
 
 layout(location = 41) uniform sampler2D depthTexture;
+layout(location = 42) uniform sampler2D colorTexture;
+layout(location = 43) uniform sampler2D normalTexture;
 
 float getAmbientOcclusionFactor(float currentDepth, vec2 uv) {
     float ao = 0.0;
