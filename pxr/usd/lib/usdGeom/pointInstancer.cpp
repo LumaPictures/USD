@@ -833,10 +833,14 @@ UsdGeomPointInstancer::_GetAccelerationsForInstanceTransforms(
     UsdTimeCode sampleTime;
     bool hasSamples;
     VtVec3fArray accelerationData;
+    double dummyLowerTimeValue;
+    double dummyUpperTimeValue;
     if (!_GetAttrForInstanceTransforms<VtVec3fArray>(
         GetAccelerationsAttr(),
         baseTime,
         &sampleTime,
+        &dummyLowerTimeValue,
+        &dummyUpperTimeValue,
         &hasSamples,
         &accelerationData)) {
         return false;
