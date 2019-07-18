@@ -44,8 +44,6 @@
 #include "pxr/imaging/hdSt/renderPassShader.h"
 #include "pxr/imaging/hdSt/bufferArrayRangeGL.h"
 #include "pxr/imaging/hdSt/bufferResourceGL.h"
-#include "pxr/imaging/hdSt/renderDelegate.h"
-#include "pxr/imaging/hdSt/tokens.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -272,6 +270,8 @@ HdxOitRenderTask::_PrepareOitBuffers(
     HdTaskContext* ctx, 
     HdRenderIndex* renderIndex)
 {
+    const int numSamples = 8; // Should match glslfx files
+
     HdResourceRegistrySharedPtr const& resourceRegistry = 
         renderIndex->GetResourceRegistry();
 
@@ -370,29 +370,13 @@ HdxOitRenderTask::_PrepareOitBuffers(
     (*ctx)[HdxTokens->oitDepthBufferBar] = _depthBar;
     (*ctx)[HdxTokens->oitUniformBar] = _uniformBar;
 
-    HdRenderDelegate* renderDelegate = renderIndex->GetRenderDelegate();
-    if (!TF_VERIFY(dynamic_cast<HdStRenderDelegate*>(renderDelegate),
-                  "OIT Task only works with HdSt")) {
-        return;
-    }
-
-    VtValue oitNumSamples = renderDelegate
-        ->GetRenderSetting(HdStRenderSettingsTokens->oitNumSamples);
-    if (!TF_VERIFY(oitNumSamples.IsHolding<int>(),
-                   "OIT Number of Samples is not an integer!")) {
-        return;
-    }
-    const int numSamples = std::max(1, oitNumSamples.UncheckedGet<int>());
-
     // The OIT buffer are sized based on the size of the screen.
     GfVec2i screenSize = _GetScreenSize();
     int newBufferSize = screenSize[0] * screenSize[1];
-    bool resizeOitBuffers = (newBufferSize > _bufferSize) ||
-                            (_numSamples != numSamples);
+    bool resizeOitBuffers = (newBufferSize > _bufferSize);
 
     if (resizeOitBuffers) {
         _bufferSize = newBufferSize;
-        _numSamples = numSamples;
 
         // +1 because element 0 of the counter buffer is used as an atomic
         // counter in the shader to give each fragment a unique index.
