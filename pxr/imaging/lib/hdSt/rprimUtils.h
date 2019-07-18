@@ -1,5 +1,5 @@
 //
-// Copyright 2017 Pixar
+// Copyright 2019 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,44 +21,30 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
+#ifndef HDST_RPRIM_UTILS_H
+#define HDST_RPRIM_UTILS_H
+
 #include "pxr/pxr.h"
-#include "pxr/imaging/hdStream/rendererPlugin.h"
-
-#include "pxr/imaging/hdSt/renderDelegate.h"
-#include "pxr/imaging/hdx/rendererPluginRegistry.h"
-
+#include "pxr/imaging/hdSt/api.h"
+#include "pxr/imaging/hd/sceneDelegate.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-TF_REGISTRY_FUNCTION(TfType)
-{
-    HdxRendererPluginRegistry::Define<HdStreamRendererPlugin>();
-}
+class HdDrawItem;
+class HdRprim;
+class HdRprimSharedData;
 
-HdRenderDelegate *
-HdStreamRendererPlugin::CreateRenderDelegate()
-{
-    return new HdStRenderDelegate();
-}
-
-HdRenderDelegate*
-HdStreamRendererPlugin::CreateRenderDelegate(
-    HdRenderSettingsMap const& settingsMap)
-{
-    return new HdStRenderDelegate(settingsMap);
-}
-
-void
-HdStreamRendererPlugin::DeleteRenderDelegate(HdRenderDelegate *renderDelegate)
-{
-    delete renderDelegate;
-}
-
-bool
-HdStreamRendererPlugin::IsSupported() const
-{
-    return HdStRenderDelegate::IsSupported();
-}
-
+// Given prim information it will create sources representing
+// constant primvars and hand it to the resource registry.
+HDST_API
+void HdStPopulateConstantPrimvars(
+    HdRprim *prim,
+    HdRprimSharedData *sharedData,
+    HdSceneDelegate *delegate,
+    HdDrawItem *drawItem,
+    HdDirtyBits *dirtyBits,
+    HdPrimvarDescriptorVector const& constantPrimvars);
 
 PXR_NAMESPACE_CLOSE_SCOPE
+
+#endif // HDST_RPRIM_UTILS_H

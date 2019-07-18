@@ -74,6 +74,7 @@ pxr_library(hdSt
         resourceBinder
         resourceGL
         resourceRegistry
+        rprimUtils
         shaderCode
         shaderKey
         smoothNormals
@@ -84,6 +85,7 @@ pxr_library(hdSt
         unitTestGLDrawing
         vboMemoryManager
         vboSimpleMemoryManager
+        volume
 
     PUBLIC_HEADERS
         api.h
@@ -108,6 +110,7 @@ pxr_library(hdSt
         triangulate
         unitTestDelegate
         unitTestHelper
+        volumeShaderKey
 
     RESOURCE_FILES
         plugInfo.json
@@ -133,6 +136,7 @@ pxr_library(hdSt
         shaders/simpleTexturedSurface.glslfx
         shaders/terminals.glslfx
         shaders/visibility.glslfx
+        shaders/volume.glslfx
 )
 
 if (X11_FOUND OR APPLE)
