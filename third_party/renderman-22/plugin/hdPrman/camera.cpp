@@ -59,6 +59,10 @@ HdPrmanCamera::Sync(HdSceneDelegate *sceneDelegate,
     SdfPath const &id = GetId();
     HdDirtyBits& bits = *dirtyBits;
 
+    if (bits & DirtyViewMatrix) {
+        sceneDelegate->SampleTransform(id, &_sampleXforms);
+    }
+
     if (bits & DirtyParams) {
         TfToken params[] = {
             HdCameraTokens->horizontalAperture,
@@ -130,7 +134,9 @@ HdPrmanCamera::SetRileyCameraParams(RixParamList *camParams,
         float const *fStop =
             _GetDictItem<float>(_params, HdCameraTokens->fStop);
         if (fStop) {
-            projParams->SetFloat(RixStr.k_fStop, *fStop);
+            // RenderMan defines disabled DOF as fStop=inf not zero
+            float const value = (*fStop <= 0) ? RI_INFINITY : *fStop;
+            projParams->SetFloat(RixStr.k_fStop, value);
         }
 
         float const *focalLength =
