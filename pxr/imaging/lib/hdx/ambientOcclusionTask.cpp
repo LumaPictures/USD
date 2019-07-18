@@ -50,7 +50,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
-    (aoKernel)
+    (hdxAoKernel)
 );
 
 namespace {
@@ -109,19 +109,21 @@ private:
 
 // The sample should conform to poission disc sampling.
 // Once we have the normal available, this becomes a bit easier.
-VtVec2fArray _GenerateSamplingKernel(const int numPoints)
+VtArray<float> _GenerateSamplingKernel(const int numPoints)
 {
     std::ranlux24 engine1(42);
     std::ranlux24 engine2(137);
 
     std::uniform_real_distribution<float> distribution(0.0f, 1.0f);
 
-    VtVec2fArray ret; ret.assign(numPoints, {0.0f, 0.0f});
-    std::generate(ret.begin(), ret.end(), [&] () -> GfVec2f {
-        const auto angle = distribution(engine1) * M_2_PI;
+    VtArray<float> ret;
+    ret.reserve(numPoints * 2);
+    for (auto i = decltype(numPoints){0}; i < numPoints; i += 1) {
+        const auto angle = distribution(engine1) * M_PI * 2.0f;
         const auto distance = sqrtf(distribution(engine2));
-        return {distance * sinf(angle), distance * cosf(angle)};
-    });
+        ret.push_back(distance * sinf(angle));
+        ret.push_back(distance * cosf(angle));
+    }
     return ret;
 }
 
@@ -186,31 +188,31 @@ void HdxAmbientOcclusionTask::Prepare(HdTaskContext* ctx,
         HdBufferSpecVector kernelSpecs;
         kernelSpecs.push_back(
             HdBufferSpec(
-                _tokens->aoKernel,
-                HdTupleType {HdTypeFloatVec2, static_cast<size_t>(numSamples)})
+                _tokens->hdxAoKernel,
+                HdTupleType {HdTypeFloat, 1})
         );
 
         _kernelBar = resourceRegistry->AllocateSingleBufferArrayRange(
-            _tokens->aoKernel,
+            _tokens->hdxAoKernel,
             kernelSpecs,
             HdBufferArrayUsageHint()
         );
 
-        _renderPassShader->AddBufferBinding(
-            HdBindingRequest(
-                HdBinding::SSBO,
-                _tokens->aoKernel,
-                _kernelBar,
-                false /* interleave */
-            ));
-
         HdBufferSourceSharedPtr kernelSource(
             new HdVtBufferSource(
-                _tokens->aoKernel,
+                _tokens->hdxAoKernel,
                 VtValue(_GenerateSamplingKernel(numSamples))
             )
         );
         resourceRegistry->AddSource(_kernelBar, kernelSource);
+
+        _renderPassShader->AddBufferBinding(
+            HdBindingRequest(
+                HdBinding::SSBO,
+                _tokens->hdxAoKernel,
+                _kernelBar,
+                false /* interleave */
+            ));
     };
 
     if (!_renderPass) {
