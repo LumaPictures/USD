@@ -49,6 +49,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     (MaterialLayer_2)
     (bxdf)
     (displacement)
+    (volume)
     (pbsMaterialIn)
     (inputMaterial)
     (OSL)
@@ -139,8 +140,10 @@ _ApplyStudioFixes(HdMaterialNetworkMap *netMap)
                     }
                 }
                 if (!modelRoot.IsEmpty())  {
+		    std::string modelName = modelRoot.GetName();
+		    modelName = TfStringGetBeforeSuffix(modelName, '_');
                     s = TfStringReplace(s, _tokens->globalAttrModelName,
-                                        modelRoot.GetName());
+                                        modelName);
                     if (param.second.IsHolding<std::string>()) {
                         param.second = VtValue(s);
                     } else if (param.second.IsHolding<TfToken>()) {
@@ -435,7 +438,8 @@ _MapHdNodesToRileyNodes(
 
         // Create equivalent Riley shading node.
         riley::ShadingNode sn;
-        if (shaders[i]->GetContext() == _tokens->bxdf) {
+        if (shaders[i]->GetContext() == _tokens->bxdf ||
+            shaders[i]->GetContext() == SdrNodeContext->Volume) {
             sn.type = riley::ShadingNode::k_Bxdf;
         } else if (shaders[i]->GetContext() == SdrNodeContext->Pattern ||
                    shaders[i]->GetContext() == _tokens->OSL) {
@@ -469,7 +473,7 @@ _MapHdNodesToRileyNodes(
             if (!prop) {
                 TF_DEBUG(HDPRMAN_MATERIALS)
                     .Msg("Unknown shader property '%s' for "
-                         "shader '%s' at '%s'; ignoring.",
+                         "shader '%s' at '%s'; ignoring.\n",
                          param.first.GetText(),
                          shaders[i]->GetName().c_str(),
                          mat.nodes[i].path.GetText());
@@ -485,7 +489,7 @@ _MapHdNodesToRileyNodes(
                 }
                 TF_DEBUG(HDPRMAN_MATERIALS)
                     .Msg("Unknown shader entry field type for "
-                         "field '%s' on shader '%s' at '%s'; ignoring.",
+                         "field '%s' on shader '%s' at '%s'; ignoring.\n",
                          param.first.GetText(),
                          shaders[i]->GetName().c_str(),
                          mat.nodes[i].path.GetText());
@@ -613,7 +617,7 @@ _MapHdNodesToRileyNodes(
                 TF_DEBUG(HDPRMAN_MATERIALS)
                     .Msg("Unknown shading parameter type '%s'; skipping "
                          "parameter '%s' on node '%s' ('%s'); "
-                         "expected type '%s'",
+                         "expected type '%s'\n",
                          param.second.GetTypeName().c_str(),
                          param.first.GetText(),
                          mat.nodes[i].path.GetText(),
@@ -750,7 +754,7 @@ _ConvertHdMaterialToRman(
     _FindShaders(mat.nodes, &shaders);
     _ExpandVstructs(&mat, shaders);
     _MapHdNodesToRileyNodes(mgr, mat, shaders, result);
-    return true;
+    return !result->empty();
 }
 
 /* virtual */
@@ -777,9 +781,10 @@ HdPrmanMaterial::Sync(HdSceneDelegate *sceneDelegate,
             HdPrman_ConvertUsdPreviewMaterial(&networkMap);
             _ApplyStudioFixes(&networkMap);
 
-            HdMaterialNetwork bxdfNet, dispNet;
+            HdMaterialNetwork bxdfNet, dispNet, volNet;
             TfMapLookup(networkMap.map, _tokens->bxdf, &bxdfNet);
             TfMapLookup(networkMap.map, _tokens->displacement, &dispNet);
+            TfMapLookup(networkMap.map, _tokens->volume, &volNet);
 
             if (TfDebug::IsEnabled(HDPRMAN_MATERIALS)) {
                 if (!bxdfNet.nodes.empty()) {
@@ -788,12 +793,16 @@ HdPrmanMaterial::Sync(HdSceneDelegate *sceneDelegate,
                 if (!dispNet.nodes.empty()) {
                     HdPrman_DumpMat("Displacement", id, dispNet);
                 }
+                if (!volNet.nodes.empty()) {
+                    HdPrman_DumpMat("Volume", id, volNet);
+                }
             }
 
             std::vector<riley::ShadingNode> nodes;
 
-            // Bxdf
-            if (_ConvertHdMaterialToRman(mgr, bxdfNet, &nodes)) {
+            // Surface/Volume
+            if (_ConvertHdMaterialToRman(mgr, bxdfNet, &nodes) ||
+                _ConvertHdMaterialToRman(mgr, volNet, &nodes)) {
                 if (_materialId == riley::MaterialId::k_InvalidId) {
                     _materialId = riley->CreateMaterial(&nodes[0],
                                                         nodes.size());
@@ -813,9 +822,9 @@ HdPrmanMaterial::Sync(HdSceneDelegate *sceneDelegate,
                 mgr->DestroyRixParamList(
                     const_cast<RixParamList*>(node.params));
             }
+            nodes.clear();
 
             // Displacement
-            nodes.clear();
             if (_ConvertHdMaterialToRman(mgr, dispNet, &nodes)) {
                 if (_displacementId == riley::DisplacementId::k_InvalidId) {
                     _displacementId = riley->CreateDisplacement(&nodes[0],
