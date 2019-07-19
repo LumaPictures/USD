@@ -37,9 +37,9 @@
 
 -- glsl AmbientOcclusion.SSAO
 
-layout(location = 41) uniform sampler2D depthTexture;
-// layout(location = 42) uniform sampler2D colorTexture;
-// layout(location = 43) uniform sampler2D normalTexture;
+layout(binding = 0) uniform sampler2D depthTexture;
+layout(binding = 1) uniform sampler2D colorTexture;
+// layout(binding = 2) uniform sampler2D normalTexture;
 
 float getAmbientOcclusionFactor(float currentDepth, vec2 uv) {
     float ao = 0.0;
@@ -58,7 +58,7 @@ float getAmbientOcclusionFactor(float currentDepth, vec2 uv) {
 vec4 imageShader(vec2 uv)
 {
     float depth = texture2D(depthTexture, uv).x;
-    return vec4(depth, 0, 0, 1);
+    return vec4(depth, 1, 1, 1);
     if (depth > 0.9999) {
         return vec4(0, 0, 0, 0);
     } else {
