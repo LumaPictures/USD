@@ -1460,7 +1460,7 @@ UsdImagingGLEngine::_BindInternalDrawTarget(
         _drawTarget = GlfDrawTarget::New(drawTargetSize, requestMSAA);
         _drawTarget->Bind();
         _drawTarget->AddAttachment("color", GL_RGBA, GL_FLOAT, GL_RGBA16F);
-        _drawTarget->AddAttachment("normal", GL_RGBA, GL_FLOAT, GL_RGBA16F);
+        // _drawTarget->AddAttachment("normal", GL_RGBA, GL_FLOAT, GL_RGBA16F);
         _drawTarget->AddAttachment("depth", GL_DEPTH_COMPONENT, GL_FLOAT, 
                                    GL_DEPTH_COMPONENT32F);
     } else {
