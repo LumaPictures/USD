@@ -23,6 +23,7 @@
 //
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/glf/diagnostic.h"
+#include "pxr/imaging/glf/drawTarget.h"
 
 #include "pxr/imaging/hdx/ambientOcclusionTask.h"
 
@@ -85,10 +86,10 @@ public:
     }
 
     void BindResources(const HdSt_ResourceBinder& binder, int program) override {
-        glActiveTexture(GL_TEXTURE0 + 41);
+        glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, _depthTex);
-        //glActiveTexture(GL_TEXTURE0 + 42);
-        //glBindTexture(GL_TEXTURE_2D, _colorTex);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, _colorTex);
         /*glActiveTexture(GL_TEXTURE0 + 43);
         glBindTexture(GL_TEXTURE_2D, _normalTex);*/
         //glActiveTexture(GL_TEXTURE0);
@@ -100,11 +101,11 @@ public:
         _depthTex = tex;
     }
 
-    /* inline void SetColorTexture(GLuint tex) {
+    inline void SetColorTexture(GLuint tex) {
         _colorTex = tex;
     }
 
-    inline void SetNormalTexture(GLuint tex) {
+    /*inline void SetNormalTexture(GLuint tex) {
         _normalTex = tex;
     } */
 
@@ -119,7 +120,7 @@ private:
     const int _numSamples;
     ID _hash;
     int _depthTex;
-    // int _colorTex;
+    int _colorTex;
     // int _normalTex;
 };
 
@@ -284,60 +285,37 @@ void HdxAmbientOcclusionTask::Execute(HdTaskContext* ctx)
     glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &drawFramebuffer);
 
     const auto screenSize = HdxUtils::GetScreenSize();
-    GLuint depthTex = 0;
-    // GLuint colorTex = 0;
-    // GLuint normalTex = 0;
-    glGenTextures(1, &depthTex);
-    // glGenTextures(1, &colorTex);
-    //glGenTextures(1, &normalTex);
-    auto* shader = static_cast<HdxAmbientOcclusionRenderPassShader*>(
-        _renderPassShader.get());
-    shader->SetDepthTexture(depthTex);
-    // shader->SetColorTexture(colorTex);
-    // shader->SetNormalTexture(normalTex);
 
-    auto setTexParams = [] () {
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    };
+    auto drawTarget = GlfDrawTarget::New(
+        screenSize,
+        false /* request MSAA */
+    );
 
-    glBindTexture(GL_TEXTURE_2D, depthTex);
-    setTexParams();
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F,
-                 screenSize[0], screenSize[1], 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, nullptr);
-    // Do we need this? normal is in location 1, so I assume the framebuffer
-    // is not going to be valid if we don't bind anything to location 1.
-    /* glBindTexture(GL_TEXTURE_2D, colorTex);
-    setTexParams();
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F,
-                 screenSize[0], screenSize[1], 0, GL_RGBA, GL_FLOAT, nullptr); */
+    drawTarget->Bind();
+    drawTarget->AddAttachment("depth"
+                            , GL_DEPTH_COMPONENT
+                            , GL_FLOAT
+                            , GL_DEPTH_COMPONENT32F);
+    drawTarget->AddAttachment("color"
+                            , GL_RGBA
+                            , GL_FLOAT
+                            , GL_RGBA16F);
 
-    /* glBindTexture(GL_TEXTURE_2D, normalTex);
-    setTexParams();
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F,
-                 screenSize[0], screenSize[1], 0, GL_RGBA, GL_FLOAT, nullptr); */
-
-    // glBindTexture(GL_TEXTURE_2D, 0);
-
-    GLuint framebuffer;
-    glGenFramebuffers(1, &framebuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-    // glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTex, 0);
-    // glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, normalTex, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTex, 0);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    auto framebuffer = drawTarget->GetFramebufferId();
 
     glBindFramebuffer(GL_READ_FRAMEBUFFER, drawFramebuffer);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer);
     glBlitFramebuffer(0, 0, screenSize[0], screenSize[1],
                       0, 0, screenSize[0], screenSize[1],
-                      GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-                      // GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT, GL_NEAREST);
+                      GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT, GL_NEAREST);
 
     glBindFramebuffer(GL_FRAMEBUFFER, drawFramebuffer);
     GLF_POST_PENDING_GL_ERRORS();
+
+    auto* shader = static_cast<HdxAmbientOcclusionRenderPassShader*>(
+        _renderPassShader.get());
+    shader->SetDepthTexture(drawTarget->GetAttachment("depth")->GetGlTextureName());
+    shader->SetColorTexture(drawTarget->GetAttachment("color")->GetGlTextureName());
 
     _renderPassState->Bind();
 
@@ -349,10 +327,9 @@ void HdxAmbientOcclusionTask::Execute(HdTaskContext* ctx)
 
     _renderPassState->Unbind();
 
-    glDeleteTextures(1, &depthTex);
-    // glDeleteTextures(1, &colorTex);
-    // glDeleteTextures(1, &normalTex);
-    glDeleteFramebuffers(1, &framebuffer);
+    drawTarget->Bind();
+    drawTarget->ClearAttachments();
+    drawTarget = nullptr;
     glPopDebugGroup();
 }
 
