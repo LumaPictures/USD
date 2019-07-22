@@ -64,13 +64,18 @@ TF_DEFINE_ENV_SETTING(HD_OIT_NUM_SAMPLES, 8,
                       "artifacts and flicker, but significantly increases "
                       "memory usage and degrades performance");
 
-TF_DEFINE_ENV_SETTING(HD_ENABLE_AMBIENT_OCCLUSION, true,
+TF_DEFINE_ENV_SETTING(HD_ENABLE_AMBIENT_OCCLUSION, false,
            "Enables ambient occlusion by default.");
 
 TF_DEFINE_ENV_SETTING(HD_AMBIENT_OCCLUSION_NUM_SAMPLES, 32,
                       "Number of ambient occlusion samples. Increase the value"
                       "increases frame time, but improves ambient occlusion"
                       "quality.");
+
+TF_DEFINE_ENV_SETTING(HD_AMBIENT_OCCLUSION_RADIUS, "16.0f",
+                      "Radius of sampling for the Ambient Occlusion. Larger "
+                      "values takes more geometry per pixel into "
+                      "consideration.");
 
 TF_DEFINE_ENV_SETTING(HDST_ENABLE_EXPERIMENTAL_VOLUME_ELLIPSOID_STANDINS, false,
                       "Render constant density ellipsoid standins for "
@@ -129,7 +134,7 @@ HdStRenderDelegate::_Initialize()
     }
 
     // Initialize the settings and settings descriptors.
-    _settingDescriptors.reserve(4);
+    _settingDescriptors.reserve(5);
     _settingDescriptors.emplace_back("Enable Tiny Prim Culling",
         HdStRenderSettingsTokens->enableTinyPrimCulling,
         VtValue(bool(TfGetEnvSetting(HD_ENABLE_GPU_TINY_PRIM_CULLING))));
@@ -142,6 +147,10 @@ HdStRenderDelegate::_Initialize()
     _settingDescriptors.emplace_back("Ambient Occlusion Number of Samples",
         HdStRenderSettingsTokens->aoNumSamples,
         VtValue(int(TfGetEnvSetting(HD_AMBIENT_OCCLUSION_NUM_SAMPLES))));
+    _settingDescriptors.emplace_back("Ambient Occlusion Radius",
+        HdStRenderSettingsTokens->aoRadius,
+        VtValue(float(
+            atof(TfGetEnvSetting(HD_AMBIENT_OCCLUSION_RADIUS).c_str()))));
     _PopulateDefaultSettings(_settingDescriptors);
 }
 
