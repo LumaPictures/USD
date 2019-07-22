@@ -52,40 +52,14 @@ vec4 imageShader(vec2 uv)
 
     // XXX renderPass.WriteOitLayersToBuffer does not clamp the number of
     //     depth samples we store for a pixel. Here we process no more than
-    //     'OIT_NUM_SAMPLES' for a pixel. (If there are greater than
-    //     'OIT_NUM_SAMPLES' samples stored for this pixel some will
-    //     currently not contribute)
-    vec4 sortedColor[OIT_NUM_SAMPLES];
-    float sortedDepth[OIT_NUM_SAMPLES];
+    //     'maxSamples' for a pixel. (If there are greater than 'maxSamples'
+    //     samples stored for this pixel some will currently not contribute)
+    const int maxSamples = 8;
+    vec4 sortedColor[maxSamples];
+    float sortedDepth[maxSamples];
 
-#if 1
-    // Select sorting
-    while (nodeIndex != -1 && numDepths < OIT_NUM_SAMPLES) {
-        sortedDepth[numDepths] = hdxOitDepthBuffer[nodeIndex];
-        sortedColor[numDepths] = hdxOitDataBuffer[nodeIndex];
-        nodeIndex = hdxOitIndexBuffer[nodeIndex];
-        numDepths += 1;
-    }
-
-    for (int depth = 0; depth < numDepths - 1; depth += 1) {
-        int swap = depth;
-        for (int i = depth + 1; i < numDepths; i += 1) {
-            if (sortedDepth[swap] > sortedDepth[i]) {
-                swap = i;
-            }
-        }
-        float td = sortedDepth[swap];
-        vec4 tc = sortedColor[swap];
-
-        sortedDepth[swap] = sortedDepth[depth];
-        sortedColor[swap] = sortedColor[depth];
-
-        sortedDepth[depth] = td;
-        sortedColor[depth] = tc;
-    }
-#else
     while (nodeIndex != -1 && 
-           numDepths < OIT_NUM_SAMPLES && 
+           numDepths < maxSamples && 
            nodeIndex < hdxOitDataBuffer.length()) 
     {
         float currentDepth = hdxOitDepthBuffer[nodeIndex]; 
@@ -100,8 +74,7 @@ vec4 imageShader(vec2 uv)
         sortedDepth[insertIndex] = hdxOitDepthBuffer[nodeIndex];
         numDepths += 1; 
         nodeIndex = hdxOitIndexBuffer[nodeIndex]; 
-    }
-#endif
+    } 
 
     int depth = 0;
     vec4 colorAccum = vec4(0);
