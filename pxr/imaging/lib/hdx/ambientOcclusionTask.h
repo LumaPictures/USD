@@ -2,6 +2,9 @@
 #define HDX_AMBIENTOCCLUSION_TASK_H
 
 #include "pxr/pxr.h"
+
+#include "pxr/base/gf/matrix4f.h"
+
 #include "pxr/imaging/hdx/api.h"
 
 #include "pxr/imaging/hd/task.h"
@@ -13,7 +16,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 class HdSceneDelegate;
 
 struct HdxAmbientOcclusionTaskParams {
-    bool enable = false;
+    SdfPath cameraId;
+    bool enable;
 };
 
 using HdStRenderPassStateSharedPtr =
@@ -60,6 +64,7 @@ private:
     HdBufferArrayRangeSharedPtr _kernelBar;
     HdBufferArrayRangeSharedPtr _uniformBar;
 
+    GfMatrix4f _cameraProjection;
     int _aoNumSamples = -1;
     float _aoRadius = -1.0f;
 };
