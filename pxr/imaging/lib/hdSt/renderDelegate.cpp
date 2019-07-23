@@ -72,7 +72,7 @@ TF_DEFINE_ENV_SETTING(HD_AMBIENT_OCCLUSION_NUM_SAMPLES, 32,
                       "increases frame time, but improves ambient occlusion"
                       "quality.");
 
-TF_DEFINE_ENV_SETTING(HD_AMBIENT_OCCLUSION_RADIUS, "16.0f",
+TF_DEFINE_ENV_SETTING(HD_AMBIENT_OCCLUSION_RADIUS, "16.0",
                       "Radius of sampling for the Ambient Occlusion. Larger "
                       "values takes more geometry per pixel into "
                       "consideration.");
@@ -149,8 +149,11 @@ HdStRenderDelegate::_Initialize()
         VtValue(int(TfGetEnvSetting(HD_AMBIENT_OCCLUSION_NUM_SAMPLES))));
     _settingDescriptors.emplace_back("Ambient Occlusion Radius",
         HdStRenderSettingsTokens->aoRadius,
-        VtValue(float(
-            atof(TfGetEnvSetting(HD_AMBIENT_OCCLUSION_RADIUS).c_str()))));
+        VtValue(static_cast<float>(
+                atof(TfGetEnvSetting(HD_AMBIENT_OCCLUSION_RADIUS).c_str())
+            )
+        )
+    );
     _PopulateDefaultSettings(_settingDescriptors);
 }
 
