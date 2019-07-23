@@ -58,6 +58,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     (hdxAoRadius)
     (hdxAoUniforms)
     (hdxAoUniformBar)
+    (hdxAoProjectionMatrix)
 );
 
 namespace {
@@ -112,21 +113,29 @@ private:
 
 // The sample should conform to poission disc sampling.
 // Once we have the normal available, this becomes a bit easier.
-VtArray<float> _GenerateSamplingKernel(const int numPoints)
+VtArray<GfVec3f> _GenerateSamplingKernel(const int numPoints)
 {
-    std::ranlux24 engine1(42);
-    std::ranlux24 engine2(137);
+    VtArray<GfVec3f> ret; ret.reserve(numPoints);
+    std::ranlux24 engineX(42);
+    std::ranlux24 engineY(137);
+    std::ranlux24 engineZ(1337);
 
     std::uniform_real_distribution<float> distribution(0.0f, 1.0f);
-
-    VtArray<float> ret;
-    ret.reserve(numPoints * 2);
     for (auto i = decltype(numPoints){0}; i < numPoints; i += 1) {
-        const auto angle = distribution(engine1) * M_PI * 2.0f;
-        const auto distance = sqrtf(distribution(engine2));
-        ret.push_back(distance * sinf(angle));
-        ret.push_back(distance * cosf(angle));
+        GfVec3f vec {
+            distribution(engineX),
+            distribution(engineY),
+            distribution(engineZ),
+        };
+
+        vec.Normalize();
+        float scale = static_cast<float>(i) / static_cast<float>(numPoints);
+        // Lerp between 0.1 and 1.0 for better distribution.
+        scale = 0.1 + scale * scale * 0.9;
+        vec *= scale;
+        ret.push_back(vec);
     }
+
     return ret;
 }
 
@@ -148,6 +157,13 @@ void HdxAmbientOcclusionTask::Sync(HdSceneDelegate* delegate,
           HdDirtyBits* dirtyBits)
 {
     HD_TRACE_FUNCTION();
+    if (*dirtyBits & HdChangeTracker::DirtyParams) {
+        auto value = delegate->Get(GetId(), HdTokens->params);
+        if (value.IsHolding<HdxAmbientOcclusionTaskParams>()) {
+            auto params = value.UncheckedGet<HdxAmbientOcclusionTaskParams>();
+            TF_UNUSED(params);
+        }
+    }
     *dirtyBits = HdChangeTracker::Clean;
 }
 
@@ -227,7 +243,7 @@ void HdxAmbientOcclusionTask::Prepare(HdTaskContext* ctx,
         kernelSpecs.push_back(
             HdBufferSpec(
                 _tokens->hdxAoKernel,
-                HdTupleType {HdTypeFloat, 1})
+                HdTupleType {HdTypeFloatVec3, 1})
         );
 
         _kernelBar = resourceRegistry->AllocateSingleBufferArrayRange(
