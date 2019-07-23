@@ -951,7 +951,12 @@ UsdImagingGLEngine::SetRendererSetting(TfToken const& id, VtValue const& value)
     }
 
     TF_VERIFY(_renderIndex);
-    _renderIndex->GetRenderDelegate()->SetRenderSetting(id, value);
+    if (value.IsHolding<double>()) {
+        _renderIndex->GetRenderDelegate()->SetRenderSetting(
+            id, VtValue(static_cast<float>(value.UncheckedGet<double>())));
+    } else {
+        _renderIndex->GetRenderDelegate()->SetRenderSetting(id, value);
+    }
 }
 
 void 
