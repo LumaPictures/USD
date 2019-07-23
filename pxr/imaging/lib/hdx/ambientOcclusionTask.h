@@ -60,7 +60,8 @@ private:
     HdBufferArrayRangeSharedPtr _kernelBar;
     HdBufferArrayRangeSharedPtr _uniformBar;
 
-    int _numSamples = -1;
+    int _aoNumSamples = -1;
+    float _aoRadius = -1.0f;
 };
 
 HDX_API
