@@ -38,10 +38,9 @@
 -- glsl AmbientOcclusion.SSAO
 
 layout(binding = 0) uniform sampler2D depthTexture;
-layout(binding = 1) uniform sampler2D colorTexture;
-layout(binding = 2) uniform sampler2D normalTexture;
+layout(binding = 1) uniform sampler2D normalTexture;
 
-float getAmbientOcclusionFactor(float currentDepth, vec2 uv) {
+float getAmbientOcclusionFactor(float currentDepth, vec3 normal, vec2 uv) {
     float ao = 0.0;
     int numSamples = HdGet_hdxAoNumSamples();
     float radius = HdGet_hdxAoRadius();
@@ -59,10 +58,11 @@ float getAmbientOcclusionFactor(float currentDepth, vec2 uv) {
 
 vec4 imageShader(vec2 uv)
 {
+    vec4 normalData = texture2D(normalTexture, uv);
     float depth = texture2D(depthTexture, uv).x;
-    if (depth > 0.9999) {
+    if (depth > 0.9999 || normalData.w < 0.0001) {
         return vec4(0, 0, 0, 0);
     } else {
-        return vec4(0.0, 0.0, 0.0, getAmbientOcclusionFactor(depth, uv));
+        return vec4(0.0, 0.0, 0.0, getAmbientOcclusionFactor(depth, normalData.xyz, uv));
     }
 }
