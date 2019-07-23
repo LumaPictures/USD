@@ -508,6 +508,8 @@ HdxTaskController::_CreateAmbientOcclusionTask()
         _tokens->ambientOcclusionTask);
 
     HdxAmbientOcclusionTaskParams taskParams;
+    taskParams.cameraId = _freeCamId;
+    taskParams.enable = true;
 
     GetRenderIndex()->InsertTask<HdxAmbientOcclusionTask>(
         &_delegate, _ambientOcclusionTaskId);
@@ -1470,6 +1472,16 @@ HdxTaskController::_SetCameraParamForTasks(SdfPath const& id)
                 _pickFromRenderBufferTaskId, HdTokens->params, params);
             GetRenderIndex()->GetChangeTracker().MarkTaskDirty(
                 _pickFromRenderBufferTaskId, HdChangeTracker::DirtyParams);
+        }
+
+        if (!_ambientOcclusionTaskId.IsEmpty()) {
+            auto params = _delegate.GetParameter<HdxAmbientOcclusionTaskParams>(
+                    _ambientOcclusionTaskId, HdTokens->params);
+            params.cameraId = _activeCameraId;
+            _delegate.SetParameter(_ambientOcclusionTaskId, HdTokens->params,
+                                   params);
+            GetRenderIndex()->GetChangeTracker().MarkTaskDirty(
+                _ambientOcclusionTaskId, HdChangeTracker::DirtyParams);
         }
     }
 }
