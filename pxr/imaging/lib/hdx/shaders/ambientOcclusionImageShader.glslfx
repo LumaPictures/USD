@@ -43,26 +43,26 @@ layout(binding = 2) uniform sampler2D normalTexture;
 
 float getAmbientOcclusionFactor(float currentDepth, vec2 uv) {
     float ao = 0.0;
+    int numSamples = HdGet_hdxAoNumSamples();
+    float radius = HdGet_hdxAoRadius();
     ivec2 depthSize =  textureSize(depthTexture, 0).xy;
-    vec2 radius = 16.0 * vec2(1.0 / float(depthSize.x), 1.0 / float(depthSize.y));
-    for (int i = 0; i < AO_SAMPLES; i += 1) {
-        vec2 offset = radius * vec2(hdxAoKernel[i * 2], hdxAoKernel[i * 2 + 1]);
+    vec2 screenRadius = radius * vec2(1.0 / float(depthSize.x), 1.0 / float(depthSize.y));
+    for (int i = 0; i < numSamples; i += 1) {
+        vec2 offset = screenRadius * vec2(hdxAoKernel[i * 2], hdxAoKernel[i * 2 + 1]);
         float depth = texture2D(depthTexture, uv + offset).x;
         if (currentDepth > depth) {
             ao += 1.0;
         }
     }
-    return ao / float(AO_SAMPLES);
+    return ao / float(numSamples);
 }
 
 vec4 imageShader(vec2 uv)
 {
-    return vec4(texture2D(normalTexture, uv).xyz, 1);
-    /*float depth = texture2D(depthTexture, uv).x;
-    return vec4(depth, 1, 1, 1);
+    float depth = texture2D(depthTexture, uv).x;
     if (depth > 0.9999) {
         return vec4(0, 0, 0, 0);
     } else {
         return vec4(0.0, 0.0, 0.0, getAmbientOcclusionFactor(depth, uv));
-    }*/
+    }
 }
