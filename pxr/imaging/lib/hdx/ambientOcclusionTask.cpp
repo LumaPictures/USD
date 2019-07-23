@@ -84,8 +84,6 @@ public:
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, _depthTex);
         glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, _colorTex);
-        glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D, _normalTex);
         HdStRenderPassShader::BindResources(binder, program);
     }
@@ -93,11 +91,6 @@ public:
     inline void SetDepthTexture(GLuint tex)
     {
         _depthTex = tex;
-    }
-
-    inline void SetColorTexture(GLuint tex)
-    {
-        _colorTex = tex;
     }
 
     inline void SetNormalTexture(GLuint tex)
@@ -114,7 +107,6 @@ private:
 
     ID _hash;
     int _depthTex;
-    int _colorTex;
     int _normalTex;
 };
 
@@ -326,10 +318,6 @@ void HdxAmbientOcclusionTask::Execute(HdTaskContext* ctx)
                             , GL_DEPTH_COMPONENT
                             , GL_FLOAT
                             , GL_DEPTH_COMPONENT32F);
-    drawTarget->AddAttachment("color"
-                            , GL_RGBA
-                            , GL_FLOAT
-                            , GL_RGBA16F);
     drawTarget->AddAttachment("normal"
                             , GL_RGBA
                             , GL_FLOAT
@@ -340,18 +328,14 @@ void HdxAmbientOcclusionTask::Execute(HdTaskContext* ctx)
 
     glBindFramebuffer(GL_READ_FRAMEBUFFER, drawFramebuffer);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer);
-    // Blit framebuffers don't copy all the buffers at once. Need to do one by
-    // one. We copy depth with the first color attachment copy.
-    glReadBuffer(GL_COLOR_ATTACHMENT0);
+    // Normal is bound to the second slot. Luckily blit framebuffer only
+    // blits the read buffer to the drawbuffer(s), so we don't have to keep
+    // a color buffer around.
+    glReadBuffer(GL_COLOR_ATTACHMENT1);
     glDrawBuffer(GL_COLOR_ATTACHMENT0);
     glBlitFramebuffer(0, 0, screenSize[0], screenSize[1],
                       0, 0, screenSize[0], screenSize[1],
                       GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT, GL_NEAREST);
-    glReadBuffer(GL_COLOR_ATTACHMENT1);
-    glDrawBuffer(GL_COLOR_ATTACHMENT1);
-    glBlitFramebuffer(0, 0, screenSize[0], screenSize[1],
-                      0, 0, screenSize[0], screenSize[1],
-                      GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
     glReadBuffer(GL_COLOR_ATTACHMENT0);
     glBindFramebuffer(GL_FRAMEBUFFER, drawFramebuffer);
@@ -362,7 +346,6 @@ void HdxAmbientOcclusionTask::Execute(HdTaskContext* ctx)
     auto* shader = static_cast<HdxAmbientOcclusionRenderPassShader*>(
         _renderPassShader.get());
     shader->SetDepthTexture(drawTarget->GetAttachment("depth")->GetGlTextureName());
-    shader->SetColorTexture(drawTarget->GetAttachment("color")->GetGlTextureName());
     shader->SetNormalTexture(drawTarget->GetAttachment("normal")->GetGlTextureName());
 
     _renderPassState->Bind();
