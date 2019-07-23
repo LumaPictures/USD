@@ -36,6 +36,8 @@
 #include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
 
+#include "pxr/imaging/hdSt/bufferArrayRangeGL.h"
+#include "pxr/imaging/hdSt/bufferResourceGL.h"
 #include "pxr/imaging/hdSt/renderPassShader.h"
 #include "pxr/imaging/hdSt/renderPassState.h"
 #include "pxr/imaging/hdSt/renderDelegate.h"
@@ -52,32 +54,24 @@ PXR_NAMESPACE_OPEN_SCOPE
 TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
     (hdxAoKernel)
+    (hdxAoNumSamples)
+    (hdxAoRadius)
+    (hdxAoUniforms)
+    (hdxAoUniformBar)
 );
 
 namespace {
 
+using HdBufferSourceSharedPtrVector = std::vector<HdBufferSourceSharedPtr>;
+
 class HdxAmbientOcclusionRenderPassShader : public HdStRenderPassShader {
 public:
-    HdxAmbientOcclusionRenderPassShader(int numSamples) :
-        HdStRenderPassShader(HdxPackageAmbientOcclusionImageShader()),
-        _numSamples(numSamples)
+    HdxAmbientOcclusionRenderPassShader() :
+        HdStRenderPassShader(HdxPackageAmbientOcclusionImageShader())
     {
         // The hash of this shader is constant, no custom bindings and the
         // input parameters are constant.
         _hash = HdStRenderPassShader::ComputeHash();
-        boost::hash_combine(_hash, numSamples);
-    }
-
-    std::string GetSource(const TfToken& shaderStageKey) const override
-    {
-        const auto src = HdStRenderPassShader::GetSource(shaderStageKey);
-
-        std::stringstream defines;
-        defines << "#define AO_SAMPLES "
-                << _numSamples
-                << "\n";
-
-        return defines.str() + src;
     }
 
     ID ComputeHash() const override
@@ -85,7 +79,8 @@ public:
         return _hash;
     }
 
-    void BindResources(const HdSt_ResourceBinder& binder, int program) override {
+    void BindResources(const HdSt_ResourceBinder& binder, int program) override
+    {
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, _depthTex);
         glActiveTexture(GL_TEXTURE1);
@@ -95,27 +90,28 @@ public:
         HdStRenderPassShader::BindResources(binder, program);
     }
 
-    inline void SetDepthTexture(GLuint tex) {
+    inline void SetDepthTexture(GLuint tex)
+    {
         _depthTex = tex;
     }
 
-    inline void SetColorTexture(GLuint tex) {
+    inline void SetColorTexture(GLuint tex)
+    {
         _colorTex = tex;
     }
 
-    inline void SetNormalTexture(GLuint tex) {
+    inline void SetNormalTexture(GLuint tex)
+    {
         _normalTex = tex;
     }
 
     ~HdxAmbientOcclusionRenderPassShader() override = default;
 private:
-    HdxAmbientOcclusionRenderPassShader()                                                       = delete;
     HdxAmbientOcclusionRenderPassShader(const HdxAmbientOcclusionRenderPassShader&)             = delete;
     HdxAmbientOcclusionRenderPassShader(HdxAmbientOcclusionRenderPassShader&&)                  = delete;
     HdxAmbientOcclusionRenderPassShader& operator=(const  HdxAmbientOcclusionRenderPassShader&) = delete;
     HdxAmbientOcclusionRenderPassShader& operator=(HdxAmbientOcclusionRenderPassShader&&)       = delete;
 
-    const int _numSamples;
     ID _hash;
     int _depthTex;
     int _colorTex;
@@ -184,51 +180,29 @@ void HdxAmbientOcclusionTask::Prepare(HdTaskContext* ctx,
         return;
     }
 
-    auto aoNumSamples = renderDelegate
+    auto aoNumSamplesVal = renderDelegate
         ->GetRenderSetting(HdStRenderSettingsTokens->aoNumSamples);
-    if (!TF_VERIFY(aoNumSamples.IsHolding<int>(),
+    if (!TF_VERIFY(aoNumSamplesVal.IsHolding<int>(),
                    "Ambient Occlusion num samples is not an integer!")) {
         return;
     }
-    const auto numSamples = std::max(1, aoNumSamples.UncheckedGet<int>());
-    auto rebuildShader = false;
-    if (numSamples != _numSamples) {
-        _numSamples = numSamples;
-        rebuildShader = true;
+    const auto aoNumSamples = std::max(1, aoNumSamplesVal.UncheckedGet<int>());
+    const auto aoRadiusVal = renderDelegate
+        ->GetRenderSetting(HdStRenderSettingsTokens->aoRadius);
+    if (!TF_VERIFY(aoRadiusVal.IsHolding<float>(),
+                   "Ambient Occlusion radius is not a float!")) {
+        return;
+    }
+    const auto aoRadius = std::max(0.0f, aoRadiusVal.UncheckedGet<float>());
+    auto updateConstants = false;
+    if (aoNumSamples != _aoNumSamples
+     || aoRadius != _aoRadius) {
+        _aoNumSamples = aoNumSamples;
+        _aoRadius = aoRadius;
+        updateConstants = true;
     }
 
     const auto& resourceRegistry = renderIndex->GetResourceRegistry();
-
-    auto buildKernel = [&] () {
-        HdBufferSpecVector kernelSpecs;
-        kernelSpecs.push_back(
-            HdBufferSpec(
-                _tokens->hdxAoKernel,
-                HdTupleType {HdTypeFloat, 1})
-        );
-
-        _kernelBar = resourceRegistry->AllocateSingleBufferArrayRange(
-            _tokens->hdxAoKernel,
-            kernelSpecs,
-            HdBufferArrayUsageHint()
-        );
-
-        HdBufferSourceSharedPtr kernelSource(
-            new HdVtBufferSource(
-                _tokens->hdxAoKernel,
-                VtValue(_GenerateSamplingKernel(numSamples))
-            )
-        );
-        resourceRegistry->AddSource(_kernelBar, kernelSource);
-
-        _renderPassShader->AddBufferBinding(
-            HdBindingRequest(
-                HdBinding::SSBO,
-                _tokens->hdxAoKernel,
-                _kernelBar,
-                false /* interleave */
-            ));
-    };
 
     if (!_renderPass) {
         HdRprimCollection collection;
@@ -252,18 +226,78 @@ void HdxAmbientOcclusionTask::Prepare(HdTaskContext* ctx,
             HdBlendFactor::HdBlendFactorOne,
             HdBlendFactor::HdBlendFactorOne);
 
-        _renderPassShader.reset(new HdxAmbientOcclusionRenderPassShader(
-            numSamples));
+        _renderPassShader.reset(new HdxAmbientOcclusionRenderPassShader());
 
         _renderPassState->SetRenderPassShader(_renderPassShader);
-        buildKernel();
         _renderPass->Prepare(GetRenderTags());
-    } else if(rebuildShader) {
-        _renderPassShader.reset(new HdxAmbientOcclusionRenderPassShader(
-            _numSamples));
-        _renderPassState->SetRenderPassShader(_renderPassShader);
-        buildKernel();
-        _renderPass->Prepare(GetRenderTags());
+
+        HdBufferSpecVector kernelSpecs;
+        kernelSpecs.push_back(
+            HdBufferSpec(
+                _tokens->hdxAoKernel,
+                HdTupleType {HdTypeFloat, 1})
+        );
+
+        _kernelBar = resourceRegistry->AllocateSingleBufferArrayRange(
+            _tokens->hdxAoKernel,
+            kernelSpecs,
+            HdBufferArrayUsageHint()
+        );
+
+        _renderPassShader->AddBufferBinding(
+            HdBindingRequest(
+                HdBinding::SSBO,
+                _tokens->hdxAoKernel,
+                _kernelBar,
+                false /* interleave */
+            )
+        );
+
+        HdBufferSpecVector uniformSpecs;
+        uniformSpecs.emplace_back(
+            _tokens->hdxAoNumSamples,
+            HdTupleType { HdTypeInt32, 1}
+        );
+        uniformSpecs.emplace_back(
+            _tokens->hdxAoRadius,
+            HdTupleType { HdTypeFloat, 1}
+        );
+
+        _uniformBar = resourceRegistry->AllocateUniformBufferArrayRange(
+            _tokens->hdxAoUniforms,
+            uniformSpecs,
+            HdBufferArrayUsageHint()
+        );
+
+        _renderPassShader->AddBufferBinding(
+            HdBindingRequest(
+                HdBinding::UBO,
+                _tokens->hdxAoUniformBar,
+                _uniformBar,
+                true
+            )
+        );
+
+        updateConstants = true;
+    }
+
+    if (updateConstants)
+    {
+        HdBufferSourceSharedPtr kernelSource(
+            new HdVtBufferSource(
+                _tokens->hdxAoKernel,
+                VtValue(_GenerateSamplingKernel(aoNumSamples))
+            )
+        );
+        resourceRegistry->AddSource(_kernelBar, kernelSource);
+        HdBufferSourceSharedPtrVector uniformSources;
+        uniformSources.emplace_back(
+            new HdVtBufferSource(_tokens->hdxAoNumSamples, VtValue(aoNumSamples))
+        );
+        uniformSources.emplace_back(
+            new HdVtBufferSource(_tokens->hdxAoRadius, VtValue(aoRadius))
+        );
+        resourceRegistry->AddSources(_uniformBar, uniformSources);
     }
 }
 
