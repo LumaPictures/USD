@@ -9,6 +9,8 @@
 
 #include "pxr/imaging/hd/task.h"
 
+#include "pxr/imaging/glf/drawTarget.h"
+
 #include <memory>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -66,6 +68,7 @@ private:
 
     GfMatrix4f _cameraProjection = GfMatrix4f(0.0f);
     SdfPath _cameraId;
+    GlfDrawTargetRefPtr _drawTarget;
     int _aoNumSamples = -1;
     float _aoRadius = -1.0f;
 };
