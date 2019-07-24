@@ -379,21 +379,24 @@ void HdxAmbientOcclusionTask::Execute(HdTaskContext* ctx)
 
     const auto screenSize = HdxUtils::GetScreenSize();
 
-    auto drawTarget = GlfDrawTarget::New(screenSize
+    if (_drawTarget == nullptr) {
+        _drawTarget = GlfDrawTarget::New(screenSize
                                        , false /* request MSAA */);
-
-    drawTarget->Bind();
-    drawTarget->AddAttachment("depth"
+        _drawTarget->Bind();
+        _drawTarget->AddAttachment("depth"
                             , GL_DEPTH_COMPONENT
                             , GL_FLOAT
                             , GL_DEPTH_COMPONENT32F);
-    drawTarget->AddAttachment("normal"
+        _drawTarget->AddAttachment("normal"
                             , GL_RGBA
                             , GL_FLOAT
                             , GL_RGBA16F);
-    drawTarget->DrawBuffers();
+        _drawTarget->DrawBuffers();
+    } else if (_drawTarget->GetSize() != screenSize) {
+        _drawTarget->SetSize(screenSize);
+    }
 
-    auto framebuffer = drawTarget->GetFramebufferId();
+    auto framebuffer = _drawTarget->GetFramebufferId();
 
     glBindFramebuffer(GL_READ_FRAMEBUFFER, drawFramebuffer);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer);
@@ -414,8 +417,8 @@ void HdxAmbientOcclusionTask::Execute(HdTaskContext* ctx)
 
     auto* shader = static_cast<HdxAmbientOcclusionRenderPassShader*>(
         _renderPassShader.get());
-    shader->SetDepthTexture(drawTarget->GetAttachment("depth")->GetGlTextureName());
-    shader->SetNormalTexture(drawTarget->GetAttachment("normal")->GetGlTextureName());
+    shader->SetDepthTexture(_drawTarget->GetAttachment("depth")->GetGlTextureName());
+    shader->SetNormalTexture(_drawTarget->GetAttachment("normal")->GetGlTextureName());
 
     _renderPassState->Bind();
 
@@ -427,9 +430,6 @@ void HdxAmbientOcclusionTask::Execute(HdTaskContext* ctx)
 
     _renderPassState->Unbind();
 
-    drawTarget->Bind();
-    drawTarget->ClearAttachments();
-    drawTarget = nullptr;
     glPopDebugGroup();
 }
 
