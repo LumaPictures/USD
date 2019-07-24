@@ -67,12 +67,12 @@ TF_DEFINE_ENV_SETTING(HD_OIT_NUM_SAMPLES, 8,
 TF_DEFINE_ENV_SETTING(HD_ENABLE_AMBIENT_OCCLUSION, false,
            "Enables ambient occlusion by default.");
 
-TF_DEFINE_ENV_SETTING(HD_AMBIENT_OCCLUSION_NUM_SAMPLES, 32,
+TF_DEFINE_ENV_SETTING(HD_AMBIENT_OCCLUSION_NUM_SAMPLES, 256,
                       "Number of ambient occlusion samples. Increase the value"
                       "increases frame time, but improves ambient occlusion"
                       "quality.");
 
-TF_DEFINE_ENV_SETTING(HD_AMBIENT_OCCLUSION_RADIUS, "16.0",
+TF_DEFINE_ENV_SETTING(HD_AMBIENT_OCCLUSION_RADIUS, "64.0",
                       "Radius of sampling for the Ambient Occlusion. Larger "
                       "values takes more geometry per pixel into "
                       "consideration.");
