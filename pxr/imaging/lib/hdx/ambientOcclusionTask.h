@@ -64,7 +64,8 @@ private:
     HdBufferArrayRangeSharedPtr _kernelBar;
     HdBufferArrayRangeSharedPtr _uniformBar;
 
-    GfMatrix4f _cameraProjection;
+    GfMatrix4f _cameraProjection = GfMatrix4f(0.0f);
+    SdfPath _cameraId;
     int _aoNumSamples = -1;
     float _aoRadius = -1.0f;
 };
