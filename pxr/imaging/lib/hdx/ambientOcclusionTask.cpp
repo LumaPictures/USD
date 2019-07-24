@@ -61,6 +61,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     (hdxAoUniforms)
     (hdxAoUniformBar)
     (hdxAoProjectionMatrix)
+    (hdxAoProjectionMatrixInv)
     (hdxAoNearFar)
 );
 
@@ -126,8 +127,8 @@ VtArray<GfVec3f> _GenerateSamplingKernel(const int numPoints)
     std::uniform_real_distribution<float> distribution(0.0f, 1.0f);
     for (auto i = decltype(numPoints){0}; i < numPoints; i += 1) {
         GfVec3f vec {
-            distribution(engineX),
-            distribution(engineY),
+            distribution(engineX) * 2.0f - 1.0f,
+            distribution(engineY) * 2.0f - 1.0f,
             distribution(engineZ),
         };
 
@@ -280,6 +281,7 @@ void HdxAmbientOcclusionTask::Prepare(HdTaskContext* ctx,
         );
 
         HdBufferSpecVector uniformSpecs;
+        uniformSpecs.reserve(5);
         uniformSpecs.emplace_back(
             _tokens->hdxAoNumSamples,
             HdTupleType { HdTypeInt32, 1}
@@ -290,6 +292,10 @@ void HdxAmbientOcclusionTask::Prepare(HdTaskContext* ctx,
         );
         uniformSpecs.emplace_back(
             _tokens->hdxAoProjectionMatrix,
+            HdTupleType { HdTypeFloatMat4, 1}
+        );
+        uniformSpecs.emplace_back(
+            _tokens->hdxAoProjectionMatrixInv,
             HdTupleType { HdTypeFloatMat4, 1}
         );
         uniformSpecs.emplace_back(
@@ -328,6 +334,7 @@ void HdxAmbientOcclusionTask::Prepare(HdTaskContext* ctx,
 
     if (updateConstants) {
         HdBufferSourceSharedPtrVector uniformSources;
+        uniformSources.reserve(5);
         uniformSources.emplace_back(
             new HdVtBufferSource(_tokens->hdxAoNumSamples, VtValue(_aoNumSamples))
         );
@@ -337,6 +344,10 @@ void HdxAmbientOcclusionTask::Prepare(HdTaskContext* ctx,
         uniformSources.emplace_back(
             new HdVtBufferSource(_tokens->hdxAoProjectionMatrix
                                , VtValue(_cameraProjection))
+        );
+        uniformSources.emplace_back(
+            new HdVtBufferSource(_tokens->hdxAoProjectionMatrixInv
+                               , VtValue(_cameraProjection.GetInverse()))
         );
         // http://dougrogers.blogspot.com/2013/02/how-to-derive-near-and-far-clip-plane.html
         // Needed to flip second coordinate, different matrix major.
