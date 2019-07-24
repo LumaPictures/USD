@@ -40,16 +40,42 @@
 layout(binding = 0) uniform sampler2D depthTexture;
 layout(binding = 1) uniform sampler2D normalTexture;
 
-float getAmbientOcclusionFactor(float currentDepth, vec3 normal, vec2 uv) {
+#define M_PI 3.1415926535897932384626433832795
+
+// https://stackoverflow.com/questions/32227283/getting-world-position-from-depth-buffer-value
+vec3 getViewSpace(float depth, vec2 uv)
+{
+    vec4 clipSpace = vec4(uv * 2.0 - 1.0, depth, 1.0);
+    vec4 viewSpace = HdGet_hdxAoProjectionMatrixInv() * clipSpace;
+    return viewSpace.xyz / viewSpace.w;
+}
+
+// https://stackoverflow.com/questions/5149544/can-i-generate-a-random-number-inside-a-pixel-shader
+// Author: Michael Pohoreski
+// Copyright: Copyleft 2012 :-)
+float someRandom(vec2 p)
+{
+  const vec2 r = vec2(23.1406926327792690, 2.6651441426902251);
+  return fract(cos(mod(123456789., 1e-7 + 256. * dot(p,r))));
+}
+
+float getAmbientOcclusionFactor(float depth, vec3 normal, vec2 uv) {
+    vec3 screenPos = getViewSpace(depth, uv);
     float ao = 0.0;
     int numSamples = HdGet_hdxAoNumSamples();
     float radius = HdGet_hdxAoRadius();
-    ivec2 depthSize =  textureSize(depthTexture, 0).xy;
-    vec2 screenRadius = radius * vec2(1.0 / float(depthSize.x), 1.0 / float(depthSize.y));
+    float randomValue = someRandom(uv) * M_PI * 2.0;
+    vec3 dx = vec3(sin(randomValue), cos(randomValue), 0.0);
+    vec3 dy = normalize(cross(dx, normal));
+    dx = normalize(cross(dy, normal));
     for (int i = 0; i < numSamples; i += 1) {
-        vec2 offset = screenRadius * vec2(hdxAoKernel[i].x, hdxAoKernel[i].z);
-        float depth = texture2D(depthTexture, uv + offset).x;
-        if (currentDepth > depth) {
+        vec3 sampleDirection = vec3(hdxAoKernel[i].x, hdxAoKernel[i].y, hdxAoKernel[i].z) * radius;
+        vec3 samplePos = screenPos + sampleDirection.x * dx + sampleDirection.y * dy + sampleDirection.z * normal;
+        vec4 projectedSample = HdGet_hdxAoProjectionMatrix() * vec4(samplePos, 1.0);
+        vec2 sampleUv = (projectedSample.xy / projectedSample.w) * 0.5 + 0.5;
+        float sampleDepth = texture2D(depthTexture, sampleUv).x;
+        vec3 realPos = getViewSpace(sampleDepth, sampleUv);
+        if (((samplePos.z + radius * 0.01) < realPos.z) && ((realPos.z - samplePos.z) < radius)) {
             ao += 1.0;
         }
     }
@@ -64,5 +90,6 @@ vec4 imageShader(vec2 uv)
         return vec4(0, 0, 0, 0);
     } else {
         return vec4(0.0, 0.0, 0.0, getAmbientOcclusionFactor(depth, normalData.xyz, uv));
+        // return vec4((1.0 - getAmbientOcclusionFactor(depth, normalData.xyz, uv)).xxx, 1.0);
     }
 }
