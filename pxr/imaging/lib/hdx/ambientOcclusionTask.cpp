@@ -27,6 +27,7 @@
 
 #include "pxr/imaging/hdx/ambientOcclusionTask.h"
 
+#include "pxr/imaging/hd/camera.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/renderDelegate.h"
 #include "pxr/imaging/hd/renderIndex.h"
@@ -48,6 +49,7 @@
 #include "pxr/imaging/hdx/utils.h"
 
 #include <random>
+#include <iostream>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -59,6 +61,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     (hdxAoUniforms)
     (hdxAoUniformBar)
     (hdxAoProjectionMatrix)
+    (hdxAoNearFar)
 );
 
 namespace {
@@ -161,7 +164,7 @@ void HdxAmbientOcclusionTask::Sync(HdSceneDelegate* delegate,
         auto value = delegate->Get(GetId(), HdTokens->params);
         if (value.IsHolding<HdxAmbientOcclusionTaskParams>()) {
             auto params = value.UncheckedGet<HdxAmbientOcclusionTaskParams>();
-            TF_UNUSED(params);
+            _cameraId = params.cameraId;
         }
     }
     *dirtyBits = HdChangeTracker::Clean;
@@ -202,11 +205,26 @@ void HdxAmbientOcclusionTask::Prepare(HdTaskContext* ctx,
         return;
     }
     const auto aoRadius = std::max(0.0f, aoRadiusVal.UncheckedGet<float>());
+
+    const auto* camera = static_cast<const HdCamera*>(
+        renderIndex->GetSprim(HdPrimTypeTokens->camera, _cameraId));
+    GfMatrix4f cameraProjection(0.0f);
+    if (camera != nullptr) {
+        cameraProjection = GfMatrix4f(camera->GetProjectionMatrix());
+    }
+
     auto updateConstants = false;
-    if (aoNumSamples != _aoNumSamples
-     || aoRadius != _aoRadius) {
+    auto rebuildKernel = false;
+    if (aoNumSamples != _aoNumSamples) {
         _aoNumSamples = aoNumSamples;
+        rebuildKernel = true;
+        updateConstants = true;
+    }
+
+    if (aoRadius != _aoRadius
+     || cameraProjection != _cameraProjection) {
         _aoRadius = aoRadius;
+        _cameraProjection = cameraProjection;
         updateConstants = true;
     }
 
@@ -270,6 +288,14 @@ void HdxAmbientOcclusionTask::Prepare(HdTaskContext* ctx,
             _tokens->hdxAoRadius,
             HdTupleType { HdTypeFloat, 1}
         );
+        uniformSpecs.emplace_back(
+            _tokens->hdxAoProjectionMatrix,
+            HdTupleType { HdTypeFloatMat4, 1}
+        );
+        uniformSpecs.emplace_back(
+            _tokens->hdxAoNearFar,
+            HdTupleType { HdTypeFloatVec2, 1}
+        );
 
         _uniformBar = resourceRegistry->AllocateUniformBufferArrayRange(
             _tokens->hdxAoUniforms,
@@ -286,24 +312,40 @@ void HdxAmbientOcclusionTask::Prepare(HdTaskContext* ctx,
             )
         );
 
+        rebuildKernel = true;
         updateConstants = true;
     }
 
-    if (updateConstants)
-    {
+    if (rebuildKernel) {
         HdBufferSourceSharedPtr kernelSource(
             new HdVtBufferSource(
                 _tokens->hdxAoKernel,
-                VtValue(_GenerateSamplingKernel(aoNumSamples))
+                VtValue(_GenerateSamplingKernel(_aoNumSamples))
             )
         );
         resourceRegistry->AddSource(_kernelBar, kernelSource);
+    }
+
+    if (updateConstants) {
         HdBufferSourceSharedPtrVector uniformSources;
         uniformSources.emplace_back(
-            new HdVtBufferSource(_tokens->hdxAoNumSamples, VtValue(aoNumSamples))
+            new HdVtBufferSource(_tokens->hdxAoNumSamples, VtValue(_aoNumSamples))
         );
         uniformSources.emplace_back(
-            new HdVtBufferSource(_tokens->hdxAoRadius, VtValue(aoRadius))
+            new HdVtBufferSource(_tokens->hdxAoRadius, VtValue(_aoRadius))
+        );
+        uniformSources.emplace_back(
+            new HdVtBufferSource(_tokens->hdxAoProjectionMatrix
+                               , VtValue(_cameraProjection))
+        );
+        // http://dougrogers.blogspot.com/2013/02/how-to-derive-near-and-far-clip-plane.html
+        // Needed to flip second coordinate, different matrix major.
+        const auto C = _cameraProjection[2][2];
+        const auto D = _cameraProjection[3][2];
+        GfVec2f nearFar {D / (C - 1.0f), D / (C + 1.0f)};
+        uniformSources.emplace_back(
+            new HdVtBufferSource(_tokens->hdxAoNearFar
+                               , VtValue(nearFar))
         );
         resourceRegistry->AddSources(_uniformBar, uniformSources);
     }
