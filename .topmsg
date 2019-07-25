@@ -1,0 +1,5 @@
+From: Paul Molodowitch <paulm@lumapictures.com>
+Subject: fix for OIT with older glew
+
+...such as that available within maya.  Older glew will mean a different set
+of gl functions are available
