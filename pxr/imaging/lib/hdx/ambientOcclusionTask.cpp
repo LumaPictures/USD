@@ -48,6 +48,9 @@
 #include "pxr/imaging/hdx/package.h"
 #include "pxr/imaging/hdx/utils.h"
 
+#include "pxr/base/tf/envSetting.h"
+#include "pxr/base/tf/getenv.h"
+
 #include <random>
 #include <iostream>
 
@@ -63,7 +66,12 @@ TF_DEFINE_PRIVATE_TOKENS(
     (hdxAoProjectionMatrix)
     (hdxAoProjectionMatrixInv)
     (hdxAoNearFar)
+    (hdxAoEnableDebug)
 );
+
+TF_DEFINE_ENV_SETTING(HDX_AMBIENT_OCCLUSION_ENABLE_DEBUG, false,
+                      "Enables the debug display of the ao factor instead"
+                      "of applying AO to color.");
 
 namespace {
 
@@ -281,7 +289,7 @@ void HdxAmbientOcclusionTask::Prepare(HdTaskContext* ctx,
         );
 
         HdBufferSpecVector uniformSpecs;
-        uniformSpecs.reserve(5);
+        uniformSpecs.reserve(6);
         uniformSpecs.emplace_back(
             _tokens->hdxAoNumSamples,
             HdTupleType { HdTypeInt32, 1}
@@ -301,6 +309,10 @@ void HdxAmbientOcclusionTask::Prepare(HdTaskContext* ctx,
         uniformSpecs.emplace_back(
             _tokens->hdxAoNearFar,
             HdTupleType { HdTypeFloatVec2, 1}
+        );
+        uniformSpecs.emplace_back(
+            _tokens->hdxAoEnableDebug,
+            HdTupleType { HdTypeInt32, 1}
         );
 
         _uniformBar = resourceRegistry->AllocateUniformBufferArrayRange(
@@ -334,7 +346,7 @@ void HdxAmbientOcclusionTask::Prepare(HdTaskContext* ctx,
 
     if (updateConstants) {
         HdBufferSourceSharedPtrVector uniformSources;
-        uniformSources.reserve(5);
+        uniformSources.reserve(6);
         uniformSources.emplace_back(
             new HdVtBufferSource(_tokens->hdxAoNumSamples, VtValue(_aoNumSamples))
         );
@@ -358,9 +370,17 @@ void HdxAmbientOcclusionTask::Prepare(HdTaskContext* ctx,
             new HdVtBufferSource(_tokens->hdxAoNearFar
                                , VtValue(nearFar))
         );
+        static const int enableDebug =
+            TfGetEnvSetting(HDX_AMBIENT_OCCLUSION_ENABLE_DEBUG) ? 1 : 0;
+        uniformSources.emplace_back(
+            new HdVtBufferSource(_tokens->hdxAoEnableDebug
+                               , VtValue(enableDebug))
+        );
         resourceRegistry->AddSources(_uniformBar, uniformSources);
     }
 }
+
+#define USE_GL_DEBUG_GROUP
 
 void HdxAmbientOcclusionTask::Execute(HdTaskContext* ctx)
 {
@@ -368,11 +388,12 @@ void HdxAmbientOcclusionTask::Execute(HdTaskContext* ctx)
     HF_MALLOC_TAG_FUNCTION();
 
     if (!TF_VERIFY(_renderPassState)) return;
-
+#ifdef USE_GL_DEBUG_GROUP
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION
                    , 0
                    , -1
                    , "Ambient Occlusion Rendering");
+#endif
 
     GLint drawFramebuffer;
     glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &drawFramebuffer);
@@ -430,7 +451,9 @@ void HdxAmbientOcclusionTask::Execute(HdTaskContext* ctx)
 
     _renderPassState->Unbind();
 
+#ifdef USE_GL_DEBUG_GROUP
     glPopDebugGroup();
+#endif
 }
 
 std::ostream& operator<<(

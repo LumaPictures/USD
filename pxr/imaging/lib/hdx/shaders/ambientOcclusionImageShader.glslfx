@@ -89,7 +89,10 @@ vec4 imageShader(vec2 uv)
     if (depth > 0.9999 || normalData.w < 0.0001) {
         return vec4(0, 0, 0, 0);
     } else {
-        return vec4(0.0, 0.0, 0.0, getAmbientOcclusionFactor(depth, normalData.xyz, uv));
-        // return vec4((1.0 - getAmbientOcclusionFactor(depth, normalData.xyz, uv)).xxx, 1.0);
+        if (HdGet_hdxAoEnableDebug() == 1) {
+            return vec4((1.0 - getAmbientOcclusionFactor(depth, normalData.xyz, uv)).xxx, 1.0);
+        } else {
+            return vec4(0.0, 0.0, 0.0, getAmbientOcclusionFactor(depth, normalData.xyz, uv));
+        }
     }
 }
