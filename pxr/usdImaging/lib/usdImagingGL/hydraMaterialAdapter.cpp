@@ -61,10 +61,12 @@ TF_DEFINE_PRIVATE_TOKENS(
 );
 
 TF_DEFINE_ENV_SETTING(
-    PXR_PREVIEW_SURFACE_TRANSLUCENT_TAG, "additive",
-    "Sets the material tag for UsdPreviewSurface if opacity is less than one"
-    "or mapped to a texture. Default value is \"additive\", set it to"
-    "\"translucent\" to enable OIT translucency.");
+    PXR_PREVIEW_SURFACE_TRANSLUCENT_TAG, "translucent",
+    "Sets the material tag for UsdPreviewSurface if opacity is less than one "
+    "or mapped to a texture. Default value is \"translucent\", which enables "
+    "OIT translucency, but is more expensive for surfaces with opacity < 1. "
+    "Set to \"additive\" for a faster render, but that doesn't display "
+    "\"correctly\" (especially for mostly-opaque surfaces).");
 
 TF_REGISTRY_FUNCTION(TfType)
 {
