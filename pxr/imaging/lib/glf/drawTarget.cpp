@@ -46,7 +46,7 @@ TF_DEFINE_ENV_SETTING(GLF_DRAW_TARGETS_NUM_SAMPLES, 4,
                       "Number of samples greater than 1 forces MSAA.");
 
 static unsigned int 
-GetNumSamples()
+GetGlfNumSamples()
 {
     static int reqNumSamples = TfGetEnvSetting(GLF_DRAW_TARGETS_NUM_SAMPLES);
     unsigned int numSamples = 1;
@@ -60,6 +60,12 @@ GlfDrawTargetRefPtr
 GlfDrawTarget::New( GfVec2i const & size, bool requestMSAA )
 {
     return TfCreateRefPtr(new This(size, requestMSAA));
+}
+
+GlfDrawTargetRefPtr
+GlfDrawTarget::NewWithSamples(const GfVec2i& size, unsigned int numSamples)
+{
+    return TfCreateRefPtr(new This(size, numSamples));
 }
 
 GlfDrawTarget::GlfDrawTarget( GfVec2i const & size, bool requestMSAA /* =false */) :
@@ -76,13 +82,28 @@ GlfDrawTarget::GlfDrawTarget( GfVec2i const & size, bool requestMSAA /* =false *
     // If MSAA has been requested and it is enabled then we will create
     // msaa buffers
     if (requestMSAA) {
-        _numSamples = GetNumSamples();
+        _numSamples = GetGlfNumSamples();
     }
 
     _GenFrameBuffer();
 
     _attachmentsPtr = TfCreateRefPtr( new AttachmentsContainer );
 }
+
+GlfDrawTarget::GlfDrawTarget(const GfVec2i& size, unsigned int numSamples) :
+    _framebuffer(0),
+    _framebufferMS(0),
+    _unbindRestoreReadFB(0),
+    _unbindRestoreDrawFB(0),
+    _bindDepth(0),
+    _size(size),
+    _numSamples(std::max(1u, numSamples))
+{
+    GlfGlewInit();
+    _GenFrameBuffer();
+    _attachmentsPtr = TfCreateRefPtr(new AttachmentsContainer);
+}
+
 
 GlfDrawTargetRefPtr
 GlfDrawTarget::New( GlfDrawTargetPtr const & drawtarget )
