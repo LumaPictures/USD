@@ -58,12 +58,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_TINY_PRIM_CULLING, false,
                       "Enable tiny prim culling");
 
-TF_DEFINE_ENV_SETTING(HD_OIT_NUM_SAMPLES, 8,
-                      "Number of Object Independent Transparency samples per "
-                      "pixel. Increasing the value decreases translucency "
-                      "artifacts and flicker, but significantly increases "
-                      "memory usage and degrades performance");
-
 TF_DEFINE_ENV_SETTING(HDST_ENABLE_EXPERIMENTAL_VOLUME_ELLIPSOID_STANDINS, false,
                       "Render constant density ellipsoid standins for "
                       "volume prims");
@@ -121,13 +115,10 @@ HdStRenderDelegate::_Initialize()
     }
 
     // Initialize the settings and settings descriptors.
-    _settingDescriptors.reserve(2);
-    _settingDescriptors.emplace_back("Enable Tiny Prim Culling",
+    _settingDescriptors.resize(1);
+    _settingDescriptors[0] = { "Enable Tiny Prim Culling",
         HdStRenderSettingsTokens->enableTinyPrimCulling,
-        VtValue(bool(TfGetEnvSetting(HD_ENABLE_GPU_TINY_PRIM_CULLING))));
-    _settingDescriptors.emplace_back("OIT Number of Samples",
-        HdStRenderSettingsTokens->oitNumSamples,
-        VtValue(int(TfGetEnvSetting(HD_OIT_NUM_SAMPLES))));
+        VtValue(bool(TfGetEnvSetting(HD_ENABLE_GPU_TINY_PRIM_CULLING))) };
     _PopulateDefaultSettings(_settingDescriptors);
 }
 
