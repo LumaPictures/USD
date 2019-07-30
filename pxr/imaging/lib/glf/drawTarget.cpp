@@ -197,10 +197,15 @@ GlfDrawTarget::DrawBuffers()
     if (!buffers.empty()) {
         // Do we need this?
         std::sort(buffers.begin(), buffers.end());
-        glNamedFramebufferDrawBuffers(HasMSAA()
+        if (glNamedFramebufferDrawBuffers) {
+            glNamedFramebufferDrawBuffers(HasMSAA()
                                     ? GetFramebufferMSId() : GetFramebufferId()
                                     , static_cast<GLsizei>(buffers.size())
                                     , buffers.data());
+        } else {
+            glDrawBuffers(static_cast<GLsizei>(buffers.size())
+                        , buffers.data());
+        }
     }
 }
 
