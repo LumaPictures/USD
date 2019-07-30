@@ -76,6 +76,10 @@ public:
     static GlfDrawTargetRefPtr New( GfVec2i const & size, 
                                     bool requestMSAA = false );
 
+    GLF_API
+    static GlfDrawTargetRefPtr NewWithSamples(GfVec2i const & size, 
+                                              unsigned int numSamples = 1);
+
     /// Returns a new instance.
     /// GL framebuffers cannot be shared across contexts, but texture
     /// attachments can. In order to reflect this, GlfDrawTargets hold
@@ -211,6 +215,9 @@ public:
     /// Returns if the draw target uses msaa
     bool HasMSAA() const { return (_numSamples > 1); }
 
+    /// Returns the number of samples for MSAAA.
+    unsigned int GetNumSamples() const { return _numSamples; };
+
     /// Returns the framebuffer object Id.
     GLF_API
     GLuint GetFramebufferId() const;
@@ -265,6 +272,9 @@ protected:
 
     GLF_API
     GlfDrawTarget( GfVec2i const & size, bool requestMSAA );
+
+    GLF_API
+    GlfDrawTarget(const GfVec2i& size, unsigned int numSamples);
 
     GLF_API
     GlfDrawTarget( GlfDrawTargetPtr const & drawtarget );
