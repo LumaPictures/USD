@@ -53,7 +53,6 @@ PXR_NAMESPACE_OPEN_SCOPE
     (oitUniformBar)             \
     (oitRenderPassState)        \
     (oitScreenSize)             \
-    (oitNumSamples)             \
     (renderPassState)           \
     (renderIndexVersion)        \
     (selection)                 \
