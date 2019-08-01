@@ -59,7 +59,9 @@ PXR_NAMESPACE_OPEN_SCOPE
     (enableTinyPrimCulling)                     \
     (enableAo)                                  \
     (aoNumSamples)                              \
-    (aoRadius)
+    (aoRadius)                                  \
+    (aoAmount)                                  \
+    (aoFilterRadius)
 
 TF_DECLARE_PUBLIC_TOKENS(HdStGLSLProgramTokens, HDST_API,
                          HDST_GLSL_PROGRAM_TOKENS);
