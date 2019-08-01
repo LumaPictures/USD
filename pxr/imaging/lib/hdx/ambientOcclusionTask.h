@@ -71,6 +71,7 @@ private:
     GlfDrawTargetRefPtr _drawTarget;
     int _aoNumSamples = -1;
     float _aoRadius = -1.0f;
+    float _aoAmount = -1.0f;
 };
 
 HDX_API
