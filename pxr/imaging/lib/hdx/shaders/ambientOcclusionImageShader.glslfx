@@ -75,11 +75,11 @@ float getAmbientOcclusionFactor(float depth, vec3 normal, vec2 uv) {
         vec2 sampleUv = (projectedSample.xy / projectedSample.w) * 0.5 + 0.5;
         float sampleDepth = texture2D(depthTexture, sampleUv).x;
         vec3 realPos = getViewSpace(sampleDepth, sampleUv);
-        if (((samplePos.z + radius * 0.01) < realPos.z) && ((realPos.z - samplePos.z) < radius)) {
+        if (((samplePos.z + radius * 0.1) < realPos.z) && ((realPos.z - samplePos.z) < radius)) {
             ao += 1.0;
         }
     }
-    return ao / float(numSamples);
+    return pow(ao / float(numSamples), 1.0 / HdGet_hdxAoAmount());
 }
 
 vec4 imageShader(vec2 uv)
