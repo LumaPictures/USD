@@ -29,6 +29,8 @@
 
 #include "pxr/base/gf/vec4i.h"
 
+#include <iostream>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 namespace HdxUtils {
@@ -95,11 +97,26 @@ GetScreenSize()
     } else {
         if (attachType == GL_TEXTURE) {
             int oldBinding;
+            // This is either a multisampled or a normal texture 2d.
             glGetIntegerv(GL_TEXTURE_BINDING_2D, &oldBinding);
             glBindTexture(GL_TEXTURE_2D, attachId);
-            glGetTexLevelParameteriv(GL_TEXTURE_2D,0, GL_TEXTURE_WIDTH, &s[0]);
-            glGetTexLevelParameteriv(GL_TEXTURE_2D,0, GL_TEXTURE_HEIGHT, &s[1]);
-            glBindTexture(GL_TEXTURE_2D, oldBinding);
+            if (glGetError() != GL_NO_ERROR) {
+                glBindTexture(GL_TEXTURE_2D, oldBinding);
+                glGetIntegerv(GL_TEXTURE_BINDING_2D_MULTISAMPLE, &oldBinding);
+                glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, attachId);
+                glGetTexLevelParameteriv(
+                    GL_TEXTURE_2D_MULTISAMPLE, 0, GL_TEXTURE_WIDTH, &s[0]);
+                glGetTexLevelParameteriv(
+                    GL_TEXTURE_2D_MULTISAMPLE, 0, GL_TEXTURE_HEIGHT, &s[1]);
+                glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, oldBinding);
+            } else {
+                glGetTexLevelParameteriv(
+                    GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &s[0]);
+                glGetTexLevelParameteriv(
+                    GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &s[1]);
+                glBindTexture(GL_TEXTURE_2D, oldBinding);
+            }
+            
         } else if (attachType == GL_RENDERBUFFER) {
             int oldBinding;
             glGetIntegerv(GL_RENDERBUFFER_BINDING, &oldBinding);
