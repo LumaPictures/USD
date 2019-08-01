@@ -71,6 +71,14 @@ TF_DEFINE_ENV_SETTING(HD_AMBIENT_OCCLUSION_RADIUS, "64.0",
                       "values takes more geometry per pixel into "
                       "consideration.");
 
+TF_DEFINE_ENV_SETTING(HD_AMBIENT_OCCLUSION_AMOUNT, "1.0",
+                      "Amount of ambient occlusion applied to the color buffer,"
+                      " larger values mean darker image.");
+
+TF_DEFINE_ENV_SETTING(HD_AMBIENT_OCCLUSION_FILTER_RADIUS, "16.0",
+                      "Size for the ambient occlusion filter, larger values "
+                      "mean more blur, 0.0 turns off filtering.");
+
 TF_DEFINE_ENV_SETTING(HDST_ENABLE_EXPERIMENTAL_VOLUME_ELLIPSOID_STANDINS, false,
                       "Render constant density ellipsoid standins for "
                       "volume prims");
@@ -128,7 +136,7 @@ HdStRenderDelegate::_Initialize()
     }
 
     // Initialize the settings and settings descriptors.
-    _settingDescriptors.reserve(4);
+    _settingDescriptors.reserve(6);
     _settingDescriptors.emplace_back("Enable Tiny Prim Culling",
         HdStRenderSettingsTokens->enableTinyPrimCulling,
         VtValue(bool(TfGetEnvSetting(HD_ENABLE_GPU_TINY_PRIM_CULLING))));
@@ -142,6 +150,20 @@ HdStRenderDelegate::_Initialize()
         HdStRenderSettingsTokens->aoRadius,
         VtValue(static_cast<float>(
                 atof(TfGetEnvSetting(HD_AMBIENT_OCCLUSION_RADIUS).c_str())
+            )
+        )
+    );
+    _settingDescriptors.emplace_back("Ambient Occlusion Amount",
+        HdStRenderSettingsTokens->aoAmount,
+        VtValue(static_cast<float>(
+                atof(TfGetEnvSetting(HD_AMBIENT_OCCLUSION_AMOUNT).c_str())
+            )
+        )
+    );
+    _settingDescriptors.emplace_back("Ambient Occlusion Filter Radius",
+        HdStRenderSettingsTokens->aoFilterRadius,
+        VtValue(static_cast<float>(
+                atof(TfGetEnvSetting(HD_AMBIENT_OCCLUSION_FILTER_RADIUS).c_str())
             )
         )
     );

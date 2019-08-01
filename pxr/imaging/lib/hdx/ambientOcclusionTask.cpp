@@ -67,6 +67,8 @@ TF_DEFINE_PRIVATE_TOKENS(
     (hdxAoProjectionMatrixInv)
     (hdxAoNearFar)
     (hdxAoEnableDebug)
+    (hdxAoAmount)
+    (hdxAoFilter)
 );
 
 TF_DEFINE_ENV_SETTING(HDX_AMBIENT_OCCLUSION_ENABLE_DEBUG, false,
@@ -207,6 +209,7 @@ void HdxAmbientOcclusionTask::Prepare(HdTaskContext* ctx,
         return;
     }
     const auto aoNumSamples = std::max(1, aoNumSamplesVal.UncheckedGet<int>());
+
     const auto aoRadiusVal = renderDelegate
         ->GetRenderSetting(HdStRenderSettingsTokens->aoRadius);
     if (!TF_VERIFY(aoRadiusVal.IsHolding<float>(),
@@ -214,6 +217,14 @@ void HdxAmbientOcclusionTask::Prepare(HdTaskContext* ctx,
         return;
     }
     const auto aoRadius = std::max(0.0f, aoRadiusVal.UncheckedGet<float>());
+
+    const auto aoAmountVal = renderDelegate
+        ->GetRenderSetting(HdStRenderSettingsTokens->aoAmount);
+    if (!TF_VERIFY(aoAmountVal.IsHolding<float>(),
+                   "Ambient Occlusion Amount is not a float")) {
+        return;
+    }
+    const auto aoAmount = std::max(0.0f, aoAmountVal.UncheckedGet<float>());
 
     const auto* camera = static_cast<const HdCamera*>(
         renderIndex->GetSprim(HdPrimTypeTokens->camera, _cameraId));
@@ -231,9 +242,11 @@ void HdxAmbientOcclusionTask::Prepare(HdTaskContext* ctx,
     }
 
     if (aoRadius != _aoRadius
-     || cameraProjection != _cameraProjection) {
+     || cameraProjection != _cameraProjection
+     || aoAmount != _aoAmount) {
         _aoRadius = aoRadius;
         _cameraProjection = cameraProjection;
+        _aoAmount = aoAmount;
         updateConstants = true;
     }
 
@@ -299,6 +312,10 @@ void HdxAmbientOcclusionTask::Prepare(HdTaskContext* ctx,
             HdTupleType { HdTypeFloat, 1}
         );
         uniformSpecs.emplace_back(
+            _tokens->hdxAoAmount,
+            HdTupleType { HdTypeFloat, 1}
+        );
+        uniformSpecs.emplace_back(
             _tokens->hdxAoProjectionMatrix,
             HdTupleType { HdTypeFloatMat4, 1}
         );
@@ -352,6 +369,9 @@ void HdxAmbientOcclusionTask::Prepare(HdTaskContext* ctx,
         );
         uniformSources.emplace_back(
             new HdVtBufferSource(_tokens->hdxAoRadius, VtValue(_aoRadius))
+        );
+        uniformSources.emplace_back(
+            new HdVtBufferSource(_tokens->hdxAoAmount, VtValue(_aoAmount))
         );
         uniformSources.emplace_back(
             new HdVtBufferSource(_tokens->hdxAoProjectionMatrix
