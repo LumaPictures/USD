@@ -420,35 +420,56 @@ void HdxAmbientOcclusionTask::Execute(HdTaskContext* ctx)
 
     const auto screenSize = HdxUtils::GetScreenSize();
 
-    if (_drawTarget == nullptr) {
-        _drawTarget = GlfDrawTarget::New(screenSize
-                                       , false /* request MSAA */);
-        _drawTarget->Bind();
-        _drawTarget->AddAttachment("depth"
-                            , GL_DEPTH_COMPONENT
-                            , GL_FLOAT
-                            , GL_DEPTH_COMPONENT32F);
-        _drawTarget->AddAttachment("normal"
-                            , GL_RGBA
-                            , GL_FLOAT
-                            , GL_RGBA16F);
-        _drawTarget->DrawBuffers();
-    } else if (_drawTarget->GetSize() != screenSize) {
-        _drawTarget->SetSize(screenSize);
+    if (_sourceDrawTarget == nullptr) {
+        _sourceDrawTarget = GlfDrawTarget::New(screenSize, false);
+        _sourceDrawTarget->Bind();
+        _sourceDrawTarget->AddAttachment("depth"
+                                   , GL_DEPTH_COMPONENT
+                                   , GL_FLOAT
+                                   , GL_DEPTH_COMPONENT32F);
+        _sourceDrawTarget->AddAttachment("color"
+                                   , GL_RGBA
+                                   , GL_FLOAT
+                                   , GL_RGBA16F);
+        _sourceDrawTarget->AddAttachment("normal"
+                                   , GL_RGBA
+                                   , GL_FLOAT
+                                   , GL_RGBA16F);
+        _sourceDrawTarget->DrawBuffers();
+        _sourceDrawTarget->Unbind();
+    } else if (_sourceDrawTarget->GetSize() != screenSize) {
+        _sourceDrawTarget->SetSize(screenSize);
     }
 
-    auto framebuffer = _drawTarget->GetFramebufferId();
+    /* if (_blurDrawTarget == nullptr) {
+        _blurDrawTarget = GlfDrawTarget::New(screenSize, false);
+        _blurDrawTarget->AddAttachment("color"
+                                     , GL_RED
+                                     , GL_FLOAT
+                                     , GL_R16F);
+    } */
+
+    auto framebuffer = _sourceDrawTarget->GetFramebufferId();
 
     glBindFramebuffer(GL_READ_FRAMEBUFFER, drawFramebuffer);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer);
     // Normal is bound to the second slot. Luckily blit framebuffer only
     // blits the read buffer to the drawbuffer(s), so we don't have to keep
     // a color buffer around.
-    glReadBuffer(GL_COLOR_ATTACHMENT1);
+    glReadBuffer(GL_COLOR_ATTACHMENT0);
     glDrawBuffer(GL_COLOR_ATTACHMENT0);
     glBlitFramebuffer(0, 0, screenSize[0], screenSize[1],
                       0, 0, screenSize[0], screenSize[1],
-                      GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT, GL_NEAREST);
+                      GL_DEPTH_BUFFER_BIT
+                    | GL_COLOR_BUFFER_BIT
+                    | GL_STENCIL_BUFFER_BIT
+                    , GL_NEAREST);
+
+    glReadBuffer(GL_COLOR_ATTACHMENT1);
+    glDrawBuffer(GL_COLOR_ATTACHMENT1);
+    glBlitFramebuffer(0, 0, screenSize[0], screenSize[1],
+                      0, 0, screenSize[0], screenSize[1],
+                      GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
     glReadBuffer(GL_COLOR_ATTACHMENT0);
     glBindFramebuffer(GL_FRAMEBUFFER, drawFramebuffer);
@@ -458,8 +479,10 @@ void HdxAmbientOcclusionTask::Execute(HdTaskContext* ctx)
 
     auto* shader = static_cast<HdxAmbientOcclusionRenderPassShader*>(
         _renderPassShader.get());
-    shader->SetDepthTexture(_drawTarget->GetAttachment("depth")->GetGlTextureName());
-    shader->SetNormalTexture(_drawTarget->GetAttachment("normal")->GetGlTextureName());
+    shader->SetDepthTexture(
+        _sourceDrawTarget->GetAttachment("depth")->GetGlTextureName());
+    shader->SetNormalTexture(
+        _sourceDrawTarget->GetAttachment("normal")->GetGlTextureName());
 
     _renderPassState->Bind();
 
