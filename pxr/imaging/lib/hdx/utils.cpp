@@ -24,6 +24,7 @@
 //
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/glf/contextCaps.h"
+#include "pxr/imaging/glf/diagnostic.h"
 
 #include "pxr/imaging/hdx/utils.h"
 
@@ -97,6 +98,12 @@ GetScreenSize()
             int oldBinding;
             // This is either a multisampled or a normal texture 2d.
             glGetIntegerv(GL_TEXTURE_BINDING_2D, &oldBinding);
+            // Clear out any pending errors before attempting to bind to
+            // GL_TEXTURE_2D - that way, if it errors, we know it was this
+            // call, and we assume it's because it's actually a MULTISAMPLE
+            // texture - this is ugly, but we don't know of any better way
+            // to check this!
+            GLF_POST_PENDING_GL_ERRORS();
             glBindTexture(GL_TEXTURE_2D, attachId);
             if (glGetError() != GL_NO_ERROR) {
                 glBindTexture(GL_TEXTURE_2D, oldBinding);
