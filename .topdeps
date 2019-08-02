@@ -29,3 +29,4 @@ tg/simple_features/ambient_occlusion
 tg/bugfixes/sign_compare
 tg/bugfixes/katana_point_instancer_primvar_scope
 tg/simple_features/oit_maya_fix
+tg/bugfixes/multisample_texture_query_fix
