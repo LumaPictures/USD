@@ -29,8 +29,6 @@
 
 #include "pxr/base/gf/vec4i.h"
 
-#include <iostream>
-
 PXR_NAMESPACE_OPEN_SCOPE
 
 namespace HdxUtils {
