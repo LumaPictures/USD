@@ -1,0 +1,6 @@
+From: Paul Molodowitch <paulm@lumapictures.com>
+Subject: Fixing texture size query in case of multisampled textures.
+
+In the branch where directStateAccessEnabled is false, if you bind a
+multisampled texture to GL_TEXTURE_2D, querying the width and height
+will always return 1024 (the default)
