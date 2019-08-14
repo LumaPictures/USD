@@ -205,23 +205,6 @@ UsdGeomPointInstancer::CreateVelocitiesAttr(VtValue const &defaultValue, bool wr
 }
 
 UsdAttribute
-UsdGeomPointInstancer::GetAccelerationsAttr() const
-{
-    return GetPrim().GetAttribute(UsdGeomTokens->accelerations);
-}
-
-UsdAttribute
-UsdGeomPointInstancer::CreateAccelerationsAttr(VtValue const &defaultValue, bool writeSparsely) const
-{
-    return UsdSchemaBase::_CreateAttr(UsdGeomTokens->accelerations,
-                       SdfValueTypeNames->Vector3fArray,
-                       /* custom = */ false,
-                       SdfVariabilityVarying,
-                       defaultValue,
-                       writeSparsely);
-}
-
-UsdAttribute
 UsdGeomPointInstancer::GetAngularVelocitiesAttr() const
 {
     return GetPrim().GetAttribute(UsdGeomTokens->angularVelocities);
@@ -291,7 +274,6 @@ UsdGeomPointInstancer::GetSchemaAttributeNames(bool includeInherited)
         UsdGeomTokens->orientations,
         UsdGeomTokens->scales,
         UsdGeomTokens->velocities,
-        UsdGeomTokens->accelerations,
         UsdGeomTokens->angularVelocities,
         UsdGeomTokens->invisibleIds,
     };
@@ -821,64 +803,13 @@ UsdGeomPointInstancer::_GetVelocitiesForInstanceTransforms(
     return true;
 }
 
-// TODO: unify the two accessor functions.
 bool
-UsdGeomPointInstancer::_GetAccelerationsForInstanceTransforms(
-    UsdTimeCode baseTime,
-    size_t numInstances,
-    UsdTimeCode positionsSampleTime,
-    UsdTimeCode* accelerationsSampleTime,
-    VtVec3fArray* accelerations) const
-{
-    UsdTimeCode sampleTime;
-    bool hasSamples;
-    VtVec3fArray accelerationData;
-    double dummyLowerTimeValue;
-    double dummyUpperTimeValue;
-    if (!_GetAttrForInstanceTransforms<VtVec3fArray>(
-        GetAccelerationsAttr(),
-        baseTime,
-        &sampleTime,
-        &dummyLowerTimeValue,
-        &dummyUpperTimeValue,
-        &hasSamples,
-        &accelerationData)) {
-        return false;
-    }
-
-    if (!hasSamples || !GfIsClose(
-        sampleTime.GetValue(),
-        positionsSampleTime.GetValue(),
-        std::numeric_limits<double>::epsilon())) {
-        TF_WARN("%s -- acceleration samples are not aligned with "
-                "position samples",
-                GetPrim().GetPath().GetText());
-        return false;
-    }
-
-    if (accelerationData.size() != numInstances) {
-        TF_WARN("%s -- found [%zu] accelerations, but expected [%zu]",
-                GetPrim().GetPath().GetText(),
-                accelerationData.size(),
-                numInstances);
-        return false;
-    }
-
-    *accelerationsSampleTime = sampleTime;
-    *accelerations = accelerationData;
-    return true;
-}
-
-bool
-UsdGeomPointInstancer::
-    _GetPositionsAndVelocitiesAndAccelerationsForInstanceTransforms(
+UsdGeomPointInstancer::_GetPositionsAndVelocitiesForInstanceTransforms(
     UsdTimeCode baseTime,
     size_t numInstances,
     VtVec3fArray* positions,
     VtVec3fArray* velocities,
-    UsdTimeCode* velocitiesSampleTime,
-    VtVec3fArray* accelerations,
-    UsdTimeCode* accelerationsSampleTime) const
+    UsdTimeCode* velocitiesSampleTime) const
 {
     UsdTimeCode positionsSampleTime;
     double positionsLowerTimeValue;
@@ -904,15 +835,6 @@ UsdGeomPointInstancer::
             velocitiesSampleTime,
             velocities)) {
         velocities->clear();
-    }
-
-    if (!positionsHasSamples || !_GetAccelerationsForInstanceTransforms(
-        baseTime,
-        numInstances,
-        positionsSampleTime,
-        accelerationsSampleTime,
-        accelerations)) {
-        accelerations->clear();
     }
 
     return true;
@@ -1128,8 +1050,6 @@ UsdGeomPointInstancer::_ComputeInstanceTransformsAtTimePreamble(
     VtVec3fArray* positions,
     VtVec3fArray* velocities,
     UsdTimeCode* velocitiesSampleTime,
-    VtVec3fArray* accelerations,
-    UsdTimeCode* accelerationsSampleTime,
     VtVec3fArray* scales,
     VtQuathArray* orientations,
     VtVec3fArray* angularVelocities,
@@ -1155,14 +1075,12 @@ UsdGeomPointInstancer::_ComputeInstanceTransformsAtTimePreamble(
         return true;
     }
 
-    if (!_GetPositionsAndVelocitiesAndAccelerationsForInstanceTransforms(
+    if (!_GetPositionsAndVelocitiesForInstanceTransforms(
             baseTime,
             numInstances,
             positions,
             velocities,
-            velocitiesSampleTime,
-            accelerations,
-            accelerationsSampleTime)) {
+            velocitiesSampleTime)) {
         return false;
     }
 
@@ -1234,8 +1152,6 @@ UsdGeomPointInstancer::ComputeInstanceTransformsAtTime(
     VtVec3fArray positions;
     VtVec3fArray velocities;
     UsdTimeCode velocitiesSampleTime;
-    VtVec3fArray accelerations;
-    UsdTimeCode accelerationsSampleTime;
     VtVec3fArray scales;
     VtQuathArray orientations;
     VtVec3fArray angularVelocities;
@@ -1251,8 +1167,6 @@ UsdGeomPointInstancer::ComputeInstanceTransformsAtTime(
             &positions,
             &velocities,
             &velocitiesSampleTime,
-            &accelerations,
-            &accelerationsSampleTime,
             &scales,
             &orientations,
             &angularVelocities,
@@ -1307,8 +1221,6 @@ UsdGeomPointInstancer::ComputeInstanceTransformsAtTime(
         positions,
         velocities,
         velocitiesSampleTime,
-        accelerations,
-        accelerationsSampleTime,
         scales,
         orientations,
         angularVelocities,
@@ -1340,8 +1252,6 @@ UsdGeomPointInstancer::ComputeInstanceTransformsAtTimes(
     VtVec3fArray positions;
     VtVec3fArray velocities;
     UsdTimeCode velocitiesSampleTime;
-    VtVec3fArray accelerations;
-    UsdTimeCode accelerationsSampleTime;
     VtVec3fArray scales;
     VtQuathArray orientations;
     VtVec3fArray angularVelocities;
@@ -1357,8 +1267,6 @@ UsdGeomPointInstancer::ComputeInstanceTransformsAtTimes(
             &positions,
             &velocities,
             &velocitiesSampleTime,
-            &accelerations,
-            &accelerationsSampleTime,
             &scales,
             &orientations,
             &angularVelocities,
@@ -1380,9 +1288,7 @@ UsdGeomPointInstancer::ComputeInstanceTransformsAtTimes(
 
     std::vector<VtArray<GfMatrix4d>> xformsArrayData;
     xformsArrayData.resize(numSamples);
-    bool useInterpolated = velocities.empty() &&
-                           accelerations.empty() &&
-                           angularVelocities.empty();
+    bool useInterpolated = (velocities.empty() && angularVelocities.empty());
     for (size_t i = 0; i < numSamples; i++) {
 
         UsdTimeCode time = times[i];
@@ -1424,8 +1330,6 @@ UsdGeomPointInstancer::ComputeInstanceTransformsAtTimes(
                 positions,
                 velocities,
                 velocitiesSampleTime,
-                accelerations,
-                accelerationsSampleTime,
                 scales,
                 orientations,
                 angularVelocities,
@@ -1451,8 +1355,6 @@ UsdGeomPointInstancer::ComputeInstanceTransformsAtTime(
     const VtVec3fArray& positions,
     const VtVec3fArray& velocities,
     UsdTimeCode velocitiesSampleTime,
-    const VtVec3fArray& accelerations,
-    UsdTimeCode accelerationsSampleTime,
     const VtVec3fArray& scales,
     const VtQuathArray& orientations,
     const VtVec3fArray& angularVelocities,
@@ -1470,11 +1372,6 @@ UsdGeomPointInstancer::ComputeInstanceTransformsAtTime(
         velocityScale * static_cast<float>(
             (time.GetValue() - velocitiesSampleTime.GetValue())
             / timeCodesPerSecond);
-    const double accelerationTime =
-        time.GetValue() - accelerationsSampleTime.GetValue();
-    const float accelerationMultiplier =
-        velocityScale * static_cast<float>(
-            accelerationTime * accelerationTime / (2.0 * timeCodesPerSecond));
     const float angularVelocityMultiplier =
         velocityScale * static_cast<float>(
             (time.GetValue() - angularVelocitiesSampleTime.GetValue())
@@ -1498,11 +1395,10 @@ UsdGeomPointInstancer::ComputeInstanceTransformsAtTime(
         }
     }
 
-    const auto computeInstanceXforms = [&mask, &velocityMultiplier,
-        &accelerationMultiplier, &angularVelocityMultiplier, &scales,
-        &orientations, &positions, &velocities, &accelerations,
-        &angularVelocities, &identity, &protoXforms, &protoIndices, &protoPaths,
-        &xforms] (size_t start, size_t end) {
+    const auto computeInstanceXforms = [&mask, &velocityMultiplier, 
+        &angularVelocityMultiplier, &scales, &orientations, &positions, 
+        &velocities, &angularVelocities, &identity, &protoXforms, &protoIndices, 
+        &protoPaths, &xforms] (size_t start, size_t end) {
         for (size_t instanceId = start ; instanceId < end ; ++instanceId) {
             if (!mask.empty() && !mask[instanceId]) {
                 continue;
@@ -1529,10 +1425,6 @@ UsdGeomPointInstancer::ComputeInstanceTransformsAtTime(
             GfVec3f translation = positions[instanceId];
             if (velocities.size() != 0) {
                 translation += velocityMultiplier * velocities[instanceId];
-            }
-            if (accelerations.size() != 0) {
-                translation +=
-                    accelerationMultiplier * accelerations[instanceId];
             }
             instanceTransform.SetTranslation(translation);
 
