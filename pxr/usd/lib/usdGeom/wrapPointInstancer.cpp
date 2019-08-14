@@ -92,13 +92,6 @@ _CreateVelocitiesAttr(UsdGeomPointInstancer &self,
 }
         
 static UsdAttribute
-_CreateAccelerationsAttr(UsdGeomPointInstancer &self,
-                                      object defaultVal, bool writeSparsely) {
-    return self.CreateAccelerationsAttr(
-        UsdPythonToSdfType(defaultVal, SdfValueTypeNames->Vector3fArray), writeSparsely);
-}
-        
-static UsdAttribute
 _CreateAngularVelocitiesAttr(UsdGeomPointInstancer &self,
                                       object defaultVal, bool writeSparsely) {
     return self.CreateAngularVelocitiesAttr(
@@ -184,13 +177,6 @@ void wrapUsdGeomPointInstancer()
              &This::GetVelocitiesAttr)
         .def("CreateVelocitiesAttr",
              &_CreateVelocitiesAttr,
-             (arg("defaultValue")=object(),
-              arg("writeSparsely")=false))
-        
-        .def("GetAccelerationsAttr",
-             &This::GetAccelerationsAttr)
-        .def("CreateAccelerationsAttr",
-             &_CreateAccelerationsAttr,
              (arg("defaultValue")=object(),
               arg("writeSparsely")=false))
         
