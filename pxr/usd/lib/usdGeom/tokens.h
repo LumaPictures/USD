@@ -58,14 +58,10 @@ PXR_NAMESPACE_OPEN_SCOPE
 /// Use UsdGeomTokens like so:
 ///
 /// \code
-///     gprim.GetMyTokenValuedAttr().Set(UsdGeomTokens->accelerations);
+///     gprim.GetMyTokenValuedAttr().Set(UsdGeomTokens->all);
 /// \endcode
 struct UsdGeomTokensType {
     USDGEOM_API UsdGeomTokensType();
-    /// \brief "accelerations"
-    /// 
-    /// UsdGeomPointInstancer
-    const TfToken accelerations;
     /// \brief "all"
     /// 
     /// Possible value for UsdGeomMesh::GetFaceVaryingLinearInterpolationAttr()
