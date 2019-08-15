@@ -23,6 +23,7 @@
 //
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/glf/contextCaps.h"
+#include "pxr/imaging/glf/diagnostic.h"
 
 #include "pxr/imaging/hdx/oitResolveTask.h"
 #include "pxr/imaging/hdx/tokens.h"
@@ -121,7 +122,7 @@ _GetScreenSize()
 
     GlfContextCaps const &caps = GlfContextCaps::GetInstance();
 
-    if (ARCH_LIKELY(caps.directStateAccessEnabled)) {
+    if (ARCH_LIKELY(caps.directStateAccessEnabled) && glGetTextureLevelParameteriv) {
         if (attachType == GL_TEXTURE) {
             glGetTextureLevelParameteriv(attachId, 0, GL_TEXTURE_WIDTH, &s[0]);
             glGetTextureLevelParameteriv(attachId, 0, GL_TEXTURE_HEIGHT, &s[1]);
@@ -134,11 +135,31 @@ _GetScreenSize()
     } else {
         if (attachType == GL_TEXTURE) {
             int oldBinding;
+            // This is either a multisampled or a normal texture 2d.
             glGetIntegerv(GL_TEXTURE_BINDING_2D, &oldBinding);
+            // Clear out any pending errors before attempting to bind to
+            // GL_TEXTURE_2D - that way, if it errors, we know it was this
+            // call, and we assume it's because it's actually a MULTISAMPLE
+            // texture - this is ugly, but we don't know of any better way
+            // to check this!
+            GLF_POST_PENDING_GL_ERRORS();
             glBindTexture(GL_TEXTURE_2D, attachId);
-            glGetTexLevelParameteriv(GL_TEXTURE_2D,0, GL_TEXTURE_WIDTH, &s[0]);
-            glGetTexLevelParameteriv(GL_TEXTURE_2D,0, GL_TEXTURE_HEIGHT, &s[1]);
-            glBindTexture(GL_TEXTURE_2D, oldBinding);
+            if (glGetError() != GL_NO_ERROR) {
+                glBindTexture(GL_TEXTURE_2D, oldBinding);
+                glGetIntegerv(GL_TEXTURE_BINDING_2D_MULTISAMPLE, &oldBinding);
+                glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, attachId);
+                glGetTexLevelParameteriv(
+                    GL_TEXTURE_2D_MULTISAMPLE, 0, GL_TEXTURE_WIDTH, &s[0]);
+                glGetTexLevelParameteriv(
+                    GL_TEXTURE_2D_MULTISAMPLE, 0, GL_TEXTURE_HEIGHT, &s[1]);
+                glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, oldBinding);
+            } else {
+                glGetTexLevelParameteriv(
+                    GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &s[0]);
+                glGetTexLevelParameteriv(
+                    GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &s[1]);
+                glBindTexture(GL_TEXTURE_2D, oldBinding);
+            }
         } else if (attachType == GL_RENDERBUFFER) {
             int oldBinding;
             glGetIntegerv(GL_RENDERBUFFER_BINDING, &oldBinding);
