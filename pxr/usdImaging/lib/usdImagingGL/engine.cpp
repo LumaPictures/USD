@@ -929,7 +929,12 @@ UsdImagingGLEngine::SetRendererSetting(TfToken const& id, VtValue const& value)
     }
 
     TF_VERIFY(_renderIndex);
-    _renderIndex->GetRenderDelegate()->SetRenderSetting(id, value);
+    if (value.IsHolding<double>()) {
+        _renderIndex->GetRenderDelegate()->SetRenderSetting(
+            id, VtValue(static_cast<float>(value.UncheckedGet<double>())));
+    } else {
+        _renderIndex->GetRenderDelegate()->SetRenderSetting(id, value);
+    }
 }
 
 void 
@@ -1438,8 +1443,10 @@ UsdImagingGLEngine::_BindInternalDrawTarget(
         _drawTarget = GlfDrawTarget::New(drawTargetSize, requestMSAA);
         _drawTarget->Bind();
         _drawTarget->AddAttachment("color", GL_RGBA, GL_FLOAT, GL_RGBA16F);
+        _drawTarget->AddAttachment("normal", GL_RGBA, GL_FLOAT, GL_RGBA16F);
         _drawTarget->AddAttachment("depth", GL_DEPTH_COMPONENT, GL_FLOAT, 
                                    GL_DEPTH_COMPONENT32F);
+        _drawTarget->DrawBuffers();
     } else {
         _drawTarget->Bind();
 

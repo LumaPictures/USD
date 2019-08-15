@@ -1,5 +1,5 @@
 //
-// Copyright 2016 Pixar
+// Copyright 2019 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,29 +21,28 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef HDX_PACKAGE_H
-#define HDX_PACKAGE_H
+//
+#ifndef HDX_UTILS
+#define HDX_UTILS
 
 #include "pxr/pxr.h"
-#include "pxr/imaging/hdx/version.h"
-#include "pxr/base/tf/token.h"
+
+#include "pxr/imaging/hdx/api.h"
+
+#include "pxr/base/gf/vec2i.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+namespace HdxUtils
+{
 
-TfToken HdxPackageFullscreenShader();
-TfToken HdxPackageRenderPassShader();
-TfToken HdxPackageRenderPassIdShader();
-TfToken HdxPackageRenderPassPickingShader();
-TfToken HdxPackageRenderPassShadowShader();
-TfToken HdxPackageSimpleLightingShader();
-TfToken HdxPackageColorCorrectionShader();
-TfToken HdxPackageRenderPassOitShader();
-TfToken HdxPackageRenderPassOitOpaqueShader();
-TfToken HdxPackageOitResolveImageShader();
-TfToken HdxPackageAmbientOcclusionImageShader();
+/// Query the screen size from either the currently active framebuffer or
+/// using the OpenGL viewport size.
+HDX_API
+GfVec2i GetScreenSize();
 
+}
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif
+#endif // HDX_UTILS

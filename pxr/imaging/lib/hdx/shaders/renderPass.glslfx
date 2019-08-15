@@ -32,11 +32,13 @@
 -- glsl HdxRenderPass.RenderOitOpaquePixels
 
 layout (location = 0) out vec4 colorOut;
+layout (location = 1) out vec4 normalOut;
 
 void RenderOutput(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
 {
     if (color.a >= 1.0) {
         colorOut = vec4(color.rgb, 1);
+        normalOut = vec4(Neye, 1);
     } else {
         discard;
     }

@@ -56,7 +56,12 @@ PXR_NAMESPACE_OPEN_SCOPE
     (color)
 
 #define HDST_RENDER_SETTINGS_TOKENS             \
-    (enableTinyPrimCulling)
+    (enableTinyPrimCulling)                     \
+    (enableAo)                                  \
+    (aoNumSamples)                              \
+    (aoRadius)                                  \
+    (aoAmount)                                  \
+    (aoFilterRadius)
 
 #define HDST_MATERIAL_TAG_TOKENS                \
     (volume)

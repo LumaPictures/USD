@@ -58,6 +58,27 @@ PXR_NAMESPACE_OPEN_SCOPE
 TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_TINY_PRIM_CULLING, false,
                       "Enable tiny prim culling");
 
+TF_DEFINE_ENV_SETTING(HD_ENABLE_AMBIENT_OCCLUSION, false,
+           "Enables ambient occlusion by default.");
+
+TF_DEFINE_ENV_SETTING(HD_AMBIENT_OCCLUSION_NUM_SAMPLES, 256,
+                      "Number of ambient occlusion samples. Increase the value"
+                      "increases frame time, but improves ambient occlusion"
+                      "quality.");
+
+TF_DEFINE_ENV_SETTING(HD_AMBIENT_OCCLUSION_RADIUS, "64.0",
+                      "Radius of sampling for the Ambient Occlusion. Larger "
+                      "values takes more geometry per pixel into "
+                      "consideration.");
+
+TF_DEFINE_ENV_SETTING(HD_AMBIENT_OCCLUSION_AMOUNT, "1.0",
+                      "Amount of ambient occlusion applied to the color buffer,"
+                      " larger values mean darker image.");
+
+TF_DEFINE_ENV_SETTING(HD_AMBIENT_OCCLUSION_FILTER_RADIUS, "16.0",
+                      "Size for the ambient occlusion filter, larger values "
+                      "mean more blur, 0.0 turns off filtering.");
+
 TF_DEFINE_ENV_SETTING(HDST_ENABLE_EXPERIMENTAL_VOLUME_ELLIPSOID_STANDINS, false,
                       "Render constant density ellipsoid standins for "
                       "volume prims");
@@ -115,10 +136,37 @@ HdStRenderDelegate::_Initialize()
     }
 
     // Initialize the settings and settings descriptors.
-    _settingDescriptors.resize(1);
-    _settingDescriptors[0] = { "Enable Tiny Prim Culling",
+    _settingDescriptors.reserve(6);
+    _settingDescriptors.emplace_back("Enable Tiny Prim Culling",
         HdStRenderSettingsTokens->enableTinyPrimCulling,
-        VtValue(bool(TfGetEnvSetting(HD_ENABLE_GPU_TINY_PRIM_CULLING))) };
+        VtValue(bool(TfGetEnvSetting(HD_ENABLE_GPU_TINY_PRIM_CULLING))));
+    _settingDescriptors.emplace_back("Enable Ambient Occlusion",
+        HdStRenderSettingsTokens->enableAo,
+        VtValue(bool(TfGetEnvSetting(HD_ENABLE_AMBIENT_OCCLUSION))));
+    _settingDescriptors.emplace_back("Ambient Occlusion Number of Samples",
+        HdStRenderSettingsTokens->aoNumSamples,
+        VtValue(int(TfGetEnvSetting(HD_AMBIENT_OCCLUSION_NUM_SAMPLES))));
+    _settingDescriptors.emplace_back("Ambient Occlusion Radius",
+        HdStRenderSettingsTokens->aoRadius,
+        VtValue(static_cast<float>(
+                atof(TfGetEnvSetting(HD_AMBIENT_OCCLUSION_RADIUS).c_str())
+            )
+        )
+    );
+    _settingDescriptors.emplace_back("Ambient Occlusion Amount",
+        HdStRenderSettingsTokens->aoAmount,
+        VtValue(static_cast<float>(
+                atof(TfGetEnvSetting(HD_AMBIENT_OCCLUSION_AMOUNT).c_str())
+            )
+        )
+    );
+    _settingDescriptors.emplace_back("Ambient Occlusion Filter Radius",
+        HdStRenderSettingsTokens->aoFilterRadius,
+        VtValue(static_cast<float>(
+                atof(TfGetEnvSetting(HD_AMBIENT_OCCLUSION_FILTER_RADIUS).c_str())
+            )
+        )
+    );
     _PopulateDefaultSettings(_settingDescriptors);
 }
 
