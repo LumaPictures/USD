@@ -805,6 +805,15 @@ class "PointBased" (
         See also \\ref UsdGeom_VelocityInterpolation .""" 
     )
 
+    vector3f[] accelerations (
+        doc = """If provided, 'accelerations' should be used with
+        velocities to compute positions between samples for the 'points'
+        attribute rather than interpolating between neighboring 'points'
+        samples. Acceleration is measured in position units per second-squared.
+        To convert to position units per squared UsdTimeCode, divide by the
+        square of UsdStage::GetTimeCodesPerSecond()."""
+    )
+
     # shaping
     normal3f[] normals (
         doc = """Provide an object-space orientation for individual points, 
@@ -1820,12 +1829,12 @@ class PointInstancer "PointInstancer" (
   )
 
   vector3f[] accelerations (
-       doc = """If provided, per-instance 'acceleration' will be used to
-       compute positions between samples for the 'positions' attribute,
-       rather than interpolating between neighboring 'positions' samples.
-       Velocity is measured in position units per second, as per most
-       simulation software. To convert to position units per UsdTimeCode,
-       divide by UsdStage::GetTimeCodesPerSecond()."""
+        doc = """If authored, per-instance 'accelerations' will be used with
+        velocities to compute positions between samples for the 'positions'
+        attribute rather than interpolating between neighboring 'positions'
+        samples. Acceleration is measured in position units per second-squared.
+        To convert to position units per squared UsdTimeCode, divide by the
+        square of UsdStage::GetTimeCodesPerSecond()."""
   )
 
   vector3f[] angularVelocities (
