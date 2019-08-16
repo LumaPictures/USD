@@ -322,7 +322,7 @@ PxrUsdKatanaReadPointInstancer(
     }
 
     //
-    // Build sources. Keep track of which instances use them.
+    // Build sources (prototypes). Keep track of which instances use them.
     //
 
     FnGeolibServices::StaticSceneCreateOpArgsBuilder sourcesBldr(false);
