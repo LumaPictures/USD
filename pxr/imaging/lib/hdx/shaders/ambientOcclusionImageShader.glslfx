@@ -1,0 +1,98 @@
+-- glslfx version 0.1
+
+//
+// Copyright 2019 Pixar
+//
+// Licensed under the Apache License, Version 2.0 (the "Apache License")
+// with the following modification; you may not use this file except in
+// compliance with the Apache License and the following modification to it:
+// Section 6. Trademarks. is deleted and replaced with:
+//
+// 6. Trademarks. This License does not grant permission to use the trade
+//    names, trademarks, service marks, or product names of the Licensor
+//    and its affiliates, except as required to comply with Section 4(c) of
+//    the License and to reproduce the content of the NOTICE file.
+//
+// You may obtain a copy of the Apache License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the Apache License with the above modification is
+// distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied. See the Apache License for the specific
+// language governing permissions and limitations under the Apache License.
+//
+
+-- configuration
+{
+    "techniques": {
+        "default": {
+            "fragmentShader": {
+                "source": [ "AmbientOcclusion.SSAO" ]
+            }
+        }
+    }
+}
+
+-- glsl AmbientOcclusion.SSAO
+
+layout(binding = 0) uniform sampler2D depthTexture;
+layout(binding = 1) uniform sampler2D normalTexture;
+
+#define M_PI 3.1415926535897932384626433832795
+
+// https://stackoverflow.com/questions/32227283/getting-world-position-from-depth-buffer-value
+vec3 getViewSpace(float depth, vec2 uv)
+{
+    vec4 clipSpace = vec4(uv * 2.0 - 1.0, depth, 1.0);
+    vec4 viewSpace = HdGet_hdxAoProjectionMatrixInv() * clipSpace;
+    return viewSpace.xyz / viewSpace.w;
+}
+
+// https://stackoverflow.com/questions/5149544/can-i-generate-a-random-number-inside-a-pixel-shader
+// Author: Michael Pohoreski
+// Copyright: Copyleft 2012 :-)
+float someRandom(vec2 p)
+{
+  const vec2 r = vec2(23.1406926327792690, 2.6651441426902251);
+  return fract(cos(mod(123456789., 1e-7 + 256. * dot(p,r))));
+}
+
+float getAmbientOcclusionFactor(float depth, vec3 normal, vec2 uv) {
+    vec3 screenPos = getViewSpace(depth, uv);
+    float ao = 0.0;
+    int numSamples = HdGet_hdxAoNumSamples();
+    float radius = HdGet_hdxAoRadius();
+    float randomValue = someRandom(uv) * M_PI * 2.0;
+    vec3 dx = vec3(sin(randomValue), cos(randomValue), 0.0);
+    vec3 dy = normalize(cross(dx, normal));
+    dx = normalize(cross(dy, normal));
+    for (int i = 0; i < numSamples; i += 1) {
+        vec3 sampleDirection = vec3(hdxAoKernel[i].x, hdxAoKernel[i].y, hdxAoKernel[i].z) * radius;
+        vec3 samplePos = screenPos + sampleDirection.x * dx + sampleDirection.y * dy + sampleDirection.z * normal;
+        vec4 projectedSample = HdGet_hdxAoProjectionMatrix() * vec4(samplePos, 1.0);
+        vec2 sampleUv = (projectedSample.xy / projectedSample.w) * 0.5 + 0.5;
+        float sampleDepth = texture2D(depthTexture, sampleUv).x;
+        vec3 realPos = getViewSpace(sampleDepth, sampleUv);
+        if (((samplePos.z + radius * 0.05) < realPos.z) && ((realPos.z - samplePos.z) < radius)) {
+            ao += 1.0;
+        }
+    }
+    return pow(ao / float(numSamples), 1.0 / HdGet_hdxAoAmount());
+}
+
+vec4 imageShader(vec2 uv)
+{
+    vec4 normalData = texture2D(normalTexture, uv);
+    float depth = texture2D(depthTexture, uv).x;
+    if (depth > 0.9999 || normalData.w < 0.0001) {
+        return vec4(0, 0, 0, 0);
+    } else {
+        if (HdGet_hdxAoEnableDebug() == 1) {
+            return vec4((1.0 - getAmbientOcclusionFactor(depth, normalData.xyz, uv)).xxx, 1.0);
+        } else {
+            return vec4(0.0, 0.0, 0.0, getAmbientOcclusionFactor(depth, normalData.xyz, uv));
+        }
+    }
+}

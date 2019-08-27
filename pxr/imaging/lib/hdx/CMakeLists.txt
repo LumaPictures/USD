@@ -35,6 +35,7 @@ pxr_library(hdx
         ${optionalIncludeDirs}
 
     PUBLIC_CLASSES
+        ambientOcclusionTask
         colorizeTask
         colorizeSelectionTask
         colorCorrectionTask
@@ -62,6 +63,7 @@ pxr_library(hdx
         taskController
         tokens
         types
+        utils
 
     PUBLIC_HEADERS
         shadowMatrixComputation.h
@@ -78,6 +80,7 @@ pxr_library(hdx
 
     RESOURCE_FILES
         plugInfo.json
+        shaders/ambientOcclusionImageShader.glslfx
         shaders/colorCorrection.glslfx
         shaders/fullscreen.glslfx
         shaders/renderPass.glslfx

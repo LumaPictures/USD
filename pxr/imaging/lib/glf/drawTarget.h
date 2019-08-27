@@ -76,6 +76,10 @@ public:
     static GlfDrawTargetRefPtr New( GfVec2i const & size, 
                                     bool requestMSAA = false );
 
+    GLF_API
+    static GlfDrawTargetRefPtr NewWithSamples(GfVec2i const & size, 
+                                              unsigned int numSamples = 1);
+
     /// Returns a new instance.
     /// GL framebuffers cannot be shared across contexts, but texture
     /// attachments can. In order to reflect this, GlfDrawTargets hold
@@ -131,6 +135,10 @@ public:
         GLF_API
         void TouchContents();
 
+        // Returns to if attachment is bound to any of the color slots.
+        GLF_API
+        bool IsColorAttachment() const;
+
     private:
         Attachment(int glIndex, GLenum format, GLenum type,
                    GLenum internalFormat, GfVec2i size, 
@@ -162,6 +170,10 @@ public:
     void AddAttachment( std::string const & name, 
                         GLenum format, GLenum type, GLenum internalFormat );
 
+    /// Sets up draw buffers for the framebuffer after attachments are added.
+    GLF_API
+    void DrawBuffers();
+
     /// Removes the named attachment from the DrawTarget.
     GLF_API
     void DeleteAttachment( std::string const & name );
@@ -181,6 +193,10 @@ public:
     /// Returns the attachment with a given name or TfNullPtr;
     GLF_API
     AttachmentRefPtr GetAttachment(std::string const & name);
+
+    /// Returns the number of color attachments.
+    GLF_API
+    int GetNumberOfColorAttachments() const;
     
     /// Write the Attachment buffer to an image file (debugging).
     GLF_API
@@ -198,6 +214,9 @@ public:
 
     /// Returns if the draw target uses msaa
     bool HasMSAA() const { return (_numSamples > 1); }
+
+    /// Returns the number of samples for MSAAA.
+    unsigned int GetNumSamples() const { return _numSamples; };
 
     /// Returns the framebuffer object Id.
     GLF_API
@@ -253,6 +272,9 @@ protected:
 
     GLF_API
     GlfDrawTarget( GfVec2i const & size, bool requestMSAA );
+
+    GLF_API
+    GlfDrawTarget(const GfVec2i& size, unsigned int numSamples);
 
     GLF_API
     GlfDrawTarget( GlfDrawTargetPtr const & drawtarget );
