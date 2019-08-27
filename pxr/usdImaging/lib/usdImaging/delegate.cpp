@@ -41,6 +41,7 @@
 #include "pxr/imaging/hd/camera.h"
 #include "pxr/imaging/hd/enums.h"
 #include "pxr/imaging/hd/extComputation.h"
+#include "pxr/imaging/hd/light.h"
 #include "pxr/imaging/hd/material.h"
 #include "pxr/imaging/hd/mesh.h"
 #include "pxr/imaging/hd/meshTopology.h"
@@ -88,9 +89,10 @@ PXR_NAMESPACE_OPEN_SCOPE
 TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
     (instance)
-    (texturePath)
     (Material)
     (HydraPbsSurface)
+    (DomeLight)
+    (PreviewDomeLight)
 );
 
 // This environment variable matches a set of similar ones in
@@ -252,6 +254,10 @@ UsdImagingDelegate::_AdapterLookup(UsdPrim const& prim, bool ignoreInstancing)
         if (bindingPurpose == HdTokens->preview &&
             adapterKey == _tokens->Material) {
             adapterKey = _tokens->HydraPbsSurface;
+        } 
+        if (bindingPurpose == HdTokens->preview &&
+            adapterKey == _tokens->DomeLight) {
+            adapterKey = _tokens->PreviewDomeLight;
         }
     }
 
@@ -614,8 +620,9 @@ UsdImagingDelegate::_Populate(UsdImagingIndexProxy* proxy)
 
     SdfPathVector const& usdPathsToRepopulate =
         proxy->_GetUsdPathsToRepopulate();
-    if (usdPathsToRepopulate.empty())
+    if (usdPathsToRepopulate.empty()) {
         return;
+    }
 
     // Force initialization of SchemaRegistry (doing this in parallel causes all
     // threads to block).
@@ -1115,8 +1122,9 @@ UsdImagingDelegate::_ResyncUsdPrim(SdfPath const& usdPath,
             UsdPrimRange range(prim);
 
             for (auto iter = range.begin(); iter != range.end(); ++iter) {
-                if (prunedByParent)
+                if (prunedByParent) {
                     break;
+                }
 
                 const UsdPrim &usdPrim = *iter;
                 _HdPrimInfo *primInfo = _GetHdPrimInfo(usdPrim.GetPath());
@@ -1344,12 +1352,35 @@ UsdImagingDelegate::_RefreshUsdObject(SdfPath const& usdPath,
             //
             // XXX(UsdImagingPaths): We need to use a cachePath here,
             // not a usdPrimPath.
-            if (!_GetHdPrimInfo(usdPrimPath)) {
-                return;
+            if (_GetHdPrimInfo(usdPrimPath)) {
+                // XXX(UsdImagingPaths): We need to use a cachePath here,
+                // not a usdPrimPath.
+                affectedCachePaths.push_back(usdPrimPath);
+            } else {
+                // Since we are not populating UsdShadeShader nodes, just the
+                // UsdShadeMaterial nodes, we need to walk the usd hierarchy to 
+                // find the closest UsdShadeMaterial node and communicate that a
+                // prim has changed.
+                UsdPrim prim = _stage->GetPrimAtPath(usdPrimPath);
+                if (!prim.IsA<UsdShadeShader>()) {
+                    return;
+                } else {
+                    while (prim && !prim.IsA<UsdShadeMaterial>()) {
+                        prim = prim.GetParent();
+                    }
+
+                    // If this if check succeeds, it means that the material
+                    // is being used in UsdImaging since it was correctly
+                    // populated from GprimAdapter::_AddRprim.
+                    if (prim && _GetHdPrimInfo(prim.GetPath())) {
+                        TF_DEBUG(USDIMAGING_CHANGES).Msg("[Refresh Object]: "
+                            "HdMaterialNetwork %s affected by %s\n", 
+                            prim.GetPath().GetText(), 
+                            usdPath.GetText());
+                        affectedCachePaths.push_back(prim.GetPath());
+                    }
+                }
             }
-            // XXX(UsdImagingPaths): We need to use a cachePath here,
-            // not a usdPrimPath.
-            affectedCachePaths.push_back(usdPrimPath);
         }
     }
 
@@ -2825,7 +2856,7 @@ UsdImagingDelegate::GetLightParamValue(SdfPath const &id,
 {
     // PERFORMANCE: We should schedule this to be updated during Sync, rather
     // than pulling values on demand.
- 
+
     if (!TF_VERIFY(id != SdfPath())) {
         return VtValue();
     }
@@ -2846,16 +2877,27 @@ UsdImagingDelegate::GetLightParamValue(SdfPath const &id,
         return VtValue();
     }
 
-    // Special handling of non-attribute parameters
-    if (paramName == _tokens->texturePath) {
+    // Special handling of non-attribute parameters and textureResources
+    if (paramName == HdLightTokens->textureResource) {
         // This can be moved to a separate function as we add support for 
         // other light types that use textures in multiple ways
-        UsdLuxDomeLight domeLight(prim);
-        SdfAssetPath asset; 
-        if (!domeLight.GetTextureFileAttr().Get(&asset)) {
-            return VtValue();
-        }
-        return VtValue(asset.GetResolvedPath());
+        
+        // if we were able to get the texture file attribute from the prim
+        if (UsdAttribute textureFileAttr = prim.GetAttribute(
+                                                HdLightTokens->textureFile)) {
+
+            _HdPrimInfo *primInfo = _GetHdPrimInfo(cachePath);
+            if (TF_VERIFY(primInfo)) {
+                SdfPath textureFilePath = ConvertIndexPathToCachePath(
+                                                textureFileAttr.GetPath());
+
+                // return the laoded texture
+                return VtValue(primInfo->adapter->GetTextureResource(
+                                                primInfo->usdPrim, 
+                                                textureFilePath, _time));
+            }
+        } 
+        return VtValue();
     } else if (paramName == HdTokens->lightLink) {
         UsdCollectionAPI lightLink = light.GetLightLinkCollectionAPI();
         return VtValue(_collectionCache.GetIdForCollection(lightLink));
@@ -2865,7 +2907,7 @@ UsdImagingDelegate::GetLightParamValue(SdfPath const &id,
     }
 
     // Fallback to USD attributes.
-    return _GetUsdPrimAttribute(id, paramName);
+    return _GetUsdPrimAttribute(cachePath, paramName);
 }
 
 VtValue 
@@ -2896,7 +2938,7 @@ UsdImagingDelegate::GetCameraParamValue(SdfPath const &id,
         _UpdateSingleValue(cachePath, dirtyBit);
          if (!_valueCache.ExtractCameraParam(cachePath, paramName, &value)) {
             // Fallback to USD attributes.
-            value = _GetUsdPrimAttribute(id, paramName);
+            value = _GetUsdPrimAttribute(cachePath, paramName);
         }
     }
     return value;
