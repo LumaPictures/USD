@@ -4,6 +4,11 @@
             "Info": {
                 "ShaderResources": "shaders",
                 "Types": {
+                    "UsdImagingGLDomeLightAdapter" : {
+                        "bases": ["UsdImagingDomeLightAdapter"],
+                        "isInternal": true,
+                        "primTypeName": "PreviewDomeLight"
+                    },
                     "UsdImagingGLDrawModeAdapter" : {
                         "bases": ["UsdImagingPrimAdapter"],
                         "isInternal": true,
