@@ -1464,8 +1464,7 @@ setKind( const string &path, UsdStagePtr stage )
     if( model && !model.GetKind( &kind )) {
 
         bool hasModelChildren = false;
-        BOOST_FOREACH( UsdPrim child, p.GetChildren()) {
-
+        for( const auto& child : p.GetChildren() ) {
             TfToken childKind;
             UsdModelAPI( child ).GetKind( &childKind );
             if( KindRegistry::IsA( childKind, KindTokens->model )) {
