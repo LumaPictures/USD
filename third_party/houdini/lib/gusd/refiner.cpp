@@ -489,27 +489,33 @@ GusdRefiner::addPrimitive( const GT_PrimitiveHandle& gtPrimIn )
         }
     }
 
-    if( (primType != GT_GEO_PACKED || !refinePackedPrims) && 
-                            GusdPrimWrapper::isGTPrimSupported(gtPrim) ) {
+    if (primType != GT_GEO_PACKED || !refinePackedPrims) {
+        if (primType == GT_PRIM_VDB_VOLUME) {
+            m_collector.addVDB(gtPrim);
+        }
+        else if (GusdPrimWrapper::isGTPrimSupported(gtPrim)) {
+            UT_Matrix4D m;
+            if( primType == GT_GEO_PACKED ) {
+                // packed fragment
+                UTverify_cast<const GT_GEOPrimPacked*>(gtPrim.get())->getFullTransform()->getMatrix(m);
+            }
+            else {
+                gtPrim->getPrimitiveTransform()->getMatrix(m);
+            }
 
-        UT_Matrix4D m;
-        if( primType == GT_GEO_PACKED ) {
-            // packed fragment
-            UTverify_cast<const GT_GEOPrimPacked*>(gtPrim.get())->getFullTransform()->getMatrix(m);
+            UT_Matrix4D newCtm = m_localToWorldXform;
+            newCtm = m* m_localToWorldXform;
+
+            m_collector.add( SdfPath(primPath),
+                             addNumericSuffix,
+                             gtPrim,
+                             newCtm,
+                             purpose,
+                             m_writeCtrlFlags );
         }
         else {
-            gtPrim->getPrimitiveTransform()->getMatrix(m);
+            gtPrim->refine( *this, &m_refineParms );
         }
-
-        UT_Matrix4D newCtm = m_localToWorldXform;
-        newCtm = m* m_localToWorldXform;
-
-        m_collector.add( SdfPath(primPath),
-                         addNumericSuffix,
-                         gtPrim,
-                         newCtm,
-                         purpose,
-                         m_writeCtrlFlags );
     }
     else {
         gtPrim->refine( *this, &m_refineParms );
@@ -565,6 +571,11 @@ GusdRefinerCollector::add(
 
     m_gprims.push_back(GprimArrayEntry(newPath,prim,xform,purpose,writeCtrlFlags));
     return newPath;
+}
+
+void
+GusdRefinerCollector::addVDB(GT_PrimitiveHandle prim) {
+    m_vdbs.push_back(prim);
 }
 
 void
