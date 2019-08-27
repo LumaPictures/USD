@@ -1823,9 +1823,9 @@ private:
                                  size_t numAssetPaths,
                                  bool anchorAssetPathsOnly = false) const;
 
-    void _MakeResolvedAssetPaths(UsdTimeCode time, const UsdAttribute &attr,
-                                 VtValue *value,
-                                 bool anchorAssetPathsOnly = false) const;
+    void _MakeResolvedAssetPathsValue(UsdTimeCode time, const UsdAttribute &attr,
+                                      VtValue *value,
+                                      bool anchorAssetPathsOnly = false) const;
 
     // --------------------------------------------------------------------- //
     // Metadata Resolution
@@ -2106,6 +2106,8 @@ private:
     friend class Usd_PcpCacheAccess;
     friend class Usd_PrimData;
     friend class Usd_StageOpenRequest;
+    template <class T> friend struct Usd_AttrGetValueHelper;
+    friend struct Usd_AttrGetUntypedValueHelper;
     template <class RefsOrPayloadsEditorType, class RefsOrPayloadsProxyType> 
         friend struct Usd_ListEditImpl;
 };
