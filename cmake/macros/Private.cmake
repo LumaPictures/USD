@@ -1157,6 +1157,7 @@ function(_pxr_library NAME)
     #
 
     # Where do we install to?
+    _get_install_dir("include" headerInstallDir)
     _get_install_dir("include/${PXR_PREFIX}/${NAME}" headerInstallPrefix)
     _get_install_dir("lib" libInstallPrefix)
     if(isPlugin)
@@ -1281,6 +1282,8 @@ function(_pxr_library NAME)
             "${CMAKE_BINARY_DIR}/${PXR_INSTALL_SUBDIR}/include"
         PUBLIC
             ${args_INCLUDE_DIRS}
+        INTERFACE
+            $<INSTALL_INTERFACE:${headerInstallDir}>
     )
 
     # XXX -- May want some plugins to be baked into monolithic.
