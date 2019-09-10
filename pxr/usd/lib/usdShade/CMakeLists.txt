@@ -105,10 +105,10 @@ pxr_install_test_dir(
     DEST testUsdShadeMaterialSpecializesBaseComposition
 )
 
-# pxr_install_test_dir(
-#     SRC testenv/testUsdShadeShaderDef
-#     DEST testUsdShadeShaderDef
-# )
+#pxr_install_test_dir(
+#    SRC testenv/testUsdShadeShaderDef
+#    DEST testUsdShadeShaderDef
+#)
 
 # pxr_register_test(testUsdShadeBinding
 #     PYTHON
@@ -154,11 +154,11 @@ pxr_register_test(testUsdShadeShaders
     EXPECTED_RETURN_CODE 0
 )
 
-pxr_register_test(testUsdShadeShaderDef
-    PYTHON
-    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdShadeShaderDef"
-    EXPECTED_RETURN_CODE 0
-)
+#pxr_register_test(testUsdShadeShaderDef
+#    PYTHON
+#    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdShadeShaderDef"
+#    EXPECTED_RETURN_CODE 0
+#)
 
 pxr_register_test(testUsdShadeNodeGraphs
     PYTHON
